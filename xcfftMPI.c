@@ -4,7 +4,7 @@
 #include <math.h>
 #include <limits.h>
 #include <mpi.h>
-#include "dales_xcfftMPI.h"
+#include "xcloc_xcfftMPI.h"
 #include <ipps.h>
 
 #define PADDING   DALES_MEM_PADDING 
@@ -181,9 +181,11 @@ PARTITION_ERROR:;
     {
         fprintf(stderr, "%s: Lost count of tfSignals\n", __func__);
     }
+    xcfftMPI->precision = XCLOC_SINGLE_PRECISION;
     xcfftMPI->sigFwd.lxc = nptsPad*2 - 1;    // Length of cross-correlations
     xcfftMPI->sigFwd.nsignals = nsignalsLoc; // Number of signals to transform
     xcfftMPI->sigFwd.npts = npts;            // Number of samples in input signal
+    xcfftMPI->lxc = xcfftMPI->sigFwd.lxc;
     // Number of FFT samples
     xcfftMPI->sigFwd.ntfPts = xcfftMPI->sigFwd.lxc/2 + 1;
     xcfftMPI->sigFwd.ntfSignals = ntfSignalsLoc; // Number of inverse transforms
@@ -254,6 +256,7 @@ PARTITION_ERROR:;
         fprintf(stdout, "%s: Making descriptors...\n", __func__);
     }
     ierr = dales_xcfft_makeDftiDescriptors(&xcfftMPI->sigFwd);
+    ierr = xcloc_xcfft_makeFFTWDescriptors(&xcfftMPI->sigFwd);
     MPI_Allreduce(&ierr, &ierrAll, 1, MPI_INT, MPI_SUM, comm);
     if (ierr != 0)
     {
@@ -264,18 +267,19 @@ PARTITION_ERROR:;
     MPI_Allreduce(&ierr, &ierrAll, 1, MPI_INT, MPI_SUM, comm);
     if (ierrAll != 0){return -1;}
     ierr = dales_xcfft_makeDftiDescriptors(&xcfftMPI->xcInv);
+    ierr = xcloc_xcfft_makeFFTWDescriptors(&xcfftMPI->xcInv);
     if (ierr != 0)
-    {   
+    {
         fprintf(stderr, "%s: Error making inverse descriptor on %d\n",
                 __func__, myid);
         return -1;
-    }   
+    }
     MPI_Allreduce(&ierr, &ierrAll, 1, MPI_INT, MPI_SUM, comm);
     if (ierrAll != 0){return -1;}
 
-printf("%d %d %d %d %d\n",  myid,
-       xcfftMPI->xcInv.ntfSignals, xcfftMPI->xcInv.nsignals,
-       xcfftMPI->xcInv.npts, xcfftMPI->xcInv.lxc);
+    //printf("%d %d %d %d %d\n",  myid,
+    //       xcfftMPI->xcInv.ntfSignals, xcfftMPI->xcInv.nsignals,
+    //       xcfftMPI->xcInv.npts, xcfftMPI->xcInv.lxc);
     // Make a global table describing who owns the transform pairs and the pairs
     xcfftMPI->xcrPairs = (int *)
                          calloc((size_t) (3*xcfftMPI->ntfSignals), sizeof(int));
@@ -310,28 +314,56 @@ printf("%d %d %d %d %d\n",  myid,
  * @copyright Ben Baker distributed under Apache 2.
  *
  */
-int dales_xcfftMPI_getForwardTransforms(struct xcfftMPI_struct *xcfftMPI)
+int xcloc_xcfftMPI_getForwardTransforms(struct xcfftMPI_struct *xcfftMPI)
 {
-    float complex *fts = NULL;
     MPI_Aint targetDisp;
+    Ipp64fc *pSrc64, *pDst64;
+    Ipp32fc *pSrc32, *pDst32;
     int ftOffset, is, originCount, targetCount, targetRank;
     ftOffset = xcfftMPI->sigFwd.ftOffset;
     originCount = xcfftMPI->sigFwd.ntfPts;
     targetCount = xcfftMPI->sigFwd.ntfPts;
     //fts = (float complex *) calloc((xcfftMPI->ngetFwdSignals*ftOffset), sizeof(float complex));
-    fts = xcfftMPI->xcInv.fts;
     MPI_Win_fence(MPI_MODE_NOPRECEDE, xcfftMPI->tfWindow);
     for (is=0; is<xcfftMPI->ngetFwdSignals; is++)
     {
         targetRank = xcfftMPI->getFwdTarget[is];
         targetDisp = (MPI_Aint) (xcfftMPI->getFwdOffset[is]*ftOffset);
-        MPI_Get(&fts[is*ftOffset], originCount, MPI_C_COMPLEX,
-                targetRank, targetDisp,
-                targetCount, MPI_C_COMPLEX, xcfftMPI->tfWindow);
+//printf("%d %d %d %d %d\n", is, ftOffset, originCount, targetRank, targetDisp);
+        if (xcfftMPI->precision == XCLOC_SINGLE_PRECISION)
+        {
+            // Have the owner get its own data to lower contention
+            if (targetRank == xcfftMPI->rank)
+            {
+                pSrc32 = (Ipp32fc *) &xcfftMPI->sigFwd.fts[targetDisp]; 
+                pDst32 = (Ipp32fc *) &xcfftMPI->xcInv.fts[is*ftOffset];
+                ippsCopy_32fc(pSrc32, pDst32, targetCount);
+            }
+            else
+            {
+                MPI_Get(&xcfftMPI->xcInv.fts[is*ftOffset], originCount,
+                        MPI_C_COMPLEX, targetRank, targetDisp,
+                        targetCount, MPI_C_COMPLEX, xcfftMPI->tfWindow);
+            }
+        }
+        else 
+        {
+            if (targetRank == xcfftMPI->rank)
+            {
+                pSrc64 = (Ipp64fc *) &xcfftMPI->sigFwd.fts[targetDisp];
+                pDst64 = (Ipp64fc *) &xcfftMPI->xcInv.fts[is*ftOffset];
+                ippsCopy_64fc(pSrc64, pDst64, targetCount);
+            }
+            else
+            {
+                MPI_Get(&xcfftMPI->xcInv.fts[is*ftOffset], originCount,
+                        MPI_C_DOUBLE_COMPLEX, targetRank, targetDisp,
+                        targetCount, MPI_C_DOUBLE_COMPLEX, xcfftMPI->tfWindow);
+            }
+        }
     }
     MPI_Win_fence(MPI_MODE_NOSTORE + MPI_MODE_NOPUT + MPI_MODE_NOSUCCEED,
                   xcfftMPI->tfWindow);
-    fts = NULL;
     return 0;
 }
 //============================================================================//
@@ -560,15 +592,14 @@ int xcloc_xcfftMPI_gatherXCs(const int root, const int ntfSignals,
     void *xloc = NULL;
     int *displs = NULL;
     int *recvCounts = NULL;
-    int i, ierr, ldxcUse, lxcUse, ntfSignalsLoc, sendCount;
+    int i, ierr, ierrAll, ldxcUse, lxcUse, ntfSignalsLoc, sendCount;
     size_t nbytes;
     // Verify the root makes sense
     ierr = 0;
     if (recvType != MPI_DOUBLE && recvType != MPI_FLOAT)
     {
         fprintf(stderr, "%s: Can't gather this datatype\n", __func__);
-        ierr = 1;
-        goto BCAST_ERROR;
+        return -1;
     }
     if (root < 0 || root > xcfftMPI.nprocs - 1)
     {
@@ -577,22 +608,26 @@ int xcloc_xcfftMPI_gatherXCs(const int root, const int ntfSignals,
             fprintf(stderr, "%s: Error root=%d not on communicator\n",
                     __func__, root);
         }
-        ierr = 1;
-        goto BCAST_ERROR;
+        return -1;
     }
     if (root == xcfftMPI.rank)
-    {   
+    {
         if (ntfSignals != xcfftMPI.ntfSignals)
         {
             fprintf(stderr,
-                    "%s: ntfsignals=%d != xcfftMPI.ntfsignals=%d on rank %d\n",
-                    __func__, xcfftMPI.rank, ntfSignals, xcfftMPI.ntfSignals);
+                    "%s: ntfSignals=%d != xcfftMPI.ntfSignals=%d on rank %d\n",
+                    __func__, ntfSignals, xcfftMPI.ntfSignals, xcfftMPI.rank);
+            ierr = 1;
+        }
+        if (lxc != xcfftMPI.lxc)
+        {
+            fprintf(stderr, "%s: lxc=%d != xcfftMPI.lxc=%d on rank %d\n",
+                    __func__, lxc, xcfftMPI.lxc, xcfftMPI.rank);
             ierr = 1;
         }
         ldxcUse = ldxc;
         lxcUse = lxc;
     }   
-BCAST_ERROR:;
     MPI_Bcast(&ierr, 1, MPI_INT, root, xcfftMPI.comm);
     // Make sure the targets know what they're sending w.r.t. sizes
     MPI_Bcast(&ldxcUse, 1, MPI_INT, root, xcfftMPI.comm);
@@ -623,35 +658,41 @@ BCAST_ERROR:;
         }
     }
     // Put the cross-correlations onto my local workspace
+    ierr = 0;
     if (xcfftMPI.nsignalsLoc > 0)
     {
         if (recvType == MPI_DOUBLE)
         {
             ierr = xcloc_xcfft_getAllXCData(xcfftMPI.ntfSignalsLoc, ldxcUse,
-                                            XCLOC_DOUBLE_PRECISION, lxcUse,
+                                            lxcUse, XCLOC_DOUBLE_PRECISION,
                                             xcfftMPI.xcInv, xloc);
         }
         else
         {
             ierr = xcloc_xcfft_getAllXCData(xcfftMPI.ntfSignalsLoc, ldxcUse,
-                                            XCLOC_SINGLE_PRECISION, lxcUse,
+                                            lxcUse, XCLOC_SINGLE_PRECISION,
                                             xcfftMPI.xcInv, xloc);
         }
         if (ierr != 0)
         {
             fprintf(stderr, "%s: Error setting data on process %d\n",
                      __func__, xcfftMPI.rank);
+            ierr = 1;
         }
     }
     // Gather the data
-    MPI_Gatherv(xloc, sendCount, recvType,
-                x, recvCounts, displs,
-                recvType, root, xcfftMPI.comm);
+    MPI_Allreduce(&ierr, &ierrAll, 1, MPI_INT, MPI_SUM, xcfftMPI.comm);
+    if (ierrAll == 0)
+    {
+        MPI_Gatherv(xloc, sendCount, recvType,
+                    x, recvCounts, displs,
+                    recvType, root, xcfftMPI.comm);
+    }
     // Free workspace
     if (xloc != NULL){free(xloc);}
     if (recvCounts != NULL){free(recvCounts);}
     if (displs != NULL){free(displs);}
-    return 0;
+    return ierrAll;
 }
 //============================================================================//
 /*!
@@ -697,8 +738,7 @@ int xcloc_xcfftMPI_scatterData(
     if (sendType != MPI_DOUBLE && sendType != MPI_FLOAT)
     {
         fprintf(stderr, "%s: Can't scatter this datatype\n", __func__);
-        ierr = 1;
-        goto BCAST_ERROR;
+        return -1;
     }
     if (root < 0 || root > xcfftMPI->nprocs - 1)
     {
@@ -707,8 +747,7 @@ int xcloc_xcfftMPI_scatterData(
             fprintf(stderr, "%s: Error root=%d not on communicator\n",
                     __func__, root);
         }
-        ierr = 1;
-        goto BCAST_ERROR; 
+        return -1;
     }
     if (root == xcfftMPI->rank)
     {
@@ -716,13 +755,12 @@ int xcloc_xcfftMPI_scatterData(
         {
             fprintf(stderr,
                     "%s: nsignals=%d != xcfftMPI->nsignals=%d on rank %d\n",
-                    __func__, xcfftMPI->rank, nsignals, xcfftMPI->nsignals);
+                    __func__, nsignals, xcfftMPI->nsignals, xcfftMPI->rank);
             ierr = 1;
         }
         ldsUse = lds;
         nptsUse = npts;
     }
-BCAST_ERROR:;
     MPI_Bcast(&ierr, 1, MPI_INT, root, xcfftMPI->comm);
     if (ierr != 0){return -1;}
     // Make sure the targets know what's coming their way w.r.t. sizes
@@ -957,6 +995,7 @@ int xcloc_xcfftMPI_fourierTransform(struct xcfftMPI_struct *xcfftMPI)
     if (xcfftMPI->sigFwd.nsignals > 0)
     {
         ierrLoc = dales_xcfft_forwardTransform(&xcfftMPI->sigFwd);
+        //ierrLoc = xcloc_xcfft_forwardTransform(&xcfftMPI->sigFwd);
         if (ierrLoc != 0)
         {
             fprintf(stdout, "%s: Error computing FFTs on process %d\n",
@@ -973,7 +1012,7 @@ int xcloc_xcfftMPI_fourierTransform(struct xcfftMPI_struct *xcfftMPI)
     MPI_Allreduce(&ierrLoc, &ierr, 1, MPI_INT, MPI_SUM, xcfftMPI->comm);
     if (ierr != 0){return -1;}
     // Fetch the requisite transforms
-    ierr = dales_xcfftMPI_getForwardTransforms(xcfftMPI);
+    ierr = xcloc_xcfftMPI_getForwardTransforms(xcfftMPI);
     if (ierr != 0)
     {
         fprintf(stderr, "%s: Failed to get fwd transforms onto process %d\n",
@@ -1011,6 +1050,7 @@ int xcloc_xcfftMPI_computePhaseCorrelation(struct xcfftMPI_struct *xcfftMPI)
     }
     // Inverse transform and finish with the time-domain cross-correlations 
     ierr = dales_xcfft_inverseTransformXC(&xcfftMPI->xcInv);
+    //ierr = xcloc_xcfft_inverseTransformXC(&xcfftMPI->xcInv);
     if (ierr != 0)
     {
         fprintf(stderr, "%s: Error inverse transforming on rank %d\n",
