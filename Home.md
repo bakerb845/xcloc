@@ -8,6 +8,8 @@ Before continuing, understand that this code is intended to run on Intel hardwar
 
 ## Prerequisites
 
+To build it is required that one have 
+
 - [CMake](https://cmake.org/) version at least 2.6
 - Message Passing Interface version at least 3.  Recommended free versions are [MPICH](https://www.mpich.org/) and [OpenMPI](https://www.open-mpi.org/).
 - [Intel MKL](https://software.intel.com/en-us/mkl)
@@ -16,7 +18,10 @@ Before continuing, understand that this code is intended to run on Intel hardwar
 - [libxml2](http://xmlsoft.org/) 
 
 Optionally, it will help to have
-- libiscl
-- sacio
-to build the unit tests.
+
+- [libiscl](https://github.com/bakerb845/libiscl)
+- [sacio](https://github.com/bakerb845/sacio)
+
+which will eventually be incorporated as submodules.
+
 
