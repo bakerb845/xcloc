@@ -8,12 +8,12 @@ Before continuing, understand that this code is intended to run on Intel hardwar
 
 ## Prerequisites
 
-- CMake
-- MPI
-- Intel MKL
-- Intel Performance Primitives
-- HDF5
-- libxml2 
+- [CMake](https://cmake.org/) version at least 2.6
+- Message Passing Interface version at least 3.  Recommended free versions are [MPICH](https://www.mpich.org/) and [OpenMPI](https://www.open-mpi.org/).
+- [Intel MKL](https://software.intel.com/en-us/mkl)
+- [Intel Performance Primitives](https://software.intel.com/en-us/intel-ipp)
+- [HDF5](https://support.hdfgroup.org/HDF5/)
+- [libxml2](http://xmlsoft.org/) 
 
 Optionally, it will help to have
 - libiscl
