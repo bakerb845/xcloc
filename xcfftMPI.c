@@ -659,7 +659,7 @@ int xcloc_xcfftMPI_gatherXCs(const int root, const int ntfSignals,
         {
             ntfSignalsLoc = xcfftMPI.proc2xcPtr[i+1] - xcfftMPI.proc2xcPtr[i];
             recvCounts[i] = ntfSignalsLoc*ldxcUse;
-            displs[i] = xcfftMPI.proc2ftPtr[i]*ldxcUse;
+            displs[i] = xcfftMPI.proc2xcPtr[i]*ldxcUse;
         }
     }
     // Put the cross-correlations onto my local workspace
@@ -1035,6 +1035,28 @@ int xcloc_xcfftMPI_fourierTransform(struct xcfftMPI_struct *xcfftMPI)
                 __func__, xcfftMPI->rank);
         return -1;
     }
+/*
+char fname[128]; memset(fname, 0, 128*sizeof(char));
+sprintf(fname, "fts_%d.txt", xcfftMPI->rank); 
+FILE *f = fopen(fname, "w");
+for (int itf=0; itf<xcfftMPI->xcInv.ntfSignals; itf++)
+{
+  fprintf(f, "%d %d %d\n", itf,
+          xcfftMPI->xcInv.xcPairs[2*itf], xcfftMPI->xcInv.xcPairs[2*itf+1]); 
+}
+fprintf(f, "\n");
+for (int is=0; is<xcfftMPI->xcInv.nsignals; is++)
+{
+ for (int i=0; i<xcfftMPI->xcInv.ntfPts; i++)
+ {
+ int indx = xcfftMPI->xcInv.ftOffset*is+i; 
+ fprintf(f, "%d %d %e %e\n", is, i, 
+         crealf(xcfftMPI->xcInv.fts[indx]), cimagf(xcfftMPI->xcInv.fts[indx]));
+ }
+ fprintf(f, "\n");
+}
+fclose(f);
+*/
     return 0;
 } 
 //============================================================================//
@@ -1056,7 +1078,7 @@ int xcloc_xcfftMPI_computePhaseCorrelation(struct xcfftMPI_struct *xcfftMPI)
                                                      xcfftMPI->xcInv.ntfSignals,
                                                      xcfftMPI->xcInv.ntfPts,
                                                      xcfftMPI->xcInv.ftOffset,
-                                                     xcfftMPI->precision,
+                                                     xcfftMPI->xcInv.precision,
                                                      xcfftMPI->xcInv.xcPairs,
                                                      xcfftMPI->xcInv.fts,
                                                      xcfftMPI->xcInv.xcfts);
@@ -1074,21 +1096,3 @@ int xcloc_xcfftMPI_computePhaseCorrelation(struct xcfftMPI_struct *xcfftMPI)
     }
     return 0;
 }
-/*
-int xcloc_xcfftMPI_apply(const bool lphaseOnly,
-                         struct xcfftMPI_struct *xcfftMPI)
-{
-    int ierr;
-    // Compute the Fourier transforms
-    ierr = dales_xcfftMPI_fourierTransform(xcfftMPI);
-    if (ierr != 0)
-    {
-        fprintf(stderr, "%s: Error computing FTs on process %d\n",
-                __func__, xcfftMPI->rank);
-        return -1;
-    }    
-    // Apply the 
-    //ierr = dales_xcfft_computeCorrelationsWithFFTData(
-    return 0;
-}
-*/
