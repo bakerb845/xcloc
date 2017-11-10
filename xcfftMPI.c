@@ -192,7 +192,7 @@ PARTITION_ERROR:;
     xcfftMPI->nsignalsLoc = nsignalsLoc;  // Number of local signals
     xcfftMPI->ntfSignalsLoc = ntfSignalsLoc; // Number of local XC's
     //printf("%d %d %d\n", myid, nsignalsLoc, ntfSignalsLoc);
-    ierr = dales_xcfft_setSpace(&xcfftMPI->sigFwd);
+    ierr = xcloc_xcfft_setSpace(&xcfftMPI->sigFwd);
     if (ierr != 0)
     {
         fprintf(stderr, "%s: Error allocating space on process %d\n",
@@ -248,7 +248,7 @@ PARTITION_ERROR:;
     xcfftMPI->xcInv.npts = xcfftMPI->sigFwd.npts;
     xcfftMPI->xcInv.lxc = xcfftMPI->sigFwd.lxc;
     xcfftMPI->xcInv.xcPairs = xcPairsLoc;
-    ierr = dales_xcfft_setSpace(&xcfftMPI->xcInv);
+    ierr = xcloc_xcfft_setSpace(&xcfftMPI->xcInv);
     if (ierr != 0)
     {
         fprintf(stderr, "%s: Error allocating xcInv space on process %d\n",
@@ -731,8 +731,8 @@ int xcloc_xcfftMPI_scatterData(
     const void *__restrict__ x,
     struct xcfftMPI_struct *xcfftMPI)
 {
-    double *xloc64 = NULL;
-    float *xloc32 = NULL;
+    //double *xloc64 = NULL;
+    //float *xloc32 = NULL;
     void *xloc = NULL;
     int *displs = NULL; 
     int *sendCounts = NULL;
@@ -803,17 +803,27 @@ int xcloc_xcfftMPI_scatterData(
     {
         if (sendType == MPI_DOUBLE)
         {
+/*
             xloc64 = (double *) xloc; 
             ierr = dales_xcfft_setAllData64f(xcfftMPI->nsignalsLoc, ldsUse,
                                              nptsUse, xloc64,
                                              &xcfftMPI->sigFwd);
+*/
+            ierr = xcloc_xcfft_setAllData(xcfftMPI->nsignalsLoc, ldsUse,
+                                          nptsUse, XCLOC_DOUBLE_PRECISION,
+                                          xloc, &xcfftMPI->sigFwd);
         }
         else
         {
+/*
             xloc32 = (float *) xloc;
             ierr = dales_xcfft_setAllData32f(xcfftMPI->nsignalsLoc, ldsUse,
                                              nptsUse, xloc32,
                                              &xcfftMPI->sigFwd);
+*/
+            ierr = xcloc_xcfft_setAllData(xcfftMPI->nsignalsLoc, ldsUse,
+                                          nptsUse, XCLOC_SINGLE_PRECISION,
+                                          xloc, &xcfftMPI->sigFwd);
         }
         if (ierr != 0)
         {
@@ -822,8 +832,8 @@ int xcloc_xcfftMPI_scatterData(
         }
     }
     // Free workspace
-    xloc64 = NULL;
-    xloc32 = NULL;
+    //xloc64 = NULL;
+    //xloc32 = NULL;
     if (xloc != NULL){free(xloc);}
     if (sendCounts != NULL){free(sendCounts);}
     if (displs != NULL){free(displs);}
