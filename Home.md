@@ -11,6 +11,7 @@ Before continuing, understand that this code is intended to run on Intel hardwar
 To build it is required that one have 
 
 - [CMake](https://cmake.org/) version at least 2.6
+- A fully C11 compliant C compiler.
 - Message Passing Interface version at least 3.  Recommended free versions are [MPICH](https://www.mpich.org/) and [OpenMPI](https://www.open-mpi.org/).
 - [Intel MKL](https://software.intel.com/en-us/mkl)
 - [Intel Performance Primitives](https://software.intel.com/en-us/intel-ipp)
