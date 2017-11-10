@@ -207,8 +207,15 @@ PARTITION_ERROR:;
     // on the communicator.
     localSize = (MPI_Aint) (xcfftMPI->sigFwd.ftOffset
                            *xcfftMPI->sigFwd.nsignals);
-    MPI_Type_size(MPI_C_COMPLEX, &sizeOfType);
-    xcfftMPI->localSizeOfFTs = (size_t) localSize;
+    if (xcfftMPI->precision == XCLOC_SINGLE_PRECISION)
+    {
+        MPI_Type_size(MPI_C_COMPLEX, &sizeOfType);
+    }
+    else
+    {
+        MPI_Type_size(MPI_C_DOUBLE_COMPLEX, &sizeOfType);
+    }
+    //xcfftMPI->localSizeOfFTs = (size_t) localSize;
     MPI_Alloc_mem(localSize*sizeOfType, MPI_INFO_NULL, &xcfftMPI->fts);
     MPI_Win_create(xcfftMPI->fts, localSize*sizeOfType, sizeOfType,
                    MPI_INFO_NULL, comm, &xcfftMPI->tfWindow);
@@ -255,7 +262,6 @@ PARTITION_ERROR:;
     {
         fprintf(stdout, "%s: Making descriptors...\n", __func__);
     }
-    ierr = dales_xcfft_makeDftiDescriptors(&xcfftMPI->sigFwd);
     ierr = xcloc_xcfft_makeFFTWDescriptors(&xcfftMPI->sigFwd);
     MPI_Allreduce(&ierr, &ierrAll, 1, MPI_INT, MPI_SUM, comm);
     if (ierr != 0)
@@ -266,7 +272,6 @@ PARTITION_ERROR:;
     }
     MPI_Allreduce(&ierr, &ierrAll, 1, MPI_INT, MPI_SUM, comm);
     if (ierrAll != 0){return -1;}
-    ierr = dales_xcfft_makeDftiDescriptors(&xcfftMPI->xcInv);
     ierr = xcloc_xcfft_makeFFTWDescriptors(&xcfftMPI->xcInv);
     if (ierr != 0)
     {
@@ -311,7 +316,7 @@ PARTITION_ERROR:;
  *
  * @result 0 indicates success.
  *
- * @copyright Ben Baker distributed under Apache 2.
+ * @copyright Ben Baker distributed under the MIT license.
  *
  */
 int xcloc_xcfftMPI_getForwardTransforms(struct xcfftMPI_struct *xcfftMPI)
@@ -362,7 +367,7 @@ int xcloc_xcfftMPI_getForwardTransforms(struct xcfftMPI_struct *xcfftMPI)
             }
         }
     }
-    MPI_Win_fence(MPI_MODE_NOSTORE + MPI_MODE_NOPUT + MPI_MODE_NOSUCCEED,
+    MPI_Win_fence(MPI_MODE_NOSTORE | MPI_MODE_NOPUT | MPI_MODE_NOSUCCEED,
                   xcfftMPI->tfWindow);
     return 0;
 }
@@ -418,7 +423,7 @@ int xcloc_xcfftMPI_getForwardTransforms(struct xcfftMPI_struct *xcfftMPI)
  *
  * @result 0 indicates success.
  *
- * @copyright Ben Baker distributed under Apache 2.
+ * @copyright Ben Baker distributed under the MIT license.
  *
  */
 int dales_xcfftMPI_getForwardTransformMap(const int nsignals,
@@ -716,7 +721,7 @@ int xcloc_xcfftMPI_gatherXCs(const int root, const int ntfSignals,
  *
  * @result 0 indicates success.
  *
- * @copyright Ben Baker distributed under Apache 2.
+ * @copyright Ben Baker distributed under the MIT license.
  *
  */
 int xcloc_xcfftMPI_scatterData(
@@ -943,13 +948,13 @@ int xcloc_xcfftMPI_finalize(struct xcfftMPI_struct *xcfftMPI)
     MPI_Win_free(&xcfftMPI->tfWindow);
     MPI_Free_mem(xcfftMPI->fts);
     // Finalize the transforms
-    ierr = dales_xcfft_finalize(&xcfftMPI->sigFwd);
+    ierr = xcloc_xcfft_finalize(&xcfftMPI->sigFwd);
     if (ierr != 0)
     {   
         fprintf(stderr, "%s: Error finalizing xcInv on process %d\n",
                 __func__, xcfftMPI->rank);
     }
-    ierr = dales_xcfft_finalize(&xcfftMPI->xcInv);
+    ierr = xcloc_xcfft_finalize(&xcfftMPI->xcInv);
     if (ierr != 0)
     {
         fprintf(stderr, "%s: Error finalizing xcInv on process %d\n",
@@ -989,13 +994,16 @@ int xcloc_xcfftMPI_fourierTransform(struct xcfftMPI_struct *xcfftMPI)
 {
     void *ftsSrc __attribute__((aligned(ALIGNMENT)));
     void *ftsDst;
-    int ierr, ierrLoc;
+    int ftOffset, ierr, ierrLoc, nsignals;
+    size_t nbytes;
     ierrLoc = 0;
+    nsignals = xcfftMPI->sigFwd.nsignals;
+    ftOffset = xcfftMPI->sigFwd.ftOffset;
     // Compute the Fourier transforms
     if (xcfftMPI->sigFwd.nsignals > 0)
     {
-        ierrLoc = dales_xcfft_forwardTransform(&xcfftMPI->sigFwd);
-        //ierrLoc = xcloc_xcfft_forwardTransform(&xcfftMPI->sigFwd);
+        //ierrLoc = dales_xcfft_forwardTransform(&xcfftMPI->sigFwd);
+        ierrLoc = xcloc_xcfft_forwardTransform(&xcfftMPI->sigFwd);
         if (ierrLoc != 0)
         {
             fprintf(stdout, "%s: Error computing FFTs on process %d\n",
@@ -1004,9 +1012,17 @@ int xcloc_xcfftMPI_fourierTransform(struct xcfftMPI_struct *xcfftMPI)
         else
         {
             // Copy to the transforms onto the memory window 
+            if (xcfftMPI->precision == XCLOC_SINGLE_PRECISION) 
+            {
+                nbytes = (size_t) (nsignals*ftOffset)*sizeof(float complex);
+            }
+            else
+            {
+                nbytes = (size_t) (nsignals*ftOffset)*sizeof(double complex);
+            }
             ftsSrc = (void *) xcfftMPI->sigFwd.fts; 
             ftsDst = (void *) xcfftMPI->fts;
-            memcpy(ftsDst, ftsSrc, xcfftMPI->localSizeOfFTs);
+            memcpy(ftsDst, ftsSrc, nbytes);
         }
     }
     MPI_Allreduce(&ierrLoc, &ierr, 1, MPI_INT, MPI_SUM, xcfftMPI->comm);
@@ -1040,6 +1056,7 @@ int xcloc_xcfftMPI_computePhaseCorrelation(struct xcfftMPI_struct *xcfftMPI)
                                                      xcfftMPI->xcInv.ntfSignals,
                                                      xcfftMPI->xcInv.ntfPts,
                                                      xcfftMPI->xcInv.ftOffset,
+                                                     xcfftMPI->precision,
                                                      xcfftMPI->xcInv.xcPairs,
                                                      xcfftMPI->xcInv.fts,
                                                      xcfftMPI->xcInv.xcfts);
@@ -1049,8 +1066,7 @@ int xcloc_xcfftMPI_computePhaseCorrelation(struct xcfftMPI_struct *xcfftMPI)
                 __func__, xcfftMPI->rank);
     }
     // Inverse transform and finish with the time-domain cross-correlations 
-    ierr = dales_xcfft_inverseTransformXC(&xcfftMPI->xcInv);
-    //ierr = xcloc_xcfft_inverseTransformXC(&xcfftMPI->xcInv);
+    ierr = xcloc_xcfft_inverseTransformXC(&xcfftMPI->xcInv);
     if (ierr != 0)
     {
         fprintf(stderr, "%s: Error inverse transforming on rank %d\n",
