@@ -17,11 +17,13 @@ To build it is required that one have
 - [HDF5](https://support.hdfgroup.org/HDF5/)
 - [libxml2](http://xmlsoft.org/) 
 
-Optionally, it will help to have
+Optionally, for compiling the unit tests, one much also build
 
 - [libiscl](https://github.com/bakerb845/libiscl)
 - [sacio](https://github.com/bakerb845/sacio)
 
-which will eventually be incorporated as submodules.
+However, these will eventually become project submodules and wrangled into the CMake.
+
+
 
 
