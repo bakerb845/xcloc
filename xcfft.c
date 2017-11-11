@@ -17,10 +17,6 @@
 #define PADDING   DALES_MEM_PADDING 
 #define ALIGNMENT DALES_MEM_ALIGNMENT 
 
-#ifndef MAX
-#define MAX(x,y) (((x) > (y)) ? (x) : (y))
-#endif
-
 #define CHECK_FFT(status) \
 if (status && !DftiErrorClass(status, DFTI_NO_ERROR)) \
 { \
@@ -32,6 +28,30 @@ if (status && !DftiErrorClass(status, DFTI_NO_ERROR)) \
 static int computePadding32f(const int n);
 static int computePadding64f(const int n);
 
+int xcloc_xcfft_checkParameters(const int npts,
+                                const int nptsPad,
+                                const int nsignals)
+{
+    if (npts < 1 || nsignals < 2 || nptsPad < npts)
+    {
+        if (npts < 1) 
+        {
+            fprintf(stderr, "%s: Signal length %d must be positive\n",
+                     __func__, npts);
+        }
+        if (nptsPad < npts)
+        {
+            fprintf(stderr, "%s: Pad length %d < signal length %d\n", 
+                    __func__, nptsPad, npts);
+        }
+        if (nsignals < 2) 
+        {
+            fprintf(stderr, "%s: At least 2 signals required\n", __func__);
+        }
+        return -1;
+    }
+    return 0;
+}
 /*!
  * @brief Initializes the Fourier transformer for the nsignals each of length
  *        npts.  For more details on implementation:
@@ -974,7 +994,7 @@ int dales_xcfft_computeXCTable(const bool lwantDiag,
  * @author Ben Baker distributed under the MIT license.
  *
  */
-int dales_xcfft_computePhaseCorrelation(struct xcfft_struct *xcfft)
+int xcloc_xcfft_computePhaseCorrelation(struct xcfft_struct *xcfft)
 {
     int ierr;
     ierr = xcloc_xcfft_apply(true, xcfft);
@@ -993,7 +1013,7 @@ int dales_xcfft_computePhaseCorrelation(struct xcfft_struct *xcfft)
  * @author Ben Baker distributed under the MIT license.
  *
  */ 
-int dales_xcfft_computeFFTCrossCorrelation(struct xcfft_struct *xcfft)
+int xcloc_xcfft_computeFFTCrossCorrelation(struct xcfft_struct *xcfft)
 {
     int ierr;
     ierr = xcloc_xcfft_apply(false, xcfft);
@@ -1357,10 +1377,12 @@ int dales_xcfft_computeXCRMSWindow(struct xcfft_struct *xcfft)
     yfilt = xcfft->yfilt;
     ntfSignals = xcfft->ntfSignals;
     dataOffset = xcfft->dataOffset;
+/*
     #pragma omp parallel default(none) \
      private(indx, ixc, filterLen, nbytes, pMaxAbs, xcFiltered, xcSqr, xwork) \
      shared(dataOffset, lfilter, lxc, ntfSignals, winLen2, y, yfilt) \
      firstprivate(pSpec, pBuf)
+*/
     {
     filterLen = lxc + winLen2; // Length of filtered signal
     nbytes = (size_t) filterLen*sizeof(float); 

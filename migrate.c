@@ -6,10 +6,72 @@
 #include "xcloc_migrate.h"
 #include <ipps.h>
 
-#ifndef MIN
-#define MIN(x,y) (((x) < (y)) ? (x) : (y))
-#endif
-
+int xcloc_migrate_checkParameters(const int ntables, const int ngrd,
+                                  const int nxc, const int lxc,
+                                  const int chunkSize, const double dt,
+                                  const int xcPairs[])
+{
+    int ierr, maxIDx, minIDx;
+    ierr = 0;
+    if (ngrd < 1)
+    {
+        fprintf(stderr, "%s: ngrd=%d must be positive\n", __func__, ngrd);
+        ierr = 1;
+    }
+    if (ntables < 2)
+    {
+        fprintf(stderr, "%s: ntables=%d must at least 2\n", __func__, ntables);
+        ierr = 1;
+    }
+    if (dt <= 0.0)
+    {
+        fprintf(stderr, "%s: dt=%f must be positive\n", __func__, dt);
+        ierr = 1;
+    }
+    if (nxc < 1)
+    {
+        fprintf(stderr, "%s: No cross-correlations\n", __func__);
+        ierr = 1;
+    }
+    if (lxc < 1)
+    {
+        fprintf(stderr, "%s: xc length=%d must be positive\n",
+                __func__, lxc);
+        ierr = 1;
+    }
+    if (lxc%2 != 1)
+    {
+        fprintf(stdout, "%s: xc length=%d is even - watch for weird behavior\n",
+                __func__, lxc);
+    }
+    if (xcPairs == NULL)
+    {
+        fprintf(stderr, "%s: xcPairs is NULL\n", __func__);
+        ierr = 1;
+    }
+    if (chunkSize%DALES_MEM_ALIGNMENT != 0)
+    {
+        fprintf(stderr, "%s: chunkSize=%d not divisible by alignment=%d\n",
+                __func__, chunkSize, DALES_MEM_ALIGNMENT);
+        ierr = 1;
+    }
+    // Get the min and max of xcPairs and make sure they are in range
+    ippsMax_32s(xcPairs, 2*nxc, &maxIDx);
+    ippsMin_32s(xcPairs, 2*nxc, &minIDx);
+    if (minIDx < 0)
+    {
+        fprintf(stderr, "%s: min index in xcPairs=%d must be positive\n",
+                __func__, minIDx);
+        ierr = 1;
+    }
+    if (maxIDx + 1 > ntables)
+    {
+        fprintf(stderr, "%s: xcPairs requires at least %d tables\n",
+                __func__, maxIDx + 1);
+        ierr = 1;
+    }
+    return ierr;
+}
 /*!
  * @brief Initializes the gridded migration structure.
  *
@@ -41,61 +103,14 @@ int xcloc_migrate_initialize(const int ntables, const int ngrd,
                              struct migrate_struct *migrate)
 {
     size_t nbytes;
-    int minIDx, maxIDx;
+    int ierr;
     memset(migrate, 0, sizeof(struct migrate_struct));
-    if (ngrd < 1 || ntables < 2 || dt <= 0.0 || nxc < 1 ||
-        lxc < 1 || xcPairs == NULL || chunkSize%DALES_MEM_ALIGNMENT != 0)
-    {   
-        if (ngrd < 1)
-        {
-            fprintf(stderr, "%s: ngrd=%d must be positive\n", __func__, ngrd);
-        }
-        if (ntables < 2)
-        {
-            fprintf(stderr, "%s: ntables=%d must at least 2\n",
-                    __func__, ntables);
-        }
-        if (dt <= 0.0)
-        {
-            fprintf(stderr, "%s: dt=%f must be positive\n", __func__, dt);
-        }
-        if (nxc < 1)
-        {
-            fprintf(stderr, "%s: No cross-correlations\n", __func__);
-        }
-        if (lxc < 1)
-        {
-            fprintf(stderr, "%s: xc length=%d must be positive\n",
-                    __func__, lxc);
-        }
-        if (xcPairs == NULL)
-        {
-            fprintf(stderr, "%s: xcPairs is NULL\n", __func__);
-        }
-        if (chunkSize%DALES_MEM_ALIGNMENT != 0)
-        {
-            fprintf(stderr, "%s: chunkSize=%d not divisible by alignment=%d\n",
-                    __func__, chunkSize, DALES_MEM_ALIGNMENT);
-        }
-        return -1;
-    }
-    if (lxc%2 != 1)
+    ierr = xcloc_migrate_checkParameters(ntables, ngrd, nxc, lxc,
+                                         chunkSize, dt, 
+                                         xcPairs);
+    if (ierr != 0)
     {
-        fprintf(stdout, "%s: Expecting odd number of xc points\n", __func__);
-    }
-    // Get the min and max of xcPairs and make sure they are in range
-    ippsMax_32s(xcPairs, 2*nxc, &maxIDx);
-    ippsMin_32s(xcPairs, 2*nxc, &minIDx);
-    if (minIDx < 0)
-    {
-        fprintf(stderr, "%s: min index in xcPairs=%d must be positive\n",
-                __func__, minIDx);
-        return -1;
-    }
-    if (maxIDx + 1 > ntables)
-    {
-        fprintf(stderr, "%s: xcPairs requires at least %d tables\n",
-                __func__, maxIDx + 1);
+        fprintf(stderr, "%s: Invalid inputs\n", __func__);
         return -1;
     }
     // Copy variables
