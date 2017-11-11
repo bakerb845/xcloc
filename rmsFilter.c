@@ -5,8 +5,21 @@
 #include <math.h>
 #include <mkl.h>
 #include <ipps.h>
-#include "xcfft_rmsFilter.h"
+#include "xcloc_rmsFilter.h"
 
+/*!
+ * @brief Initializes the RMS filter structure.
+ *
+ * @param[in] winLen     Number of samples in RMS window.  This should be
+ *                       an odd number greater than 1.
+ * @param[in] npts       Number of points in signal to filter.
+ * @param[in] precision  Precision of filter to create - float or double.
+ *
+ * @param[out] rms       RMS FIR filter.
+ *
+ * @copyright Ben Baker distributed under MIT.
+ *
+ */
 int xcloc_rmsFilter_initialize(const int winLen, const int npts,
                                const enum xclocPrecision_enum precision,
                                struct xcfftRMSFilter_struct *rms)
@@ -60,7 +73,7 @@ int xcloc_rmsFilter_initialize(const int winLen, const int npts,
         if (status != ippStsNoErr)
         {
             fprintf(stderr, "%s: Error initializing FIR filter\n", __func__);
-            return -1;
+            //return -1;
         }
         // Set it on xcfft
         rms->pSpec = (void *) pSpec32;
@@ -111,6 +124,16 @@ int xcloc_rmsFilter_initialize(const int winLen, const int npts,
     return 0;
 }
 //============================================================================//
+/*!
+ * @brief Releases memory on the RMS filter and sets variables to zero.
+ *
+ * @param[in,out] rms    On input this is the initialized RMS structure. \n
+ *                       On exit memory has been freed and variables set to 0.
+ * @result 0 indicates success.
+ *
+ * @copyright Ben Baker distributed under the MIT license.
+ *
+ */
 int xcloc_rmsFilter_finalize(struct xcfftRMSFilter_struct *rms)
 {
     IppsFIRSpec_64f *pSpec64 = NULL;
@@ -138,6 +161,29 @@ int xcloc_rmsFilter_finalize(struct xcfftRMSFilter_struct *rms)
     return 0;
 }
 //============================================================================//
+/*!
+ * @brief Applies RMS filter to signals.
+ *
+ * @param[in] nsignals    Number of signals to filter.
+ * @param[in] lds         Leading dimension of signals.  This must be greater
+ *                        than or equal to npts.
+ * @param[in] npts        Number of points in signals.
+ * @param[in] precision   Precision of signals.
+ * @param[in,out] rms     RMS filter structure.
+ * @param[in] x           Signals to filter.  This is an array of dimension
+ *                        [lds x nsignals] with leading dimension lds whose
+ *                        type is float or double as indicated by precision.
+ * @param[out] xfilt      Filtered signals.  This is an array of dimension
+ *                        [lds x nsignals] with leading dimension lds whose
+ *                        type is float or double as indicated by precision.
+ *
+ * @result 0 indicates success.
+ *
+ * @copyright Ben Baker distributed under the MIT license.
+ *
+ * @bug rms is destroyed.
+ *
+ */
 int xcloc_rmsFilter_apply(const int nsignals,
                           const int lds, const int npts, 
                           const enum xclocPrecision_enum precision,
@@ -197,25 +243,27 @@ int xcloc_rmsFilter_apply(const int nsignals,
                  __func__, npts, rms->npts);
         return -1;
     }
-    pBuf = (Ipp8u *) rms->pBuf;
     winLen2 = rms->tapsLen/2;
     filterLen = npts + winLen2; // Length of filtered signal
     if (rms->precision == XCLOC_SINGLE_PRECISION)
     {
-        pSpec32 = (IppsFIRSpec_32f *) rms->pSpec;
         nbytes = (size_t) filterLen*sizeof(float);
+/*
         #pragma omp parallel default(none) \
-         private(indx, is, filterLen, pMaxAbs32, xcFiltered32) \
+         private(indx, is, filterLen, pMaxAbs32, pSpec32, xcFiltered32) \
          private(xcSqr32, xwork32) \
          shared(lds, lfilter, nbytes, npts, nsignals, winLen2, x, xfilt) \
-         firstprivate(pSpec32, pBuf)
+         firstprivate(rms)
+*/
         {
+        pBuf = (Ipp8u *) rms->pBuf;
+        pSpec32 = (IppsFIRSpec_32f *) rms->pSpec;
         xcSqr32 = (float *) aligned_alloc(DALES_MEM_ALIGNMENT, nbytes);
         xcFiltered32 = (float *) aligned_alloc(DALES_MEM_ALIGNMENT, nbytes);
         xwork32 = (float *) aligned_alloc(DALES_MEM_ALIGNMENT, nbytes);
         memset(xcSqr32, 0, nbytes);  // Pre-pad signal 
         // Loop on the transform signals and compute RMS
-        #pragma omp for
+        //#pragma omp for
         for (is=0; is<nsignals; is++)
         {
             // Index of cross-correlation pair 
