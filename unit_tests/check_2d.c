@@ -6,6 +6,7 @@
 #include <limits.h>
 #include <math.h>
 #include "xcloc_xcfft.h"
+#include "xcloc_rmsFilter.h"
 #include "xcloc_xcfftMPI.h"
 #include "xcloc_migrate.h"
 #include "xcloc_hdf5.h"
@@ -96,6 +97,7 @@ int main(int argc, char *argv[])
     struct xclocHDF5Grid_struct h5io;
     struct xcfft_struct xcfft;
     struct xcfftMPI_struct xcfftMPI;
+    struct xcfftRMSFilter_struct rms;
     struct migrate_struct migrate;
     const double snr = -14.0; //10.0; //-14.0 works
     const double pct = 8.0;  // 5 pct taper
@@ -198,10 +200,18 @@ int main(int argc, char *argv[])
     int nptsPad = nptsSig;
     ierr = xcloc_xcfft_initialize(npts, nptsPad, nsignals, &xcfft);
     ierr = xcloc_xcfftMPI_initialize(npts, nptsPad, nsignals, MPI_COMM_WORLD,
-                                     master, &xcfftMPI);
+                                     master, NULL, &xcfftMPI);
     if (ierr != 0)
     {
         fprintf(stderr, "%s: Error initializing xcfft structure\n", __func__);
+        return EXIT_FAILURE;
+    }
+    ierr = xcloc_rmsFilter_initialize(winLen, xcfftMPI.xcInv.lxc,
+                                      xcfftMPI.xcInv.precision,
+                                      &rms); 
+    if (ierr != 0)
+    {
+        fprintf(stderr, "%s: Error creating RMS filter\n", __func__);
         return EXIT_FAILURE;
     }
     ierr = dales_xcfft_createRMSFilter(winLen, &xcfft);
@@ -245,25 +255,36 @@ int main(int argc, char *argv[])
                 MPI_Abort(MPI_COMM_WORLD, 30);
             }
         }
-//        ierr = xcloc_xcfftMPI_scatterData(master, nsignals, nptsSig, nptsSig,
-//                                          MPI_DOUBLE, obsPtr, &xcfftMPI);
+        ierr = xcloc_xcfftMPI_scatterData(master, nsignals, nptsSig, nptsSig,
+                                          MPI_DOUBLE, obsPtr, &xcfftMPI);
         if (ierr != 0)
         {
             fprintf(stderr, "%s: Error scattering data\n", __func__);
             MPI_Abort(MPI_COMM_WORLD, 30);
         }
-        ierr = dales_xcfft_computePhaseCorrelation(&xcfft);
+        ierr = xcloc_xcfft_computePhaseCorrelation(&xcfft);
         if (ierr != 0)
         {
             fprintf(stderr, "%s: Error computing phase correlations\n",
                     __func__);
             MPI_Abort(MPI_COMM_WORLD, 30);
         }
-        ierr = dales_xcfft_computeXCRMSWindow(&xcfft);
+        ierr = xcloc_xcfftMPI_computePhaseCorrelation(&xcfftMPI);
         if (ierr != 0)
         {
-            fprintf(stderr, "%s: Error filtering phase correlations\n",
+            fprintf(stderr, "%s: Error computing phase correlations\n",
                     __func__);
+            MPI_Abort(MPI_COMM_WORLD, 30);
+        }
+        ierr = xcloc_rmsFilter_apply(xcfft.ntfSignals,
+                                     xcfft.dataOffset,
+                                     xcfft.lxc,
+                                     xcfft.precision,
+                                     &rms,
+                                     xcfft.y, xcfft.yfilt);
+        if (ierr != 0)
+        {
+            fprintf(stderr, "%s: Error computing RMS window\n", __func__);
             MPI_Abort(MPI_COMM_WORLD, 30);
         }
         tall = tall + time_toc();
@@ -281,19 +302,22 @@ int main(int argc, char *argv[])
             writeCrossCorrelations(true,  "./xcorrNoiseProc", xcfft);
         }
     } // Loop on cross-correlograms
-    fprintf(stdout, "%s: Average cross-correlation time: %e\n",
-            __func__, tall*0.5);
-    fprintf(stdout, "%s: Initializing H5 archive...\n", __func__);
-    ierr = xcloc_h5ioGrid_open("./migrate.h5", "./migrate.xdmf",
-                               "/migrate",
-                               nx, ny, nz,
-                               dx, dy, dz,
-                               x0, y0, z0,
-                               &h5io);
-    if (ierr != 0)
+    if (myid == master)
     {
-        fprintf(stderr, "%s: Error initializing H5 file\n", __func__);
-        MPI_Abort(MPI_COMM_WORLD, 30);
+        fprintf(stdout, "%s: Average cross-correlation time: %e\n",
+                __func__, tall*0.5);
+        fprintf(stdout, "%s: Initializing H5 archive...\n", __func__);
+        ierr = xcloc_h5ioGrid_open("./migrate.h5", "./migrate.xdmf",
+                                   "/migrate",
+                                   nx, ny, nz,
+                                   dx, dy, dz,
+                                   x0, y0, z0,
+                                   &h5io);
+        if (ierr != 0)
+        {
+            fprintf(stderr, "%s: Error initializing H5 file\n", __func__);
+            MPI_Abort(MPI_COMM_WORLD, 30);
+        }
     }
     // Migrate the cross-correlations
     int ldxc = xcfft.dataOffset;
@@ -373,6 +397,7 @@ int main(int argc, char *argv[])
     ierr = xcloc_xcfft_finalize(&xcfft);
     ierr = xcloc_xcfftMPI_finalize(&xcfftMPI);
     ierr = xcloc_migrate_finalize(&migrate);
+    ierr = xcloc_rmsFilter_finalize(&rms);
     free(yf1);
     free(yf2);
     free(xr);

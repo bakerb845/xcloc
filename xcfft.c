@@ -897,7 +897,7 @@ int dales_xcfft_createXCTable(struct xcfft_struct *xcfft)
     nbytes = (size_t) (2*xcfft->ntfSignals)*sizeof(int);
     xcfft->xcPairs = aligned_alloc(ALIGNMENT, nbytes);
     memset(xcfft->xcPairs, 0, nbytes);
-    ierr = dales_xcfft_computeXCTable(lwantDiag, xcfft->nsignals,
+    ierr = xcloc_xcfft_computeXCTable(lwantDiag, xcfft->nsignals,
                                       xcfft->ntfSignals, xcfft->xcPairs);
     if (ierr != 0)
     {
@@ -926,7 +926,7 @@ int dales_xcfft_createXCTable(struct xcfft_struct *xcfft)
  * @author Ben Baker distributed under the MIT license.
  *
  */
-int dales_xcfft_computeXCTable(const bool lwantDiag,
+int xcloc_xcfft_computeXCTable(const bool lwantDiag,
                                const int nsignals, const int npairs, 
                                int *__restrict__ xcPairs)
 {

@@ -4,6 +4,8 @@
 #ifndef XCLOC_CONFIG_H__
 #define XCLOC_CONFIG_H__ 1
 
+#include <limits.h>
+
 /* using intel libraries; this means both IPP and MKL */
 #cmakedefine XCLOC_USE_INTEL
 /* using MPI */
@@ -18,6 +20,18 @@
 
 #define DALES_MEM_ALIGNMENT 64
 #define DALES_MEM_PADDING   DALES_MEM_ALIGNMENT
+
+#ifndef MIN
+#define MIN(x,y) (((x) < (y)) ? (x) : (y))
+#endif
+
+#ifndef MAX
+#define MAX(x,y) (((x) > (y)) ? (x) : (y))
+#endif
+
+#ifndef PATH_MAX
+#define PATH_MAX 4096
+#endif
 
 #define DALES_PAD_COMPLEX32(ALIGNMENT, n) \
 ({ \

@@ -10,10 +10,6 @@
 #define PADDING   DALES_MEM_PADDING 
 #define ALIGNMENT DALES_MEM_ALIGNMENT
 
-#ifndef MAX
-#define MAX(x,y) (((x) > (y)) ? (x) : (y))
-#endif
-
 static int cmp_int(const void *x, const void *y) 
 {
     int xx = *(int *) x;
@@ -62,6 +58,7 @@ int dales_xcfftMPI_getForwardTransformMap(const int nsignals,
 int xcloc_xcfftMPI_initialize(const int nptsIn, const int nptsPadIn,
                               const int nsignalsIn,
                               const MPI_Comm comm, const int master,
+                              const int xcPairsIn[],
                               struct xcfftMPI_struct *xcfftMPI)
 {
     int *mytf, *myxc, *xcPairs, *xcPairsLoc,
@@ -69,6 +66,7 @@ int xcloc_xcfftMPI_initialize(const int nptsIn, const int nptsPadIn,
         ntfSignals, ntfSignalsLoc;
     int i, ierr, ierrAll, sizeOfType;
     MPI_Aint localSize;
+    bool lmakeXCTable;
     const bool lwantDiag = false;
     const bool verbose = true;
     ierr = 0;
@@ -86,22 +84,10 @@ int xcloc_xcfftMPI_initialize(const int nptsIn, const int nptsPadIn,
         npts = nptsIn;
         nptsPad = nptsPadIn;
         nsignals = nsignalsIn;
-        if (npts < 1 || nptsPad < npts || nsignals < 2)
+        ierr = xcloc_xcfft_checkParameters(npts, nptsPad, nsignals);
+        if (ierr != 0)
         {
-            if (npts < 1)
-            {
-                fprintf(stderr, "%s: Signal length %d must be positive\n",
-                        __func__, npts);
-            }
-            if (nptsPad < npts)
-            {
-                fprintf(stderr, "%s: Pad length %d < signals length %d\n",
-                        __func__, nptsPad, npts);
-            }
-            if (nsignals < 2)
-            {
-                fprintf(stderr, "%s: At least 2 signals required \n", __func__);
-            }
+            fprintf(stderr, "%s: Error with fft parameters\n", __func__);
             ierr = 1;
         }
     }
@@ -119,17 +105,34 @@ int xcloc_xcfftMPI_initialize(const int nptsIn, const int nptsPadIn,
                  __func__, nprocs, xcfftMPI->ntfSignals); 
     }
     // Make a global table of stuff to do
+    lmakeXCTable = true;
     xcPairs = (int *) calloc((size_t) (xcfftMPI->ntfSignals*2), sizeof(int));
-    ierr = dales_xcfft_computeXCTable(lwantDiag,
-                                      xcfftMPI->nsignals,
-                                      xcfftMPI->ntfSignals,
-                                      xcPairs);
-    if (ierr != 0)
+    if (myid == master)
     {
-        fprintf(stderr, "%s: Error computing xc table on rank=%d\n",
-                __func__, myid);
-        return -1;
+        if (xcPairsIn != NULL)
+        { 
+            ippsCopy_32s(xcPairsIn, xcPairs, 2*xcfftMPI->ntfSignals);
+            lmakeXCTable = false;
+        } 
     }
+    MPI_Bcast(&lmakeXCTable, 1, MPI_C_BOOL, master, comm);
+    if (lmakeXCTable)
+    {
+        ierr = xcloc_xcfft_computeXCTable(lwantDiag,
+                                          xcfftMPI->nsignals,
+                                          xcfftMPI->ntfSignals,
+                                          xcPairs);
+        if (ierr != 0)
+        {
+            fprintf(stderr, "%s: Error computing xc table on rank=%d\n",
+                    __func__, myid);
+            return -1;
+        }
+    }
+    else
+    {
+        MPI_Bcast(xcPairs, xcfftMPI->ntfSignals*2, MPI_INT, master, comm);
+    } 
     // Take ownership of portions of the inverse transforms
     myxc = (int *) calloc((size_t) xcfftMPI->ntfSignals, sizeof(int));
     mytf = (int *) calloc((size_t) xcfftMPI->nsignals, sizeof(int));

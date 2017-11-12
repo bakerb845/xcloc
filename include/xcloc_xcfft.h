@@ -4,12 +4,6 @@
 #include "xcloc_enum.h"
 #include <stdbool.h>
 #include <complex.h>
-/*
-#include <fftw/fftw3.h>
-#ifdef XLOC_USE_MPI
-#include <mpi.h>
-#endif
-*/
 
 struct xcfftFIR_struct
 {
@@ -30,8 +24,6 @@ struct xcfft_struct
     struct xcfftFIR_struct fir; /*!< FIR filter for RMS window averaging. */
     void *forwardPlan;      /*!< Pointer to FFTW forward transform. */
     void *inversePlan;      /*!< Pointer to FFTW inverse transform. */
-    //void *forwardHandlePtr; /*! Handle describing forward transform. */
-    //void *inverseHandlePtr; /*! Handle describing inverse transform. */
     float complex *fts;   /*!< Fourier transforms of input signals.  This is an
                                array of dimension [ntfPts x nsignals] with
                                leading dimension ntfPts.  */
@@ -73,14 +65,18 @@ extern "C"
 {
 #endif
 
+/* Checks the parameters. */
+int xcloc_xcfft_checkParameters(const int npts, 
+                                const int nptsPad,
+                                const int nsignals);
 /* Applies the cross-correlation. */
 int xcloc_xcfft_apply(const bool lphaseOnly, struct xcfft_struct *xcfft);
 /* Compute the phase only cross-correlation. */
-int dales_xcfft_computePhaseCorrelation(struct xcfft_struct *xcfft);
+int xcloc_xcfft_computePhaseCorrelation(struct xcfft_struct *xcfft);
 /* Compute the cross-correlation with the FFT. */
-int dales_xcfft_computeFFTCrossCorrelation(struct xcfft_struct *xcfft);
+int xcloc_xcfft_computeFFTCrossCorrelation(struct xcfft_struct *xcfft);
 /* Compute the transform pairs */
-int dales_xcfft_computeXCTable(const bool lwantDiag,
+int xcloc_xcfft_computeXCTable(const bool lwantDiag,
                                const int nsignals, const int npairs,
                                int *__restrict__ xcPairs);
 /* Filters the signal */

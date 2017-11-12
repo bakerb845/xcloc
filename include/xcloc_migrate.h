@@ -33,6 +33,11 @@ extern "C"
 {
 #endif
 
+/* Checks the parameters. */
+int xcloc_migrate_checkParameters(const int ntables, const int ngrd,
+                                  const int nxc, const int lxc,
+                                  const int chunkSize, const double dt, 
+                                  const int xcPairs[]);
 /* Set the chunkSize */
 int xcloc_migrate_setChunkSize(const int chunkSize,
                                struct migrate_struct *migrate);

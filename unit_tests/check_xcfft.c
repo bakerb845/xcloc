@@ -124,7 +124,7 @@ int xcfft_randomSerialTestMPI(MPI_Comm comm)
     }
     // Initialize
     ierr = xcloc_xcfftMPI_initialize(npts, nptsPad, nsignals,
-                                     comm, master, &xcfftMPI);
+                                     comm, master, NULL, &xcfftMPI);
     if (ierr != 0)
     {
         fprintf(stderr, "%s: Error initializing structure on rank %d\n",
@@ -312,7 +312,7 @@ int xcfft_randomSerialTest(void)
         return EXIT_FAILURE;
     }
     fprintf(stdout, "%s: Computing phase-correlations...\n", __func__);
-    ierr = dales_xcfft_computePhaseCorrelation(&xcfft);
+    ierr = xcloc_xcfft_computePhaseCorrelation(&xcfft);
     if (ierr != 0)
     {   
         fprintf(stderr, "%s: Error computing phase correlations\n", __func__);
@@ -627,7 +627,7 @@ int xcfft_hardwiredSerialTest(void)
     }
     // Compute the cross-correlations
     fprintf(stdout, "%s: Computing cross-correlations...\n", __func__);
-    ierr = dales_xcfft_computeFFTCrossCorrelation(&xcfft);
+    ierr = xcloc_xcfft_computeFFTCrossCorrelation(&xcfft);
     if (ierr != 0)
     {
         fprintf(stderr, "%s: Error computing cross-correlations\n", __func__);
@@ -651,7 +651,7 @@ int xcfft_hardwiredSerialTest(void)
     } 
     // Compute the phase-correlations
     fprintf(stdout, "%s: Computing phase-correlations...\n", __func__);
-    ierr = dales_xcfft_computePhaseCorrelation(&xcfft);
+    ierr = xcloc_xcfft_computePhaseCorrelation(&xcfft);
     if (ierr != 0)
     {   
         fprintf(stderr, "%s: Error computing phase correlations\n", __func__);
