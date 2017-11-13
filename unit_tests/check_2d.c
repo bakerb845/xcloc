@@ -124,8 +124,8 @@ int main(int argc, char *argv[])
                          // furthest point in the medium to the reciever
                          // plus some
     int nptsSig = (int) (round(tmodel/dt)) + 1;
-    int nx = 512;        // handle padding
-    int ny = 512;        // handle padding
+    int nx = 512;
+    int ny = 512;
     int nz = 1;
     int ngrd = nx*ny*nz;
     double dx = (x1 - x0)/(double) (nx - 1); // should be less than 2m

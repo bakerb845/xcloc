@@ -13,6 +13,7 @@
 #else
 #include <cblas.h>
 #endif
+#include <ipps.h>
 
 #ifndef DCMPLX
 #define DCMPLX(r,i) ((double) (r) + (double) (i)*I)
@@ -72,12 +73,14 @@ int dales_unitTests_computeRickerWavelet(const int npts,
             if (fabs(ricker[i]) > tol*xmax)
             {
                 ncopy = npts - i;
-                cblas_dcopy(ncopy, &ricker[i], 1, work, 1); 
+                //cblas_dcopy(ncopy, &ricker[i], 1, work, 1); 
+                ippsCopy_64f(&ricker[i], work, ncopy);
                 break;
             }
         }
         memset(ricker, 0, (size_t) npts*sizeof(double));
-        cblas_dcopy(npts, work, 1, ricker, 1); 
+        //cblas_dcopy(npts, work, 1, ricker, 1); 
+        ippsCopy_64f(work, ricker, npts);
         free(work);
     }
     // Normalize the area energy in the signal 
@@ -85,6 +88,7 @@ int dales_unitTests_computeRickerWavelet(const int npts,
     {   
         area = cblas_dnrm2(npts, ricker, 1); 
         cblas_dscal(npts, 1.0/area, ricker, 1); 
+        //ippsDivC_64f(area, ricker, npts);
     }
     return EXIT_SUCCESS;
 }
@@ -132,7 +136,7 @@ int dales_unitTests_acousticGreensLineSource(
     const bool lverb = false; 
     // Set space
     nomega = npts/2 + 1; // Number of fft samples
-    omega = (double *) calloc((size_t) nomega, sizeof(double));
+    omega = (double *) calloc((size_t) (nomega+8), sizeof(double));
     Gw = (double complex *) calloc((size_t) nomega, sizeof(double complex));
     stfF  =(double complex *) calloc((size_t) nomega, sizeof(double complex));
     // Handle the source time function
@@ -163,6 +167,8 @@ int dales_unitTests_acousticGreensLineSource(
         return EXIT_FAILURE;
     }
     cblas_dscal(nomega, 2.0*M_PI, omega, 1); // Convert to angular frequency
+    //const Ipp64f twopi = 2.0*M_PI;
+    //ippsMulC_64f_I(twopi, omega, nomega);
     // Evaluate Greens functions for the different receivers 
     for (irec=0; irec<nrec; irec++)
     {
@@ -185,6 +191,7 @@ int dales_unitTests_acousticGreensLineSource(
         }
     } // Loop on receivers
     // Release memory
+    free(stfF);
     free(Gw);
     free(omega);
     return EXIT_SUCCESS;

@@ -39,13 +39,14 @@ struct xcloc_struct
 {
     struct xcfftMPI_struct *xcfftMPI; /*!< Array of FFT structures.  This has
                                            dimension [nSignalGroups]. */
-    int *npts;           /*!< Number of points in signals in each group.  This
-                              is an array of dimension [nSignalGroups]. */
-    int *nptsPad;        /*!< Number of points to pad in signals in each group.
-                              this is an array of dimension [nSignalGroups]. */
+    int npts;           /*!< Number of points in signals. */
+    int nptsPad;        /*!< Number of points to pad signals prior to
+                             cross-correlating.  Note, that the correlation
+                             length will be 2*nptsPad-1. */
     int *nsignals;       /*!< Number of signals in each group.  This is an array
                               of dimension [nSignalGroups]. */
     int *signalGroup;
+    int *xcPairs;
     MPI_Comm globalComm; /*!< Global communicator. */
     MPI_Comm signalComm; /*!< Signal communicator. */
     MPI_Comm signalCommSize;
@@ -57,6 +58,7 @@ struct xcloc_struct
     int nmigrateProcs;   /*!< Number of processes in a migration. */
     int nfftProcs;       /*!< Number of processes in FFT. */
     int nTotalSignals;   /*!< Cumulative number of signals. */
+    int nTotalXCs;       /*!< Cumulative number of cross-correlations. */
     int nSignalGroups;   /*!< Number of signal groups.  For example if processing
                               P and S waves then this would be 2. */
     int root;            /*!< Rank of root process.  Will be 0. */
@@ -73,6 +75,7 @@ extern "C"
 int xcloc_initialize(const MPI_Comm comm,
                      const struct xclocParms_struct xclocParms,
                      struct xcloc_struct *xcloc);
+int xcloc_makeXCPairs(struct xcloc_struct *xcloc);
 int xcloc_finalize(struct xcloc_struct *xcloc);
 
 #ifdef __cplusplus

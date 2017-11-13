@@ -19,6 +19,16 @@
 #define GEOMETRY2D_TYPE "ORIGIN_DXDY"
 #define CHUNK 256
 
+static char *strdup(const char *string)
+{
+    char *copy;
+    size_t lenos;
+    lenos = strlen(string);
+    copy = (char *) calloc(lenos+1, sizeof(char));
+    strcpy(copy, string);
+    return copy;
+}
+
 static int writeH5DataItem3d(const int nz, const int ny, const int nx, 
                              const enum xclocPrecision_enum precision,
                              const char *h5File, const char *dataSet,
