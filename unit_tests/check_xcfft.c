@@ -124,7 +124,7 @@ int xcfft_randomSerialTestMPI(MPI_Comm comm)
     }
     // Initialize
     ierr = xcloc_xcfftMPI_initialize(npts, nptsPad, nsignals,
-                                     comm, master, NULL, &xcfftMPI);
+                                     -1, comm, master, NULL, &xcfftMPI);
     if (ierr != 0)
     {
         fprintf(stderr, "%s: Error initializing structure on rank %d\n",

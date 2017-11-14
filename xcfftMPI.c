@@ -57,6 +57,7 @@ int dales_xcfftMPI_getForwardTransformMap(const int nsignals,
  */
 int xcloc_xcfftMPI_initialize(const int nptsIn, const int nptsPadIn,
                               const int nsignalsIn,
+                              const int ntfSignalsIn,
                               const MPI_Comm comm, const int master,
                               const int xcPairsIn[],
                               struct xcfftMPI_struct *xcfftMPI)
@@ -78,6 +79,7 @@ int xcloc_xcfftMPI_initialize(const int nptsIn, const int nptsPadIn,
     MPI_Comm_dup(comm, &xcfftMPI->comm);
     MPI_Comm_rank(xcfftMPI->comm, &xcfftMPI->rank);
     MPI_Comm_size(xcfftMPI->comm, &xcfftMPI->nprocs);
+    lmakeXCTable = true;
     // Have master verify the inputs
     if (myid == master)
     {
@@ -90,32 +92,50 @@ int xcloc_xcfftMPI_initialize(const int nptsIn, const int nptsPadIn,
             fprintf(stderr, "%s: Error with fft parameters\n", __func__);
             ierr = 1;
         }
+        xcfftMPI->nsignals = nsignals;
+        if (ntfSignalsIn > 0 && xcPairsIn != NULL)
+        {
+            xcfftMPI->ntfSignals = ntfSignalsIn; 
+            lmakeXCTable = false;
+        }
+        else
+        {
+            xcfftMPI->ntfSignals = ((nsignals*(nsignals-1)))/2; 
+        }
+        if (nprocs > xcfftMPI->ntfSignals)
+        {
+            fprintf(stderr, "%s: nprocs=%d > ntfSignals=%d not yet checked\n",
+                    __func__, nprocs, xcfftMPI->ntfSignals);
+        } 
     }
     MPI_Bcast(&ierr,     1, MPI_INT, master, comm);
     if (ierr != 0){return -1;}
-    MPI_Bcast(&npts,     1, MPI_INT, master, comm);
-    MPI_Bcast(&nptsPad,  1, MPI_INT, master, comm);
-    MPI_Bcast(&nsignals, 1, MPI_INT, master, comm);
+    MPI_Bcast(&npts,                 1, MPI_INT, master, comm);
+    MPI_Bcast(&nptsPad,              1, MPI_INT, master, comm);
+    MPI_Bcast(&nsignals,             1, MPI_INT, master, comm);
+    MPI_Bcast(&xcfftMPI->nsignals,   1, MPI_INT, master, comm);
+    MPI_Bcast(&xcfftMPI->ntfSignals, 1, MPI_INT, master, comm); 
+    MPI_Bcast(&lmakeXCTable, 1, MPI_C_BOOL, master, comm);
     // Parallelization is on inverse transforms - so divvy up the signals.
-    xcfftMPI->nsignals = nsignals;
-    xcfftMPI->ntfSignals = ((nsignals*(nsignals-1)))/2; 
+//    xcfftMPI->nsignals = nsignals;
+//    xcfftMPI->ntfSignals = ((nsignals*(nsignals-1)))/2; 
     if (nprocs > xcfftMPI->ntfSignals)
     {
         fprintf(stderr, "%s: nprocs=%d > ntfSignals=%d not yet checked\n",
                  __func__, nprocs, xcfftMPI->ntfSignals); 
     }
     // Make a global table of stuff to do
-    lmakeXCTable = true;
+    //lmakeXCTable = true;
     xcPairs = (int *) calloc((size_t) (xcfftMPI->ntfSignals*2), sizeof(int));
     if (myid == master)
     {
         if (xcPairsIn != NULL)
         { 
             ippsCopy_32s(xcPairsIn, xcPairs, 2*xcfftMPI->ntfSignals);
-            lmakeXCTable = false;
+            //lmakeXCTable = false;
         } 
     }
-    MPI_Bcast(&lmakeXCTable, 1, MPI_C_BOOL, master, comm);
+    //MPI_Bcast(&lmakeXCTable, 1, MPI_C_BOOL, master, comm);
     if (lmakeXCTable)
     {
         ierr = xcloc_xcfft_computeXCTable(lwantDiag,
@@ -445,8 +465,8 @@ int dales_xcfftMPI_getForwardTransformMap(const int nsignals,
     int *work, *item, *origin, *offset,
         i, i0, i1, is, isLoc, ixc, jxc, locSignal0, locSignal1, nSignalsLoc;
     work = (int *) calloc((size_t) (nsignals + 1), sizeof(int));
-    memset(work, INT_MAX, (size_t) (nsignals + 1)*sizeof(int));
-    // Create a list of origins
+    memset(work, -1, (size_t) (nsignals + 1)*sizeof(int));
+    // Create a unique list of origins
     nSignalsLoc = 0;
     for (ixc=0; ixc<ntfSignals; ixc++)
     {
@@ -460,7 +480,12 @@ int dales_xcfftMPI_getForwardTransformMap(const int nsignals,
                 if (work[i] == i0){break;}
                 if (work[i] ==-1)
                 {
-                    work[i] = i0;
+                    if (nSignalsLoc >= nsignals)
+                    {
+                        fprintf(stderr, "%s: Insufficient space\n", __func__);
+                        return -1;
+                    }
+                    work[nSignalsLoc] = i0; //work[i] = i0;
                     nSignalsLoc = nSignalsLoc + 1;
                     break;
                 }
@@ -470,7 +495,12 @@ int dales_xcfftMPI_getForwardTransformMap(const int nsignals,
                 if (work[i] == i1){break;}
                 if (work[i] ==-1)
                 {
-                    work[i] = i1;
+                    if (nSignalsLoc >= nsignals)
+                    {
+                        fprintf(stderr, "%s: Insufficient space\n", __func__);
+                        return -1;
+                    }
+                    work[nSignalsLoc] = i1; //work[i] = i1;
                     nSignalsLoc = nSignalsLoc + 1;
                     break;
                 }

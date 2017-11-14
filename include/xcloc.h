@@ -37,12 +37,8 @@ struct xclocParms_struct
 
 struct xcloc_struct
 {
-    struct xcfftMPI_struct *xcfftMPI; /*!< Array of FFT structures.  This has
+    struct xcfftMPI_struct xcfftMPI; /*!< Array of FFT structures.  This has
                                            dimension [nSignalGroups]. */
-    int npts;           /*!< Number of points in signals. */
-    int nptsPad;        /*!< Number of points to pad signals prior to
-                             cross-correlating.  Note, that the correlation
-                             length will be 2*nptsPad-1. */
     int *nsignals;       /*!< Number of signals in each group.  This is an array
                               of dimension [nSignalGroups]. */
     int *signalGroup;
@@ -58,6 +54,10 @@ struct xcloc_struct
     int nmigrateProcs;   /*!< Number of processes in a migration. */
     int nfftProcs;       /*!< Number of processes in FFT. */
     int nTotalSignals;   /*!< Cumulative number of signals. */
+    int npts;           /*!< Number of points in signals. */
+    int nptsPad;        /*!< Number of points to pad signals prior to
+                             cross-correlating.  Note, that the correlation
+                             length will be 2*nptsPad-1. */
     int nTotalXCs;       /*!< Cumulative number of cross-correlations. */
     int nSignalGroups;   /*!< Number of signal groups.  For example if processing
                               P and S waves then this would be 2. */

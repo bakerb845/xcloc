@@ -190,6 +190,8 @@ int main(int argc, char *argv[])
                                ttimes, obs);
         ierr = writeSynthetics("./greensNoisy", nrec, nptsSig, dt, xs, xr,
                                ttimes, obsNoisy);
+        ierr = writeSynthetics("./greens2", nrec, nptsSig, dt, xs, xr,
+                               ttimes, obs2);
     }
     MPI_Barrier(MPI_COMM_WORLD);
     // Cross-correlate the signals
@@ -199,7 +201,8 @@ int main(int argc, char *argv[])
     int npts = nptsSig;
     int nptsPad = nptsSig;
     ierr = xcloc_xcfft_initialize(npts, nptsPad, nsignals, &xcfft);
-    ierr = xcloc_xcfftMPI_initialize(npts, nptsPad, nsignals, MPI_COMM_WORLD,
+    ierr = xcloc_xcfftMPI_initialize(npts, nptsPad, nsignals, -1,
+                                     MPI_COMM_WORLD,
                                      master, NULL, &xcfftMPI);
     if (ierr != 0)
     {
@@ -224,10 +227,11 @@ int main(int argc, char *argv[])
     double tall = 0.0; 
     int i, ncopy;
     ncopy = xcfft.ntfSignals*xcfft.dataOffset;
-    float *yf1, *yf2;
+    float *yf1, *yf2, *yf3;
     yf1 = (float *) calloc((size_t) ncopy, sizeof(float));
     yf2 = (float *) calloc((size_t) ncopy, sizeof(float));
-    for (i=0; i<2; i++)
+    yf3 = (float *) calloc((size_t) ncopy, sizeof(float));
+    for (i=0; i<3; i++)
     {
         time_tic();
         // Get a pointer to the signal
@@ -295,11 +299,17 @@ int main(int argc, char *argv[])
             writeCrossCorrelations(false, "./xcorr", xcfft);
             writeCrossCorrelations(true,  "./xcorrProc", xcfft);
         }
-        else
+        else if (i == 1)
         {
             ippsCopy_32f(xcfft.yfilt, yf2, ncopy);
             writeCrossCorrelations(false, "./xcorrNoise", xcfft);
             writeCrossCorrelations(true,  "./xcorrNoiseProc", xcfft);
+        }
+        else
+        {
+            ippsCopy_32f(xcfft.yfilt, yf3, ncopy);
+            writeCrossCorrelations(false, "./xcorr2", xcfft);
+            writeCrossCorrelations(true,  "./xcorr2Proc", xcfft);
         }
     } // Loop on cross-correlograms
     if (myid == master)
@@ -354,7 +364,7 @@ int main(int argc, char *argv[])
         }
     }
     fprintf(stdout, "%s: Setting cross-correlations...\n", __func__);
-    for (i=0; i<2; i++)
+    for (i=0; i<3; i++)
     {
         if (i == 0)
         {
@@ -362,10 +372,16 @@ int main(int argc, char *argv[])
                                                       XCLOC_SINGLE_PRECISION,
                                                       &migrate);
         }
-        else
+        else if (i == 1)
         {
             ierr = xcloc_migrate_setCrossCorrelations(ldxc, lxc, nxc, yf2,
                                                       XCLOC_SINGLE_PRECISION, 
+                                                      &migrate);
+        }
+        else
+        {
+            ierr = xcloc_migrate_setCrossCorrelations(ldxc, lxc, nxc, yf3,
+                                                      XCLOC_SINGLE_PRECISION,
                                                       &migrate);
         }
         if (ierr != 0)
@@ -386,9 +402,14 @@ int main(int argc, char *argv[])
            ierr = xcloc_h5ioGrid_writeDataSet32f("image", nx, ny, nz,
                                                  image, &h5io);
         }
-        else
+        else if (i == 1)
         {
            ierr = xcloc_h5ioGrid_writeDataSet32f("imageNoise", nx, ny, nz,
+                                                 image, &h5io);
+        }
+        else
+        {
+           ierr = xcloc_h5ioGrid_writeDataSet32f("image2", nx, ny, nz,
                                                  image, &h5io);
         }
         image = NULL;
@@ -400,6 +421,7 @@ int main(int argc, char *argv[])
     ierr = xcloc_rmsFilter_finalize(&rms);
     free(yf1);
     free(yf2);
+    free(yf3);
     free(xr);
     free(obs);
     free(obs2);
@@ -419,10 +441,17 @@ int create2DReceiversAndTravelTimes(const int seed, const int nrec,
                                     double *__restrict__ ttimes)
  
 {
+    FILE *recvs = NULL;
     double dist;
     int irec; 
     // Randomly create the receiver locations
     srand(seed);
+    recvs = fopen("recvs.vtk", "w");
+    fprintf(recvs, "# vtk DataFile Version 2.0\n");
+    fprintf(recvs, "Receiver VTK File\n");
+    fprintf(recvs, "ASCII\n");
+    fprintf(recvs, "DATASET POLYDATA\n");
+    fprintf(recvs, "POINTS %d float\n", nrec); 
     for (irec=0; irec<nrec; irec++)
     {
         xr[3*irec+0] = ((double) rand()/RAND_MAX)*(x1 - x0);
@@ -443,7 +472,9 @@ int create2DReceiversAndTravelTimes(const int seed, const int nrec,
                    + pow(xs[2] - xr[3*irec+2], 2));
         ttimes[irec] = dist/vel;
         //printf("%d %f %f %f\n", irec, xr[3*irec+0], xr[3*irec+1], xr[3*irec+2]);
+        fprintf(recvs, "%e %e %e\n", xr[3*irec+0], xr[3*irec+1], xr[3*irec+2]);
     }
+    fclose(recvs);
     return 0;
 }
 //============================================================================//

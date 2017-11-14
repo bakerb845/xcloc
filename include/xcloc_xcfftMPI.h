@@ -72,6 +72,7 @@ extern "C"
 /* Initializes the memory on the xcfftMPI structure */
 int xcloc_xcfftMPI_initialize(const int nptsIn, const int nptsPadIn,
                               const int nsignalsIn,
+                              const int ntfSignalsIn,
                               const MPI_Comm comm, const int master,
                               const int xcPairsIn[],
                               struct xcfftMPI_struct *xcfftMPI);

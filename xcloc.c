@@ -10,6 +10,8 @@
 # warning "This only works for MPI" 
 #endif
 */
+int xcloc_splitCommunicator(const int nprocs, const int nparts, 
+                            int *__restrict__ myGroup);
 
 /*!
  * @brief Checks the xcloc parameters.
@@ -56,9 +58,10 @@ int xcloc_initialize(const MPI_Comm comm,
                      struct xcloc_struct *xcloc)
 {
     int ierr, ierrAll, ig, is, groupMax, groupMin, mpiInit, pMin, pMax;
+    const int root = 0;
     ierr = 0;
     memset(xcloc, 0, sizeof(struct xcloc_struct));
-    xcloc->root = 0;
+    xcloc->root = root;
     xcloc->nSignalGroups = 1;
     MPI_Initialized(&mpiInit);
     if (!mpiInit)
@@ -101,26 +104,33 @@ int xcloc_initialize(const MPI_Comm comm,
                     xcloc->nsignals[ig] = xcloc->nsignals[ig] + 1;
                 }
             }
-            if (xcloc->nsignals[ig] == 0)
+            if (xcloc->nsignals[ig] < 2)
             {
-                fprintf(stderr, "%s: Signal group %d is empty\n", __func__, ig);
+                fprintf(stderr,
+                        "%s: Signal group %d has %d signals; 2 required\n",
+                         __func__, ig, xcloc->nsignals[ig]);
                 ierr = 1;
                 goto BCAST_ERROR;
             }
             xcloc->nTotalSignals = xcloc->nTotalSignals + xcloc->nsignals[ig]; 
         }
-/*
-        if (xclocParms.dt <= 0.0)
-        {
-            fprintf(stderr, "%s: dt=%e must be positive\n",
-                    __func__, xcloc->dt) 
-*/
     }
 BCAST_ERROR:;
     MPI_Bcast(&ierr, 1, MPI_INT, xcloc->root, xcloc->globalComm);
     if (ierr != 0){return -1;}
     // Broadcast the parameters
-    MPI_Bcast(&xcloc->nfftProcs, 1, MPI_INT, xcloc->root, xcloc->globalComm);
+    MPI_Bcast(&xcloc->nfftProcs,     1, MPI_INT, root, xcloc->globalComm);
+    MPI_Bcast(&xcloc->npts,          1, MPI_INT, root, xcloc->globalComm);
+    MPI_Bcast(&xcloc->nptsPad,       1, MPI_INT, root, xcloc->globalComm);
+    MPI_Bcast(&xcloc->nTotalSignals, 1, MPI_INT, root, xcloc->globalComm);
+    MPI_Bcast(&xcloc->nSignalGroups, 1, MPI_INT, root, xcloc->globalComm);
+    if (xcloc->globalCommRank != xcloc->root)
+    {
+        xcloc->nsignals
+          = (int *) calloc((size_t) xcloc->nSignalGroups, sizeof(int));
+    }
+    MPI_Bcast(xcloc->nsignals, xcloc->nSignalGroups, MPI_INT,
+              xcloc->root, xcloc->globalComm);
     // Make the global XC pairs
     ierr = xcloc_makeXCPairs(xcloc);
     if (ierr != 0)
@@ -128,8 +138,19 @@ BCAST_ERROR:;
         fprintf(stderr, "%s: Failed to make XC pair on rank %d\n",
                 __func__, xcloc->globalCommRank);
     }
-
     // Initialize the FFTs
+    ierr = xcloc_xcfftMPI_initialize(xcloc->npts,
+                                     xcloc->nptsPad,
+                                     xcloc->nTotalSignals,
+                                     xcloc->nTotalXCs,
+                                     xcloc->globalComm, //fftComm,
+                                     xcloc->root,
+                                     xcloc->xcPairs,
+                                     &xcloc->xcfftMPI);
+    if (ierr != 0)
+    {
+        fprintf(stderr, "%s: Failed to initialize fft structure\n", __func__);
+    }
 /*
     ierrAll = 0;
     if (xcloc->ldoFFT)
@@ -163,6 +184,17 @@ BCAST_ERROR:;
 //============================================================================//
 /*!
  * @brief Defines the cross-correlation pairs for the different signal groups.
+ *
+ * @param[in,out] xcloc    On input contains the global communicator.  On, the
+ *                         root process the number of total signals, the number
+ *                         of signal groups, the signal groups, and the number
+ *                         of signals in each group is defined.
+ *                         On exit, all processes have the XC pairs and the
+ *                         total number of cross-correlations.
+ *
+ * @result 0 indicates success.
+ *
+ * @copyright Ben Baker distributed under the MIT license.
  *
  */
 int xcloc_makeXCPairs(struct xcloc_struct *xcloc)
@@ -316,6 +348,7 @@ int xcloc_finalize(struct xcloc_struct *xcloc)
 {
     if (xcloc->signalGroup != NULL){free(xcloc->signalGroup);}
     if (xcloc->xcPairs != NULL){free(xcloc->xcPairs);}
+    xcloc_xcfftMPI_finalize(&xcloc->xcfftMPI);
     MPI_Comm_free(&xcloc->globalComm);
     memset(xcloc, 0, sizeof(struct xcloc_struct));
     return 0;
