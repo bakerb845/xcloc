@@ -781,13 +781,15 @@ WARN_LOGFILE           =
 # spaces. See also FILE_PATTERNS and EXTENSION_MAPPING
 # Note: If this tag is empty the current directory is searched.
 
-INPUT                  = ./xcfft.c \
+INPUT                  = ./xcloc.c \
+                         ./xcfft.c \
                          ./migrate.c \
                          ./migrateMPI.c \
                          ./xcfftMPI.c \
                          ./rmsFilter.c \
                          ./h5io.c \
                          ./xdmf.c \
+                         ./include/xcloc.h \
                          ./include/xcloc_enum.h \
                          ./include/xcloc_xcfft.h \
                          ./include/xcloc_migrate.h \
