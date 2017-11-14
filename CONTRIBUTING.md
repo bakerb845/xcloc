@@ -8,5 +8,6 @@ This code is being actively developed.  There exists enough to handle event loca
 4. Be brave and set the floats and float complexes in the xcfft.h to void * then try out the mixed precision code.
 5. Tightly integrate with the travel-time computations in https://github.com/bakerb845/fteik.  
 6. Extend the HDF5 IO to spherical coordinates and/or unstructured grids.
-7. Ask.  There's always stuff to do.
+7. Write kernel code for GPUs.
+8. Ask.  There's always stuff to do.
 
