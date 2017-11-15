@@ -77,6 +77,22 @@ int main(int argc, char *argv[])
     {
         fprintf(stdout, "%s: Generating test...\n", __func__);
         xclocParms.nfftProcs = 1;
+        xclocParms.ngridProcs = nprocs;
+        if (nprocs == 4)
+        {
+            xclocParms.nfftProcs = 2;
+            xclocParms.ngridProcs = 2;
+        }
+        if (nprocs == 6)
+        {
+            xclocParms.nfftProcs = 3;
+            xclocParms.ngridProcs = 2;
+        }
+        if (nprocs == 8)
+        {
+            xclocParms.nfftProcs = 2;
+            xclocParms.ngridProcs = 4;
+        }
         xclocParms.dt = dt;
         xclocParms.npts    = nptsSig;
         xclocParms.nptsPad = nptsSig;
@@ -112,6 +128,7 @@ int main(int argc, char *argv[])
                                                      rho, Qs, nptsSig, dt,
                                                      xs, xr, stf,
                                                      &obs[N_P_SIGNALS*nptsSig]);
+printf("%d %d\n", xclocParms.nfftProcs, xclocParms.ngridProcs);
     }
     MPI_Barrier(MPI_COMM_WORLD);
     ierr = xcloc_initialize(MPI_COMM_WORLD, xclocParms, &xcloc);

@@ -57,7 +57,7 @@ int xcloc_initialize(const MPI_Comm comm,
                      const struct xclocParms_struct xclocParms,
                      struct xcloc_struct *xcloc)
 {
-    int ierr, ierrAll, ig, is, groupMax, groupMin, mpiInit, pMin, pMax;
+    int color, ierr, ierrAll, ift, ig, is, key, mpiInit, pMin, pMax;
     const int root = 0;
     ierr = 0;
     memset(xcloc, 0, sizeof(struct xcloc_struct));
@@ -81,12 +81,32 @@ int xcloc_initialize(const MPI_Comm comm,
             fprintf(stderr, "%s: Invalid parameters\n", __func__);
             goto BCAST_ERROR;
         }
+        xcloc->nfftProcs = xclocParms.nfftProcs;
+        if (xcloc->globalCommSize%xcloc->nfftProcs != 0)
+        {
+            fprintf(stderr, "%s: globalCommSize=%d not divisible by fftProc=%d\n", 
+                    __func__, xcloc->globalCommSize, xcloc->nfftProcs);
+            ierr = 1;
+            goto BCAST_ERROR;
+        }
+/*
         xcloc->nfftProcs = MIN(xclocParms.nfftProcs, xcloc->globalCommSize);
         xcloc->nfftProcs = MAX(1, xclocParms.nfftProcs);
         if (xcloc->nfftProcs != xclocParms.nfftProcs)
         {
             fprintf(stdout, "%s: Over-riding nfftProcs to %d\n", __func__,
                     xcloc->nfftProcs);
+        }
+*/
+        xcloc->ngridProcs = xclocParms.ngridProcs;
+        if (xcloc->nfftProcs*xcloc->ngridProcs != xcloc->globalCommSize)
+        {
+            fprintf(stderr,
+                    "%s: nfftProcs*ngridProcs=%d x %d != globalCommSize=%d\n", 
+                    __func__, xcloc->nfftProcs, xcloc->ngridProcs, 
+                    xcloc->globalCommSize);
+            ierr = 1;
+            goto BCAST_ERROR;
         }
         xcloc->npts    = xclocParms.npts;
         xcloc->nptsPad = xclocParms.nptsPad;
@@ -119,6 +139,7 @@ BCAST_ERROR:;
     MPI_Bcast(&ierr, 1, MPI_INT, xcloc->root, xcloc->globalComm);
     if (ierr != 0){return -1;}
     // Broadcast the parameters
+    MPI_Bcast(&xcloc->ngridProcs,    1, MPI_INT, root, xcloc->globalComm);
     MPI_Bcast(&xcloc->nfftProcs,     1, MPI_INT, root, xcloc->globalComm);
     MPI_Bcast(&xcloc->npts,          1, MPI_INT, root, xcloc->globalComm);
     MPI_Bcast(&xcloc->nptsPad,       1, MPI_INT, root, xcloc->globalComm);
@@ -131,26 +152,58 @@ BCAST_ERROR:;
     }
     MPI_Bcast(xcloc->nsignals, xcloc->nSignalGroups, MPI_INT,
               xcloc->root, xcloc->globalComm);
+    // Make the FFT communicator
+    color = MPI_UNDEFINED; 
+    key = 0;
+    for (ift=0; ift<xcloc->nfftProcs; ift++)
+    {
+        if (ift*xcloc->ngridProcs == xcloc->globalCommRank)
+        {
+            color = 0; // I'm in the group
+            key = ift; // My FFT ID
+            xcloc->ldoFFT = true;
+            //printf("go with %d %d %d\n", color, key, xcloc->nfftProcs);
+        }
+    }
+    ierr = MPI_Comm_split(xcloc->globalComm, color, key, &xcloc->fftComm);
+    if (ierr != MPI_SUCCESS)
+    {
+        fprintf(stdout, "%s: Failed splitting communicator\n", __func__);
+        return -1;
+    }
     // Make the global XC pairs
     ierr = xcloc_makeXCPairs(xcloc);
     if (ierr != 0)
     {
         fprintf(stderr, "%s: Failed to make XC pair on rank %d\n",
                 __func__, xcloc->globalCommRank);
+        return -1;
     }
     // Initialize the FFTs
-    ierr = xcloc_xcfftMPI_initialize(xcloc->npts,
-                                     xcloc->nptsPad,
-                                     xcloc->nTotalSignals,
-                                     xcloc->nTotalXCs,
-                                     xcloc->globalComm, //fftComm,
-                                     xcloc->root,
-                                     xcloc->xcPairs,
-                                     &xcloc->xcfftMPI);
-    if (ierr != 0)
+    ierr = 0;
+    if (xcloc->ldoFFT)
     {
-        fprintf(stderr, "%s: Failed to initialize fft structure\n", __func__);
+        if (xcloc->globalCommRank == 0)
+        {
+            fprintf(stdout, "%s: Initializing FFT...\n", __func__);
+        }
+        ierr = xcloc_xcfftMPI_initialize(xcloc->npts,
+                                         xcloc->nptsPad,
+                                         xcloc->nTotalSignals,
+                                         xcloc->nTotalXCs,
+                                         xcloc->fftComm,
+                                         xcloc->root,
+                                         xcloc->xcPairs,
+                                         &xcloc->xcfftMPI);
+        if (ierr != 0)
+        {
+            fprintf(stderr, "%s: Failed to initialize fft structure\n",
+                    __func__);
+            ierr = 1;
+        }
     }
+    MPI_Allreduce(&ierr, &ierrAll, 1, MPI_INT, MPI_SUM, xcloc->globalComm);
+    if (ierrAll != 0){return -1;} 
 /*
     ierrAll = 0;
     if (xcloc->ldoFFT)
@@ -348,7 +401,11 @@ int xcloc_finalize(struct xcloc_struct *xcloc)
 {
     if (xcloc->signalGroup != NULL){free(xcloc->signalGroup);}
     if (xcloc->xcPairs != NULL){free(xcloc->xcPairs);}
-    xcloc_xcfftMPI_finalize(&xcloc->xcfftMPI);
+    if (xcloc->ldoFFT)
+    {
+        xcloc_xcfftMPI_finalize(&xcloc->xcfftMPI);
+        MPI_Comm_free(&xcloc->fftComm);
+    }
     MPI_Comm_free(&xcloc->globalComm);
     memset(xcloc, 0, sizeof(struct xcloc_struct));
     return 0;

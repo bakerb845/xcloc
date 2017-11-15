@@ -6,6 +6,7 @@
 #include "xcloc_migrate.h"
 #include "xcloc_hdf5.h"
 #include "xcloc_xdmf.h"
+#include "xcloc_envelope.h"
 #include "xcloc_rmsFilter.h"
 #ifdef XCLOC_USE_MPI
 #include "xcloc_xcfftMPI.h"
@@ -20,6 +21,7 @@ struct xclocParms_struct
                            same group will be cross-correlated.  This is an
                            array of dimension [nsignals] where the is'th signal
                            returns the signal group number. */
+    int ngridProcs; /*!< Number of processes in each migration grid. */
     int nfftProcs;  /*!< Number of processes in that will be involved in
                          computing the cross-correlations.  Note, that these
                          processes will be the master ranks in the migration.
@@ -51,7 +53,9 @@ struct xcloc_struct
     MPI_Comm migrateComm;/*!< Migration communicator. */
     int globalCommSize;  /*!< Size of global communicator. */
     int globalCommRank;  /*!< Rank on global communicator. */
-    int nmigrateProcs;   /*!< Number of processes in a migration. */
+    //int nmigrateProcs;   /*!< Number of processes in a migration. */
+    int ngridProcs;      /*!< Number of processes in the migration
+                              group. */
     int nfftProcs;       /*!< Number of processes in FFT. */
     int nTotalSignals;   /*!< Cumulative number of signals. */
     int npts;           /*!< Number of points in signals. */

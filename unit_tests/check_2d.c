@@ -7,6 +7,7 @@
 #include <math.h>
 #include "xcloc_xcfft.h"
 #include "xcloc_rmsFilter.h"
+#include "xcloc_envelope.h"
 #include "xcloc_xcfftMPI.h"
 #include "xcloc_migrate.h"
 #include "xcloc_hdf5.h"
@@ -81,8 +82,8 @@ int compute2DTravelTimes(const int nx, const int ny, const int nz,
                          float *__restrict__ ttimes);
 int writeSynthetics(const char *outdir,
                     const int nrec, const int npts,
-                    const double dt, 
-                    const double xs[3],
+                    const double dt, const double vel,
+                    const int ns, const double *xs,
                     const double *__restrict__ xr, 
                     const double *__restrict__ ttimes,
                     const double *obs);
@@ -99,13 +100,15 @@ int main(int argc, char *argv[])
     struct xcfftMPI_struct xcfftMPI;
     struct xcfftRMSFilter_struct rms;
     struct migrate_struct migrate;
-    const double snr = -14.0; //10.0; //-14.0 works
+    struct xclocEnvelope_struct envelope;
+    const double snr = -10.0; //10.0; //-14.0 works
     const double pct = 8.0;  // 5 pct taper
     int chunkSize = 2048;
     int nrec = 30; // TODO make 100 or 200
+    int envWindowLen = 251; // Length of Hilbert FIR filter
     double dt = 1.0/6000.0; // Sampling rate is 6000 Hz
     double twin = 1.0;      // Window is 0.2 seconds
-    double fcent = 800.0;  // Dominant resolution is vmin/fcent ~ 5.0m (for plotting)
+    double fcent = 400.0;  // Dominant resolution is vmin/fcent ~ 5.0m (for plotting)
     bool lnorm = false;     // Don't normalize ricker wavelet (max will be 1)
     bool lshift = true;     // Make wavelet start at time 0 
     int winLen = (int) ceil((1.0/fcent)/dt); // make the window about 3 cycles 
@@ -119,7 +122,7 @@ int main(int argc, char *argv[])
     double z1 = 0.0;    // Problem is 2d - make z equal to 0.0
     double vel = 3100.0; // constant velocity (m/s)
     double rho = 2700.0; // constant density (kg/m**3)
-    double Q = 1.e5;     // effectively remove damping
+    double Q = 9.e2;     // add some damping
     double tmodel = 0.5; // max modeling time is the traveltime from the
                          // furthest point in the medium to the reciever
                          // plus some
@@ -132,11 +135,11 @@ int main(int argc, char *argv[])
     double dy = (y1 - y0)/(double) (ny - 1); // should be less than 2m
     double dz = 0.0;
     // Set the receiver location to the center of the model
-    double xs[6] = {x0 + (double) (nx/2)*dx,
-                    y0 + (double) (ny/2)*dy,
+    double xs[6] = {x0 + (double) (2*nx/7)*dx,
+                    y0 + (double) (6*ny/7)*dy,
                     z0,// Source has to be at zero for the 2d example
                     x0 + (double) (5*nx/8)*dx,
-                    y0 + (double) (3*nx/8)*dy,
+                    y0 + (double) (3*ny/8)*dy,
                     z0};
     // Randomly create the receiver locations and theoretical picks
     int ierr, irec, myid, nprocs, provided;
@@ -186,12 +189,12 @@ int main(int argc, char *argv[])
         }
         // Write the Green's functions
         fprintf(stdout, "%s: Writing Green's functions...\n", __func__);
-        ierr = writeSynthetics("./greens", nrec, nptsSig, dt, xs, xr,
-                               ttimes, obs);
-        ierr = writeSynthetics("./greensNoisy", nrec, nptsSig, dt, xs, xr,
-                               ttimes, obsNoisy);
-        ierr = writeSynthetics("./greens2", nrec, nptsSig, dt, xs, xr,
-                               ttimes, obs2);
+        ierr = writeSynthetics("./greens", nrec, nptsSig, dt, vel,
+                               1, xs, xr, ttimes, obs);
+        ierr = writeSynthetics("./greensNoisy", nrec, nptsSig, dt, vel,
+                               1, xs, xr, ttimes, obsNoisy);
+        ierr = writeSynthetics("./greens2", nrec, nptsSig, dt, vel,
+                               2, xs, xr, ttimes, obs2);
     }
     MPI_Barrier(MPI_COMM_WORLD);
     // Cross-correlate the signals
@@ -207,6 +210,15 @@ int main(int argc, char *argv[])
     if (ierr != 0)
     {
         fprintf(stderr, "%s: Error initializing xcfft structure\n", __func__);
+        return EXIT_FAILURE;
+    }
+    ierr = xcloc_envelope_initialize(envWindowLen,
+                                     xcfftMPI.xcInv.precision,
+                                     XCLOC_HIGH_ACCURACY, //xcfftMPI.xcInv.accuracy,
+                                     &envelope);
+    if (ierr != 0)
+    {
+        fprintf(stderr, "%s: Error creating envelope filter\n", __func__);
         return EXIT_FAILURE;
     }
     ierr = xcloc_rmsFilter_initialize(winLen, xcfftMPI.xcInv.lxc,
@@ -280,12 +292,20 @@ int main(int argc, char *argv[])
                     __func__);
             MPI_Abort(MPI_COMM_WORLD, 30);
         }
+        ierr = xcloc_envelope_apply(xcfft.ntfSignals,
+                                    xcfft.dataOffset,
+                                    xcfft.lxc,
+                                    xcfft.precision,
+                                    &envelope,
+                                    xcfft.y, xcfft.yfilt);
+/*
         ierr = xcloc_rmsFilter_apply(xcfft.ntfSignals,
                                      xcfft.dataOffset,
                                      xcfft.lxc,
                                      xcfft.precision,
                                      &rms,
                                      xcfft.y, xcfft.yfilt);
+*/
         if (ierr != 0)
         {
             fprintf(stderr, "%s: Error computing RMS window\n", __func__);
@@ -418,6 +438,7 @@ int main(int argc, char *argv[])
     ierr = xcloc_xcfft_finalize(&xcfft);
     ierr = xcloc_xcfftMPI_finalize(&xcfftMPI);
     ierr = xcloc_migrate_finalize(&migrate);
+    ierr = xcloc_envelope_finalize(&envelope);
     ierr = xcloc_rmsFilter_finalize(&rms);
     free(yf1);
     free(yf2);
@@ -610,8 +631,9 @@ int writeCrossCorrelations(const bool lfiltered, const char *outdir,
 //============================================================================//
 int writeSynthetics(const char *outdir,
                     const int nrec, const int npts,
-                    const double dt,
-                    const double xs[3],
+                    const double dt, const double vel,
+                    const int ns,
+                    const double *xs,
                     const double *__restrict__ xr,
                     const double *__restrict__ ttimes,
                     const double *obs)
@@ -621,8 +643,8 @@ int writeSynthetics(const char *outdir,
     const char *knetwk = "GRNS\0"; 
     const char *kcmpnm = "HHZ\0";
     char kstnm[8];
-    double dist, pick;
-    int i;
+    double dist, pick[10];
+    int i, is;
     struct sacData_struct sac;
     SET_DIRECTORY(outdir, dirRoot);
     memset(&sac, 0, sizeof(struct sacData_struct));
@@ -640,12 +662,31 @@ int writeSynthetics(const char *outdir,
     {
         memset(kstnm, 0, 8*sizeof(char));
         sprintf(kstnm, "S%03d", i);
-        dist = sqrt( pow(xs[0] - xr[3*i+0], 2)
-                   + pow(xs[1] - xr[3*i+1], 2) 
-                   + pow(xs[2] - xr[3*i+2], 2) );
+        for (is=0; is<ns; is++)
+        {
+            dist = sqrt( pow(xs[3*is+0] - xr[3*i+0], 2)
+                       + pow(xs[3*is+1] - xr[3*i+1], 2) 
+                       + pow(xs[3*is+2] - xr[3*i+2], 2) );
+            if (is == 0)
+            {
+                pick[is] = ttimes[i]/dt*DTOUT;
+            }
+            else
+            {
+                pick[is] = dist/vel/dt*DTOUT; //ttimes[i]/dt*DTOUT;
+            }
+        }
         sacio_setCharacterHeader(SAC_CHAR_KSTNM, kstnm, &sac.header);
-        pick = ttimes[i]/dt*DTOUT;
-        sacio_setFloatHeader(SAC_FLOAT_T0,    pick, &sac.header);
+        sacio_setFloatHeader(SAC_FLOAT_STLO,  xr[3*i],   &sac.header);
+        sacio_setFloatHeader(SAC_FLOAT_STLA,  xr[3*i+1], &sac.header);
+        sacio_setFloatHeader(SAC_FLOAT_STEL,  xr[3*i+2], &sac.header);
+        sacio_setFloatHeader(SAC_FLOAT_T0,    pick[0], &sac.header);
+        sacio_setCharacterHeader(SAC_CHAR_KT0, "P\0", &sac.header);
+        if (ns == 2)
+        {
+            sacio_setFloatHeader(SAC_FLOAT_T1, pick[1], &sac.header);
+            sacio_setCharacterHeader(SAC_CHAR_KT1, "S\0", &sac.header);
+        } 
         sacio_setFloatHeader(SAC_FLOAT_DIST,  dist, &sac.header);
         sacio_setFloatHeader(SAC_FLOAT_GCARC, dist, &sac.header);
         ippsCopy_64f(&obs[i*npts], sac.data, sac.npts); 
