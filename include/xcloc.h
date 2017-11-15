@@ -35,28 +35,40 @@ struct xclocParms_struct
                          2*npts+1 is a large prime number the FFT pefrormance
                          will be greatly diminished.  In this case it may be
                          advantageous to pad the transforms. */
+    int chunkSize;  /*!< Chunksize in migration grid. */
+    bool lphaseXCs; /*!< If true then the compute phase correlations. \n
+                          Otherwise, compute the cross-correlations. */
 };
 
 struct xcloc_struct
 {
     struct xcfftMPI_struct xcfftMPI; /*!< Array of FFT structures.  This has
                                            dimension [nSignalGroups]. */
+    struct migrate_struct migrate;   /*!< Migration structure. */
     int *nsignals;       /*!< Number of signals in each group.  This is an array
                               of dimension [nSignalGroups]. */
     int *signalGroup;
     int *xcPairs;
+    int *xcPairsLoc;
     MPI_Comm globalComm; /*!< Global communicator. */
-    MPI_Comm signalComm; /*!< Signal communicator. */
-    MPI_Comm signalCommSize;
-    MPI_Comm signalCommRank;
+    //MPI_Comm signalComm; /*!< Signal communicator. */
     MPI_Comm fftComm;    /*!< FFT communicator. */
     MPI_Comm migrateComm;/*!< Migration communicator. */
+    double dt;           /*!< Sampling period. */
+    int chunkSize;       /*!< Chunksize in migration grid. */ 
     int globalCommSize;  /*!< Size of global communicator. */
     int globalCommRank;  /*!< Rank on global communicator. */
+    int fftCommSize;
+    int fftCommRank;
+    int migrateCommSize;
+    int migrateCommRank;
     //int nmigrateProcs;   /*!< Number of processes in a migration. */
-    int ngridProcs;      /*!< Number of processes in the migration
+    int nmigrateGroups;  /*!< Number of migration groups. */
+    int nmigrateProcs;   /*!< Number of processes in the migration
                               group. */
     int nfftProcs;       /*!< Number of processes in FFT. */
+    int ntablesLoc;      /*!< Number of tables process will end up owning. */
+    int ntfSignalsLoc;   /*!< Number of transforms process will end up owning. */
     int nTotalSignals;   /*!< Cumulative number of signals. */
     int npts;           /*!< Number of points in signals. */
     int nptsPad;        /*!< Number of points to pad signals prior to
@@ -67,6 +79,8 @@ struct xcloc_struct
                               P and S waves then this would be 2. */
     int root;            /*!< Rank of root process.  Will be 0. */
     bool ldoFFT;         /*!< If true then I will compute the FFTs. */
+    bool lphaseXCs;      /*!< If true then compute the phase correlations. \n
+                              Otherwise, compute the cross-correlations. */
     bool linit;          /*!< Flag indicating whether or not the structure is
                               initialized. */
 };
@@ -81,6 +95,12 @@ int xcloc_initialize(const MPI_Comm comm,
                      struct xcloc_struct *xcloc);
 int xcloc_makeXCPairs(struct xcloc_struct *xcloc);
 int xcloc_finalize(struct xcloc_struct *xcloc);
+int xcloc_apply(struct xcloc_struct *xcloc);
+int xcloc_scatterDataFromRoot(const int nsignals,
+                              const int lds, const int npts,
+                              const MPI_Datatype sendType, 
+                              const void *__restrict__ x,
+                              struct xcloc_struct *xcloc);
 
 #ifdef __cplusplus
 }

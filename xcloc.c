@@ -34,6 +34,12 @@ int xcloc_checkParameters(const struct xclocParms_struct xclocParms)
                 __func__, xclocParms.dt);
         ierr = 1;
     }
+    if (xclocParms.chunkSize%DALES_MEM_ALIGNMENT != 0)
+    {
+        fprintf(stderr, "%s: chunkSize=%d not divisible by alignment=%d\n",
+                __func__, xclocParms.chunkSize, DALES_MEM_ALIGNMENT);
+        ierr = 1;
+    }
     if (xclocParms.signalGroup == NULL)
     {
         fprintf(stdout, "%s: Assuming all signals in group 0\n", __func__);
@@ -57,7 +63,7 @@ int xcloc_initialize(const MPI_Comm comm,
                      const struct xclocParms_struct xclocParms,
                      struct xcloc_struct *xcloc)
 {
-    int color, ierr, ierrAll, ift, ig, is, key, mpiInit, pMin, pMax;
+    int color, ierr, ierrAll, ift, ig, ir, is, key, mpiInit, pMin, pMax;
     const int root = 0;
     ierr = 0;
     memset(xcloc, 0, sizeof(struct xcloc_struct));
@@ -98,18 +104,22 @@ int xcloc_initialize(const MPI_Comm comm,
                     xcloc->nfftProcs);
         }
 */
-        xcloc->ngridProcs = xclocParms.ngridProcs;
-        if (xcloc->nfftProcs*xcloc->ngridProcs != xcloc->globalCommSize)
+        xcloc->nmigrateProcs = xclocParms.ngridProcs;
+        if (xcloc->nfftProcs*xcloc->nmigrateProcs != xcloc->globalCommSize)
         {
             fprintf(stderr,
-                    "%s: nfftProcs*ngridProcs=%d x %d != globalCommSize=%d\n", 
-                    __func__, xcloc->nfftProcs, xcloc->ngridProcs, 
+                    "%s: nfftProcs*nmigrateProcs=%dx%d != globalCommSize=%d\n",
+                    __func__, xcloc->nfftProcs, xcloc->nmigrateProcs, 
                     xcloc->globalCommSize);
             ierr = 1;
             goto BCAST_ERROR;
         }
+        xcloc->dt = xclocParms.dt;
+        xcloc->chunkSize = xclocParms.chunkSize; 
+        xcloc->nmigrateGroups = xcloc->nfftProcs;
         xcloc->npts    = xclocParms.npts;
         xcloc->nptsPad = xclocParms.nptsPad;
+        xcloc->lphaseXCs = xclocParms.lphaseXCs;
         ippsMax_32s(xclocParms.signalGroup, xclocParms.nsignals, &pMax);
         ippsMin_32s(xclocParms.signalGroup, xclocParms.nsignals, &pMin);
         xcloc->nSignalGroups = pMax - pMin + 1;
@@ -139,12 +149,16 @@ BCAST_ERROR:;
     MPI_Bcast(&ierr, 1, MPI_INT, xcloc->root, xcloc->globalComm);
     if (ierr != 0){return -1;}
     // Broadcast the parameters
-    MPI_Bcast(&xcloc->ngridProcs,    1, MPI_INT, root, xcloc->globalComm);
-    MPI_Bcast(&xcloc->nfftProcs,     1, MPI_INT, root, xcloc->globalComm);
-    MPI_Bcast(&xcloc->npts,          1, MPI_INT, root, xcloc->globalComm);
-    MPI_Bcast(&xcloc->nptsPad,       1, MPI_INT, root, xcloc->globalComm);
-    MPI_Bcast(&xcloc->nTotalSignals, 1, MPI_INT, root, xcloc->globalComm);
-    MPI_Bcast(&xcloc->nSignalGroups, 1, MPI_INT, root, xcloc->globalComm);
+    MPI_Bcast(&xcloc->dt, 1, MPI_DOUBLE, root, xcloc->globalComm);
+    MPI_Bcast(&xcloc->chunkSize,      1, MPI_INT, root, xcloc->globalComm);
+    MPI_Bcast(&xcloc->nmigrateGroups, 1, MPI_INT, root, xcloc->globalComm);
+    MPI_Bcast(&xcloc->nmigrateProcs,  1, MPI_INT, root, xcloc->globalComm);
+    MPI_Bcast(&xcloc->nfftProcs,      1, MPI_INT, root, xcloc->globalComm);
+    MPI_Bcast(&xcloc->npts,           1, MPI_INT, root, xcloc->globalComm);
+    MPI_Bcast(&xcloc->nptsPad,        1, MPI_INT, root, xcloc->globalComm);
+    MPI_Bcast(&xcloc->nTotalSignals,  1, MPI_INT, root, xcloc->globalComm);
+    MPI_Bcast(&xcloc->nSignalGroups,  1, MPI_INT, root, xcloc->globalComm);
+    MPI_Bcast(&xcloc->lphaseXCs, 1, MPI_C_BOOL, root, xcloc->globalComm);
     if (xcloc->globalCommRank != xcloc->root)
     {
         xcloc->nsignals
@@ -153,11 +167,12 @@ BCAST_ERROR:;
     MPI_Bcast(xcloc->nsignals, xcloc->nSignalGroups, MPI_INT,
               xcloc->root, xcloc->globalComm);
     // Make the FFT communicator
+    xcloc->fftCommRank = MPI_UNDEFINED;
     color = MPI_UNDEFINED; 
     key = 0;
     for (ift=0; ift<xcloc->nfftProcs; ift++)
     {
-        if (ift*xcloc->ngridProcs == xcloc->globalCommRank)
+        if (ift*xcloc->nmigrateProcs == xcloc->globalCommRank)
         {
             color = 0; // I'm in the group
             key = ift; // My FFT ID
@@ -168,9 +183,33 @@ BCAST_ERROR:;
     ierr = MPI_Comm_split(xcloc->globalComm, color, key, &xcloc->fftComm);
     if (ierr != MPI_SUCCESS)
     {
-        fprintf(stdout, "%s: Failed splitting communicator\n", __func__);
+        fprintf(stdout, "%s: Failed making fftComm\n", __func__);
         return -1;
     }
+    // Make the migration communicator
+    color = MPI_UNDEFINED;
+    key = 0;
+    ir = 0;
+    for (ift=0; ift<xcloc->nfftProcs; ift++)
+    {
+        for (ig=0; ig<xcloc->nmigrateProcs; ig++)
+        {
+            if (xcloc->globalCommRank == ir)
+            {
+                color = ift; // I'll get my XCs from this group
+                key   = ig;  // I'll retain my rank
+            } 
+            ir = ir + 1;
+        }
+    }
+    ierr = MPI_Comm_split(xcloc->globalComm, color, key, &xcloc->migrateComm);
+    if (ierr != MPI_SUCCESS)
+    {
+        fprintf(stderr, "%s: Failed making migrateComm\n", __func__);
+        return -1;
+    }
+    MPI_Comm_rank(xcloc->migrateComm, &xcloc->migrateCommRank);
+    MPI_Comm_size(xcloc->migrateComm, &xcloc->migrateCommSize);
     // Make the global XC pairs
     ierr = xcloc_makeXCPairs(xcloc);
     if (ierr != 0)
@@ -183,6 +222,8 @@ BCAST_ERROR:;
     ierr = 0;
     if (xcloc->ldoFFT)
     {
+        MPI_Comm_rank(xcloc->fftComm, &xcloc->fftCommRank);
+        MPI_Comm_size(xcloc->fftComm, &xcloc->fftCommSize);
         if (xcloc->globalCommRank == 0)
         {
             fprintf(stdout, "%s: Initializing FFT...\n", __func__);
@@ -204,35 +245,86 @@ BCAST_ERROR:;
     }
     MPI_Allreduce(&ierr, &ierrAll, 1, MPI_INT, MPI_SUM, xcloc->globalComm);
     if (ierrAll != 0){return -1;} 
+    // Inform the migration processes of their local migration pairs
+    if (xcloc->migrateCommRank == root)
+    {
+        xcloc->ntfSignalsLoc = xcloc->xcfftMPI.ntfSignalsLoc; 
+    }
+    MPI_Bcast(&xcloc->ntfSignalsLoc, 1, MPI_INT, root, xcloc->migrateComm);
+    xcloc->xcPairsLoc 
+        = (int *) calloc((size_t) (xcloc->ntfSignalsLoc*2), sizeof(int));
+    if (xcloc->migrateCommRank == root)
+    {
+        ippsCopy_32s(xcloc->xcfftMPI.xcInv.xcPairs, xcloc->xcPairsLoc,
+                     2*xcloc->ntfSignalsLoc);
+    }
+    MPI_Bcast(xcloc->xcPairsLoc, 2*xcloc->ntfSignalsLoc, MPI_INT,
+              root, xcloc->migrateComm);
+    // All done
+    xcloc->linit = true;
+    return 0;
+}
+//============================================================================//
 /*
-    ierrAll = 0;
+int xcloc_setTravelTimeTableFromRoot(const int ngrd,
+                                     const xcloc_struct *xcloc)
+{
+
+}
+*/
+//============================================================================//
+int xcloc_apply(struct xcloc_struct *xcloc)
+{
+    int ierr;
+    if (!xcloc->linit)
+    {
+        fprintf(stderr, "%s: xcloc not initialized\n", __func__);
+        return -1;
+    }
+    // Compute the correlograms
     if (xcloc->ldoFFT)
     {
-        ierrAll = 0;
-        for (ig=0; ig<xcloc->nSignalGroups; ig++)
+        ierr = xcloc_xcfftMPI_computePhaseCorrelation(&xcloc->xcfftMPI);
+        if (ierr != 0)
         {
-            ierr = xcloc_xcfftMPI_initialize(xcloc->npts[ig],
-                                             xcloc->nptsPad[ig],
-                                             xcloc->nsignals[ig],
-                                             xcloc->fftComm,
-                                             xcloc->root,
-                                             NULL,
-                                             &xcloc->xcfftMPI[ig]);
-            if (ierr != 0)
-            {
-                fprintf(stderr, "%s: Error initialzing xcfftMPI group %d\n",
-                        __func__, ig+1);
-                ierrAll = ierrAll + 1;
-            } 
+            fprintf(stderr, "%s: Error computing phase xcs on rank %d\n",
+                    __func__, xcloc->globalCommRank);
+            ierr = 1;
         }
-        ierr = ierrAll;
-        MPI_Allreduce(&ierr, &ierrAll, 1, MPI_INT, MPI_SUM, xcloc->fftComm); 
     }
-    MPI_Allreduce(&ierrAll, &ierr, 1, MPI_INT, MPI_SUM, xcloc->globalComm);
+    MPI_Bcast(&ierr, 1, MPI_INT, xcloc->root, xcloc->migrateComm);
     if (ierr != 0){return -1;}
-*/
- 
+    // Distribute the correlograms to the process on the migration grid
+
     return 0;
+}
+//============================================================================//
+int xcloc_scatterDataFromRoot(const int nsignals,
+                              const int lds, const int npts,
+                              const MPI_Datatype sendType,
+                              const void *__restrict__ x,
+                              struct xcloc_struct *xcloc)
+{
+    int ierr, ierrAll;
+    if (!xcloc->linit)
+    {
+        fprintf(stderr, "%s: xcloc not initialized\n", __func__);
+        return -1;
+    }
+    ierr = 0;
+    if (xcloc->ldoFFT)
+    {
+        ierr =  xcloc_xcfftMPI_scatterData(xcloc->root, nsignals,
+                                           lds, npts, sendType, x,
+                                           &xcloc->xcfftMPI);
+        if (ierr != 0)
+        {
+            fprintf(stderr, "%s: Error scattering data on globalRank=%d\n",
+                    __func__, xcloc->globalCommRank);
+        }
+    }
+    MPI_Allreduce(&ierr, &ierrAll, 1, MPI_INT, MPI_SUM, xcloc->globalComm);
+    return ierrAll;
 }
 //============================================================================//
 /*!
@@ -316,96 +408,30 @@ BCAST_ERROR:;
     return 0;
 }
 //============================================================================//
-int xcloc_makeCommunicators(struct xcloc_struct *xcloc)
-{
-    MPI_Comm globalComm;
-    int color, i, ierr;
-    globalComm = xcloc->globalComm;
-    // Split the global communicator into signal communicators 
-    xcloc->signalGroup
-        = (int *) calloc((size_t) xcloc->globalCommSize, sizeof(int));
-    ierr = xcloc_splitCommunicator(xcloc->globalCommSize,
-                                   xcloc->nSignalGroups,
-                                   xcloc->signalGroup);
-    if (ierr != 0)
-    {
-        fprintf(stderr, "%s: Error spliting global communicator\n", __func__);
-        return -1;
-    }
-    // For each signal communicator an FFT group is required
-    color = xcloc->signalGroup[xcloc->globalCommRank];
-    MPI_Comm_split(xcloc->globalComm, color, xcloc->globalCommRank,
-                   &xcloc->signalComm);
-    MPI_Comm_size(xcloc->signalComm, &xcloc->signalCommSize);
-    MPI_Comm_size(xcloc->signalComm, &xcloc->signalCommRank);
-    // The FFT groups are the masters of the local migration tables
-    return 0;
-}
-//============================================================================//
-int xcloc_splitCommunicator(const int nprocs, const int nparts, 
-                            int *__restrict__ myGroup)
-{
-    double dPart;
-    int i, ipart, low, high;
-    if (nprocs < 1 || nparts < 1 || myGroup == NULL)
-    {
-        if (nprocs < 1)
-        {
-            fprintf(stderr, "%s: No processes %d\n", __func__, nprocs);
-        }
-        if (nparts < 1)
-        {
-            fprintf(stderr, "%s: No partitions %d\n", __func__, nparts);
-        }
-        if (myGroup == NULL)
-        {
-            fprintf(stderr, "%s: myGroup is NULL\n", __func__);
-        }        
-        return -1;
-    }
-    // Everyone is in the same group 
-    if (nparts == 1)
-    {
-        for (i=0; i< nprocs; i++){myGroup[i] = 0;}
-        return 0;
-    }
-    // Initialize
-    for (i=0; i<nprocs; i++){myGroup[i] =-1;}
-    // Computing spacing of partitions
-    dPart = (double) nprocs/(double) nparts;
-    for (ipart=0; ipart<nparts; ipart++)
-    {
-        low  = (int) round((double) ipart*dPart);
-        high = (int) round((double) (ipart + 1)*dPart);
-        if (ipart == 0){low = 0;}
-        if (ipart == nparts - 1){high = nprocs;}
-        for (i=low; i<high; i++)
-        {
-            myGroup[i] = ipart;
-        }
-    }
-    // Verify
-    for (i=0; i<nparts; i++)
-    {
-        if (myGroup[i] < 0)
-        {
-            fprintf(stderr, "%s: Failed to initialize process %d\n",
-                    __func__, i);
-            return -1;
-        }
-    }
-    return 0;
-}
-//============================================================================//
+/*!
+ * @brief Releases the memory on the xcloc structure.
+ *
+ * @param[in,out] xcloc   On input this is an initialized xcloc structure. \n
+ *                        On exit all memory has been freed, all communicators
+ *                        destroyed, and all variables set to 0.
+ *
+ * @result 0 indicates success.
+ *
+ * @copyright Ben Baker distributed under the MIT license.
+ *
+ */
 int xcloc_finalize(struct xcloc_struct *xcloc)
 {
+    if (!xcloc->linit){return 0;} // Never initialized
     if (xcloc->signalGroup != NULL){free(xcloc->signalGroup);}
-    if (xcloc->xcPairs != NULL){free(xcloc->xcPairs);}
+    if (xcloc->xcPairs     != NULL){free(xcloc->xcPairs);}
+    if (xcloc->xcPairsLoc  != NULL){free(xcloc->xcPairsLoc);}
     if (xcloc->ldoFFT)
     {
         xcloc_xcfftMPI_finalize(&xcloc->xcfftMPI);
         MPI_Comm_free(&xcloc->fftComm);
     }
+    MPI_Comm_free(&xcloc->migrateComm);
     MPI_Comm_free(&xcloc->globalComm);
     memset(xcloc, 0, sizeof(struct xcloc_struct));
     return 0;

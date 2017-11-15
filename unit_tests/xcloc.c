@@ -94,6 +94,8 @@ int main(int argc, char *argv[])
             xclocParms.ngridProcs = 4;
         }
         xclocParms.dt = dt;
+        xclocParms.lphaseXCs = true;
+        xclocParms.chunkSize = 2048;
         xclocParms.npts    = nptsSig;
         xclocParms.nptsPad = nptsSig;
         xclocParms.nsignals = NSIGNALS;
@@ -128,10 +130,13 @@ int main(int argc, char *argv[])
                                                      rho, Qs, nptsSig, dt,
                                                      xs, xr, stf,
                                                      &obs[N_P_SIGNALS*nptsSig]);
-printf("%d %d\n", xclocParms.nfftProcs, xclocParms.ngridProcs);
     }
     MPI_Barrier(MPI_COMM_WORLD);
     ierr = xcloc_initialize(MPI_COMM_WORLD, xclocParms, &xcloc);
+    // Scatter the data
+    ierr = xcloc_scatterDataFromRoot(NSIGNALS, nptsSig, nptsSig,
+                                     MPI_DOUBLE, obs, &xcloc);
+    ierr = xcloc_apply(&xcloc);
     // Finalize xcloc
     xcloc_finalize(&xcloc);
     if (xr != NULL){free(xr);}
