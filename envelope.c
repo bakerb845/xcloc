@@ -203,8 +203,11 @@ int xcloc_envelope_apply(const int nsignals,
                           const void *__restrict__ x,
                           void *__restrict__ xfilt)
 {
+    IppsFIRSpec_64f *pSpec64R, *pSpec64I;
     IppsFIRSpec_32f *pSpec32R, *pSpec32I;
     Ipp8u *pBuf;
+    Ipp64f *hfiltR64, *hfiltI64, *ptr64R, *ptr64I, *xmean64,
+           *xwork64R, *xwork64I, pMean64;
     Ipp32f *hfiltR32, *hfiltI32, *ptr32R, *ptr32I, *xmean32,
            *xwork32R, *xwork32I, pMean32;
     int bufferSize, filterLen, is, specSize, tapsLen, winLen2;
@@ -295,18 +298,89 @@ int xcloc_envelope_apply(const int nsignals,
             }
             // Reincorporate the mean into the signal
             ippsAddC_32f(xmean32, pMean32, &xfilt[indx], npts);
-        }
+        } // Loop on signals
         ippsFree(pSpec32R);
         ippsFree(pSpec32I);
         ippsFree(pBuf);
         ippsFree(xwork32I);
         ippsFree(xwork32R);
         ippsFree(xmean32);
-        }
+        } // End parallel
     }
     else
     {
-
+        hfiltR64 = (Ipp64f *) envelope->hfiltR;
+        hfiltI64 = (Ipp64f *) envelope->hfiltI;
+        #pragma omp parallel default(none) \
+         shared(accuracy, bufferSize, hfiltR64, hfiltI64, filterLen, ltype4, \
+                npts, specSize, tapsLen, x, xfilt, winLen2) \
+         private(indx, is, pBuf, pMean64, pSpec64R, pSpec64I, ptr64R, ptr64I, \
+                 xmean64, xwork64R, xwork64I)
+        {
+        pSpec64R = (IppsFIRSpec_64f *) ippsMalloc_8u(specSize);
+        pSpec64I = (IppsFIRSpec_64f *) ippsMalloc_8u(specSize);
+        pBuf = ippsMalloc_8u(bufferSize);
+        ippsFIRSRInit_64f(hfiltR64, tapsLen, ippAlgAuto, pSpec64R);
+        ippsFIRSRInit_64f(hfiltI64, tapsLen, ippAlgAuto, pSpec64I);
+        xwork64I = ippsMalloc_64f(filterLen);
+        xwork64R = ippsMalloc_64f(filterLen);
+        xmean64  = ippsMalloc_64f(filterLen);
+        ippsZero_64f(xwork64R, filterLen);
+        ippsZero_64f(xwork64I, filterLen);
+        ippsZero_64f(xmean64,  filterLen);
+        // Loop on the transforms signals and compute envelope
+        #pragma omp for
+        for (is=0; is<nsignals; is++)
+        {
+            // Demean the signal
+            indx = (size_t) (is*lds)*sizeof(float);
+            ippsMean_64f(&x[indx], npts, &pMean64);
+            ippsSubC_64f(&x[indx], pMean64, xmean64, npts);
+            if (ltype4)
+            {
+                // The real part of the FIR filter is just a delay of 
+                // winLen/2 samples  
+                // TODO - This is actually a sparse filter
+                ippsFIRSR_64f(xmean64, xwork64I, filterLen, pSpec64I,
+                              NULL, NULL, pBuf);
+                // Handle the phase delay
+                ptr64R = (Ipp64f *) &xmean64[0];
+                ptr64I = (Ipp64f *) &xwork64I[winLen2];
+            }
+            else
+            {
+                // Apply the complex filter
+                ippsFIRSR_64f(xmean64, xwork64R, filterLen, pSpec64R,
+                              NULL, NULL, pBuf);
+                ippsFIRSR_64f(xmean64, xwork64I, filterLen, pSpec64I,
+                              NULL, NULL, pBuf);
+                ptr64R = (Ipp64f *) &xwork64R[winLen2];
+                ptr64I = (Ipp64f *) &xwork64I[winLen2];
+            }
+            // Compute the absolute value of the Hilbert transform.  Note,
+            // winLen2 this removes the phase delay.
+            if (accuracy == XCLOC_MEDIUM_ACCURACY)
+            {
+                vmdHypot(npts, ptr64R, ptr64I, xmean64, VML_LA);
+            }
+            else if (accuracy == XCLOC_HIGH_ACCURACY)
+            {
+                vmdHypot(npts, ptr64R, ptr64I, xmean64, VML_HA);
+            }
+            else
+            {
+                vmdHypot(npts, ptr64R, ptr64I, xmean64, VML_EP);
+            }
+            // Reincorporate the mean into the signal
+            ippsAddC_64f(xmean64, pMean64, &xfilt[indx], npts);
+        } // Loop on signals
+        ippsFree(pSpec64R);
+        ippsFree(pSpec64I);
+        ippsFree(pBuf);
+        ippsFree(xwork64I);
+        ippsFree(xwork64R);
+        ippsFree(xmean64);
+        } // End parallel
     }
     return 0;
 }

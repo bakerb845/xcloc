@@ -40,7 +40,7 @@ SET(LIB_ALL ${SACIO_LIBRARY} ${ISCL_LIBRARY} ${MKL_LIBRARY} ${IPP_LIBRARY} ${XML
 
 ADD_SUBDIRECTORY(include)
 
-SET(SRC xcloc.c rmsFilter.c xcfft.c migrate.c h5io.c xdmf.c)
+SET(SRC xcloc.c envelope.c rmsFilter.c xcfft.c migrate.c h5io.c xdmf.c)
 SET(SRC ${SRC} xcfftMPI.c migrateMPI.c)
 
 # Executables
