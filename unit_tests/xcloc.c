@@ -36,6 +36,7 @@ int main(int argc, char *argv[])
     struct xclocParms_struct xclocParms;
     struct xcloc_struct xcloc;
     int i, ierr, ierrAll, it, myid, nprocs, provided;
+    int envFIRLen = 251;  // Number of points in Hilbert FIR filter
     double fcent = 800.0; // Dominant frequency (Hz) in Ricker wavelet
     bool lnorm = false;   // Don't normalize Ricker wavelet
     bool lshift = true;   // Do shift Ricker wavelte
@@ -103,6 +104,7 @@ int main(int argc, char *argv[])
         xclocParms.dt = dt;
         xclocParms.lphaseXCs = true;
         xclocParms.chunkSize = 2048;
+        xclocParms.envFIRLen = envFIRLen;
         xclocParms.npts    = nptsSig;
         xclocParms.nptsPad = nptsSig;
         xclocParms.ngrd    = ngrd;

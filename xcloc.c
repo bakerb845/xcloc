@@ -70,9 +70,13 @@ int xcloc_initialize(const MPI_Comm comm,
                      struct xcloc_struct *xcloc)
 {
     int color, ierr, ierrAll, ift, ig, is, key, mpiInit, pMin, pMax;
+    enum xclocPrecision_enum precision;
+    enum xclocAccuracy_enum accuracy;
     const int root = 0;
     ierr = 0;
     memset(xcloc, 0, sizeof(struct xcloc_struct));
+xcloc->precision = XCLOC_SINGLE_PRECISION;
+xcloc->accuracy = XCLOC_HIGH_ACCURACY;
     xcloc->root = root;
     xcloc->nSignalGroups = 1;
     MPI_Initialized(&mpiInit);
@@ -128,6 +132,11 @@ int xcloc_initialize(const MPI_Comm comm,
         xcloc->ngrd    = xclocParms.ngrd;
         xcloc->lphaseXCs = xclocParms.lphaseXCs;
         xcloc->lxc = 2*xcloc->nptsPad - 1;
+        if (xclocParms.envFIRLen > 0)
+        {
+            xcloc->lenvelope = true;
+            xcloc->envFIRLen = xclocParms.envFIRLen;
+        }
         ippsMax_32s(xclocParms.signalGroup, xclocParms.nsignals, &pMax);
         ippsMin_32s(xclocParms.signalGroup, xclocParms.nsignals, &pMin);
         xcloc->nSignalGroups = pMax - pMin + 1;
@@ -158,6 +167,7 @@ BCAST_ERROR:;
     if (ierr != 0){return -1;}
     // Broadcast the parameters
     MPI_Bcast(&xcloc->dt, 1, MPI_DOUBLE, root, xcloc->globalComm);
+    MPI_Bcast(&xcloc->envFIRLen,      1, MPI_INT, root, xcloc->globalComm);
     MPI_Bcast(&xcloc->chunkSize,      1, MPI_INT, root, xcloc->globalComm);
     MPI_Bcast(&xcloc->nmigrateGroups, 1, MPI_INT, root, xcloc->globalComm);
     MPI_Bcast(&xcloc->nmigrateProcs,  1, MPI_INT, root, xcloc->globalComm);
@@ -169,6 +179,7 @@ BCAST_ERROR:;
     MPI_Bcast(&xcloc->nTotalSignals,  1, MPI_INT, root, xcloc->globalComm);
     MPI_Bcast(&xcloc->nSignalGroups,  1, MPI_INT, root, xcloc->globalComm);
     MPI_Bcast(&xcloc->lphaseXCs, 1, MPI_C_BOOL, root, xcloc->globalComm);
+    MPI_Bcast(&xcloc->lenvelope, 1, MPI_C_BOOL, root, xcloc->globalComm);
     if (xcloc->globalCommRank != xcloc->root)
     {
         xcloc->nsignals
@@ -176,6 +187,21 @@ BCAST_ERROR:;
     }
     MPI_Bcast(xcloc->nsignals, xcloc->nSignalGroups, MPI_INT,
               xcloc->root, xcloc->globalComm);
+    // Make the envelope structure
+    if (xcloc->lenvelope)
+    {
+        ierr = xcloc_envelope_initialize(xcloc->envFIRLen,
+                                         xcloc->precision,
+                                         xcloc->accuracy,
+                                         &xcloc->envelope);
+        if (ierr != 0)
+        {
+            fprintf(stderr, "%s: Error initializing envelope\n", __func__);
+            ierr = 1;
+        }
+        MPI_Allreduce(&ierr, &ierrAll, 1, MPI_INT, MPI_SUM, xcloc->globalComm);
+        if (ierrAll != 0){return -1;}
+    }
     // Make the FFT communicator
     xcloc->fftCommRank = MPI_UNDEFINED;
     color = MPI_UNDEFINED; 
@@ -272,24 +298,25 @@ BCAST_ERROR:;
                                        xcloc->xcfftMPI.xcrPairs,
                                        &xcloc->migrateMPI);
     MPI_Allreduce(&ierr, &ierrAll, 1, MPI_INT, MPI_SUM, xcloc->globalComm);
-    //if (ierrAll != 0){return -1;}
-/*
-    // Inform the migration processes of their local migration pairs
-    if (xcloc->migrateCommRank == root)
+    if (ierrAll != 0){return -1;}
+    // Set the temporary space for cross-correlations
+    if (xcloc->ldoFFT)
     {
-        xcloc->ntfSignalsLoc = xcloc->xcfftMPI.ntfSignalsLoc; 
+        xcloc->ntfSignalsLoc = xcloc->xcfftMPI.ntfSignalsLoc;
     }
-    MPI_Bcast(&xcloc->ntfSignalsLoc, 1, MPI_INT, root, xcloc->migrateComm);
-    xcloc->xcPairsLoc 
-        = (int *) calloc((size_t) (xcloc->ntfSignalsLoc*2), sizeof(int));
-    if (xcloc->migrateCommRank == root)
+    MPI_Bcast(&xcloc->ntfSignalsLoc, 1, MPI_INT, xcloc->root,
+              xcloc->migrateMPI.intraComm);
+    xcloc->leny = xcloc->lxc*xcloc->ntfSignalsLoc;
+    if (xcloc->precision == XCLOC_SINGLE_PRECISION)
     {
-        ippsCopy_32s(xcloc->xcfftMPI.xcInv.xcPairs, xcloc->xcPairsLoc,
-                     2*xcloc->ntfSignalsLoc);
+        xcloc->y1 = aligned_alloc(XCLOC_MEM_ALIGNMENT, (size_t) xcloc->leny*sizeof(float)); 
+        xcloc->y2 = aligned_alloc(XCLOC_MEM_ALIGNMENT, (size_t) xcloc->leny*sizeof(float));
     }
-    MPI_Bcast(xcloc->xcPairsLoc, 2*xcloc->ntfSignalsLoc, MPI_INT,
-              root, xcloc->migrateComm);
-*/
+    else
+    {
+        xcloc->y1 = aligned_alloc(XCLOC_MEM_ALIGNMENT, (size_t) xcloc->leny*sizeof(double));
+        xcloc->y2 = aligned_alloc(XCLOC_MEM_ALIGNMENT, (size_t) xcloc->leny*sizeof(double));
+    }
     // All done
     xcloc->linit = true;
     return 0;
@@ -312,6 +339,7 @@ int xcloc_setTravelTimeTableFromRoot(const int ngrd,
  */
 int xcloc_apply(struct xcloc_struct *xcloc)
 {
+    float *yf1, *yf2;
     int ierr, ierrAll;
     if (!xcloc->linit)
     {
@@ -333,7 +361,68 @@ int xcloc_apply(struct xcloc_struct *xcloc)
     MPI_Bcast(&ierrAll, 1, MPI_INT, xcloc->root, xcloc->globalComm);
     if (ierrAll != 0){return -1;}
     // Distribute the correlograms to the process on the migration grid
+    if (xcloc->precision == XCLOC_SINGLE_PRECISION)
+    {
+        if (xcloc->ldoFFT)
+        {
+            xcloc_xcfft_getAllXCData(xcloc->ntfSignalsLoc, 
+                                     xcloc->lxc,
+                                     xcloc->lxc,
+                                     XCLOC_SINGLE_PRECISION,
+                                     xcloc->xcfftMPI.xcInv,
+                                     xcloc->y1);
+        }
+        MPI_Bcast(xcloc->y1, xcloc->leny, MPI_FLOAT,
+                  xcloc->root, xcloc->migrateMPI.intraComm); 
+    }
+    else
+    {
+        if (xcloc->ldoFFT)
+        {
+            xcloc_xcfft_getAllXCData(xcloc->ntfSignalsLoc,
+                                     xcloc->lxc,
+                                     xcloc->lxc,
+                                     XCLOC_DOUBLE_PRECISION,
+                                     xcloc->xcfftMPI.xcInv,
+                                     xcloc->y1);
+        }
+        MPI_Bcast(xcloc->y1, xcloc->leny, MPI_DOUBLE,
+                  xcloc->root, xcloc->migrateMPI.intraComm);
+    }
+    // Apply the envelope
+    if (xcloc->lenvelope)
+    {
+        float *work = aligned_alloc(XCLOC_MEM_ALIGNMENT, xcloc->leny*sizeof(float));
+        memset(work, 0, xcloc->leny*sizeof(float));
+/*
+        double di = round((double) xcloc->ntfSignalsLoc/(double) xcloc->xcloc->nProcsPerGroup);
+        for (int i=0; i<xcloc->migrateMPI.nProcsPerGroup; i++)
+        { 
 
+        }
+*/
+        MPI_Allreduce(work, xcloc->y2, xcloc->leny, MPI_FLOAT, MPI_SUM, 
+                      xcloc->migrateMPI.intraComm);
+        free(work); 
+    }
+    else
+    {
+        memcpy(xcloc->y2, xcloc->y1, xcloc->leny*sizeof(float));
+    }
+    xcloc_migrate_setCrossCorrelations(xcloc->lxc, xcloc->lxc,
+                                       xcloc->ntfSignalsLoc,
+                                       xcloc->y2,
+                                       xcloc->precision,
+                                       &xcloc->migrateMPI.migrate);
+/*
+int xcloc_migrate_setCrossCorrelation(const int lxc, const int ixc, 
+                                      const void *__restrict__ xcs, 
+                                      const enum xclocPrecision_enum precision,
+                                      struct migrate_struct *migrate)
+*/
+
+    // Compute the migration image
+    xcloc_migrateMPI_computeMigrationImage(&xcloc->migrateMPI);
     return 0;
 }
 //============================================================================//
@@ -504,6 +593,8 @@ int xcloc_finalize(struct xcloc_struct *xcloc)
     if (xcloc->signalGroup != NULL){free(xcloc->signalGroup);}
     if (xcloc->xcPairs     != NULL){free(xcloc->xcPairs);}
     if (xcloc->xcPairsLoc  != NULL){free(xcloc->xcPairsLoc);}
+    if (xcloc->y1          != NULL){free(xcloc->y1);}
+    if (xcloc->y2          != NULL){free(xcloc->y2);}
     if (xcloc->ldoFFT)
     {
         xcloc_xcfftMPI_finalize(&xcloc->xcfftMPI);

@@ -51,6 +51,10 @@ int xcloc_migrate_initialize(const int ntables, const int ngrd,
 /* Deallocates/frees the migration structure */
 int xcloc_migrate_finalize(struct migrate_struct *migrate);
 /* Sets the it'th travel time table */
+int xcloc_migrate_setTable(const int it, const int ngrd,
+                           const enum xclocPrecision_enum precision,
+                           const void *__restrict__ ttimes,
+                           struct migrate_struct *migrate);
 int xcloc_migrate_setTable64f(const int it, const int ngrd,
                               const double *__restrict__ ttimes, 
                               struct migrate_struct *migrate);
@@ -69,6 +73,9 @@ int xcloc_migrate_setTable64f(const int it, const int ngrd,
                               struct migrate_struct *migrate);
 /* Sets the diffraction stack migration image to 0 */
 int xcloc_migrate_setImageToZero(struct migrate_struct *migrate);
+/* Gets the absolute value of the max differential travel time */
+int xcloc_migrate_computeMaxDifferentialTime(
+    const struct migrate_struct migrate, double *absMaxDT);
 /* Convenience function to compute the stack of migration images */
 int xcloc_migrate_computeMigrationImage(struct migrate_struct *migrate);
 int xcloc_migrate_computeXCDSMImage(struct migrate_struct *migrate);

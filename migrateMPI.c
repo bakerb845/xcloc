@@ -451,8 +451,8 @@ int xcloc_migrateMPI_setTableFromRoot(const int itIn, const int ngrdIn,
     MPI_Datatype dataType;
     MPI_Status status;
     enum xclocPrecision_enum precision;
-    int ierr, ierrAll, ig, indx, it, itLoc, ixc, ixc1, ixc2,
-        gridID, groupID, ngrd, prec;
+    int *displs, *sendCounts, ierr, ierrAll, ig, indx, ip, it, itLoc,
+        ixc, ixc1, ixc2, gridID, groupID, ngrd, prec, recvCount;
     ierr = 0;
     if (!migrateMPI->linit)
     {
@@ -565,13 +565,35 @@ int xcloc_migrateMPI_setTableFromRoot(const int itIn, const int ngrdIn,
                     break;
                 }
             }
+            // Have the master figure out the scatter offsets
+            displs = NULL;
+            sendCounts = NULL;
+            if (gridID == migrateMPI->root)
+            {
+                displs = (int *) calloc((size_t) migrateMPI->nProcsPerGroup,
+                                        sizeof(int));
+                sendCounts = (int *) calloc((size_t) migrateMPI->nProcsPerGroup,
+                                            sizeof(int));
+                for (ip=0; ip<migrateMPI->nProcsPerGroup; ip++)
+                {
+                    displs[ip]     = migrateMPI->proc2GridPtr[ip];
+                    sendCounts[ip] = migrateMPI->proc2GridPtr[ip+1]
+                                   - migrateMPI->proc2GridPtr[ip]; 
+                }
+            }
+            recvCount = migrateMPI->ngrdLoc;
+            MPI_Scatterv(work, sendCounts, displs, dataType,
+                         workLoc, recvCount, dataType, 
+                         migrateMPI->root, migrateMPI->intraComm);
+            if (displs != NULL){free(displs);}
+            if (sendCounts != NULL){free(sendCounts);}
             // Set the table
             ierr = 0;
             if (itLoc >-1)
             {
                 ierr = xcloc_migrate_setTable(itLoc, migrateMPI->ngrdLoc,
-                                               precision, workLoc,
-                                               &migrateMPI->migrate);
+                                              precision, workLoc,
+                                              &migrateMPI->migrate);
                 if (ierr != 0)
                 {
                     fprintf(stderr, "%s: Error setting traveltime table\n",

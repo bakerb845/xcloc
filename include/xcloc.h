@@ -29,6 +29,7 @@ struct xclocParms_struct
                          Therefore, this can and likely should be less than
                          the total number of processes available on the global
                          communicator. */
+    int envFIRLen;  /*!< Length of the FIR envelope function */
     int nsignals;   /*!< Number of signals. */
     int npts;       /*!< Number of points in input signals. */
     int nptsPad;    /*!< This is a tuning parameter.  The cross-correlations
@@ -48,11 +49,14 @@ struct xcloc_struct
                                            dimension [nSignalGroups]. */
     struct migrateMPI_struct migrateMPI;
     struct migrate_struct migrate;   /*!< Migration structure. */
+    struct xclocEnvelope_struct envelope; /*!< Envelope structure. */
     int *nsignals;       /*!< Number of signals in each group.  This is an array
                               of dimension [nSignalGroups]. */
     int *signalGroup;
     int *xcPairs;
     int *xcPairsLoc;
+    void *y1;
+    void *y2;
     MPI_Comm globalComm; /*!< Global communicator. */
     //MPI_Comm signalComm; /*!< Signal communicator. */
     MPI_Comm fftComm;    /*!< FFT communicator. */
@@ -83,9 +87,15 @@ struct xcloc_struct
                               P and S waves then this would be 2. */
     int root;            /*!< Rank of root process.  Will be 0. */
     int ngrd;            /*!< Total number of grid points in model. */
+    int leny;
+    int envFIRLen;
+    enum xclocPrecision_enum precision;
+    enum xclocAccuracy_enum accuracy;
     bool ldoFFT;         /*!< If true then I will compute the FFTs. */
     bool lphaseXCs;      /*!< If true then compute the phase correlations. \n
                               Otherwise, compute the cross-correlations. */
+    bool lenvelope;      /*!< If true compute the envelope of the cross
+                              correlations. */
     bool linit;          /*!< Flag indicating whether or not the structure is
                               initialized. */
 };

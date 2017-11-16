@@ -76,6 +76,9 @@ int xcloc_migrateMPI_setTableFromRoot(const int itIn, const int ngrdIn,
                                       const enum xclocPrecision_enum precision,
                                       const void *__restrict__ ttimes,
                                       struct migrateMPI_struct *migrateMPI);
+/*! Computes the migration image. */
+int xcloc_migrateMPI_computeMigrationImage(
+    struct migrateMPI_struct *migrateMPI);
 
 /*! Private function */
 int xcloc_migrateMPI_createLocalXCPairs(struct migrateMPI_struct *migrateMPI);
