@@ -15,6 +15,11 @@
 #define N_S_SIGNALS 15
 #define NSIGNALS 30
 
+int compute3DTravelTimes(const int nx, const int ny, const int nz,
+                         const double x0, const double y0, const double z0,
+                         const double dx, const double dy, const double dz,
+                         const double vel, const double xs[3],
+                         float *__restrict__ ttimes);
 int create2DReceivers(const int seed, const int nrec,
                       const double x0, const double x1,
                       const double y0, const double y1,
@@ -30,7 +35,7 @@ int main(int argc, char *argv[])
 {
     struct xclocParms_struct xclocParms;
     struct xcloc_struct xcloc;
-    int i, ierr, myid, nprocs, provided;
+    int i, ierr, ierrAll, it, myid, nprocs, provided;
     double fcent = 800.0; // Dominant frequency (Hz) in Ricker wavelet
     bool lnorm = false;   // Don't normalize Ricker wavelet
     bool lshift = true;   // Do shift Ricker wavelte
@@ -65,7 +70,9 @@ int main(int argc, char *argv[])
     double *stf = NULL;
     double *ttimes = NULL;
     double *xr = NULL;
+    float *tt = NULL;
     const int master = 0;
+    double t0, tAll;
     MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED, &provided);
     MPI_Comm_rank(MPI_COMM_WORLD, &myid);
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
@@ -98,6 +105,7 @@ int main(int argc, char *argv[])
         xclocParms.chunkSize = 2048;
         xclocParms.npts    = nptsSig;
         xclocParms.nptsPad = nptsSig;
+        xclocParms.ngrd    = ngrd;
         xclocParms.nsignals = NSIGNALS;
         xclocParms.signalGroup
             = (int *) calloc((size_t) xclocParms.nsignals, sizeof(int));
@@ -132,14 +140,96 @@ int main(int argc, char *argv[])
                                                      &obs[N_P_SIGNALS*nptsSig]);
     }
     MPI_Barrier(MPI_COMM_WORLD);
+    if (myid == master)
+    {
+        fprintf(stdout, "%s: Initializing xcloc...\n", __func__);
+    }
+    t0 = MPI_Wtime();
     ierr = xcloc_initialize(MPI_COMM_WORLD, xclocParms, &xcloc);
-    // Scatter the data
-    ierr = xcloc_scatterDataFromRoot(NSIGNALS, nptsSig, nptsSig,
-                                     MPI_DOUBLE, obs, &xcloc);
-    ierr = xcloc_apply(&xcloc);
+    if (ierr != 0)
+    {
+        fprintf(stderr, "%s: Error initializing\n", __func__);
+        ierr = 1;
+    }
+    MPI_Allreduce(&ierr, &ierrAll, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+    if (ierrAll != 0){goto END;}
+    // Set the travel time tables
+    if (myid == master)
+    {
+        fprintf(stdout, "%s: Setting travel time tables...\n", __func__);
+        tt = (float *) calloc((size_t) ngrd, sizeof(float));
+    }
+    for (it=0; it<xcloc.nTotalSignals; it++)
+    {
+        if (myid == master)
+        {
+            if (it < N_P_SIGNALS) 
+            {
+                 compute3DTravelTimes(nx, ny, nz,
+                                      x0, y0, z0,
+                                      dx, dy, dz,
+                                      vp, xs,
+                                      tt);
+            }
+            else
+            {
+                 compute3DTravelTimes(nx, ny, nz,
+                                      x0, y0, z0,
+                                      dx, dy, dz,
+                                      vs, xs,
+                                      tt);
+            } 
+        }
+        ierr = xcloc_setTableFromRoot(it, ngrd, 
+                                      XCLOC_SINGLE_PRECISION,
+                                      tt, &xcloc);
+        MPI_Barrier(MPI_COMM_WORLD);
+    } 
+    if (tt != NULL){free(tt); tt = NULL;}
+    MPI_Barrier(MPI_COMM_WORLD);
+    if (myid == master)
+    {
+        fprintf(stdout, "%s: Initializing time %5.2f (s)\n",
+                __func__, MPI_Wtime() - t0);
+    }
+    // Loop so that my scaling test computes an average
+    tAll = 0.0;
+    for (it=0; it<1; it++)
+    {
+        // Scatter the data
+        t0 = MPI_Wtime();
+        ierr = xcloc_scatterDataFromRoot(NSIGNALS, nptsSig, nptsSig,
+                                         MPI_DOUBLE, obs, &xcloc);
+        if (ierr != 0)
+        {
+            fprintf(stdout, "%s: Error scattering data\n", __func__);
+            ierr = 1;
+        }
+        MPI_Allreduce(&ierr, &ierrAll, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+        if (ierrAll != 0){goto END;}
+        // Apply
+        ierr = xcloc_apply(&xcloc);
+        if (ierr != 0)
+        {
+            fprintf(stdout, "%s: Error applying migration\n", __func__);
+            ierr = 1;
+        }
+        MPI_Allreduce(&ierr, &ierrAll, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+        if (ierrAll != 0){goto END;} 
+        // Update the timing
+        tAll = tAll + (MPI_Wtime() - t0);
+    }
+    MPI_Barrier(MPI_COMM_WORLD); 
+    if (myid == master)
+    {
+        fprintf(stdout, "%s: Average executing time: %6.3f (s)\n",
+                __func__, tAll/1.0);
+    }
+END:;
     // Finalize xcloc
     xcloc_finalize(&xcloc);
     if (xr != NULL){free(xr);}
+    if (tt != NULL){free(tt);}
     if (ttimes != NULL){free(ttimes);}
     if (stf != NULL){free(stf);}
     if (obs != NULL){free(obs);}
@@ -194,3 +284,32 @@ int computeTravelTimes(const int nrec,
     return 0;
 } 
 
+int compute3DTravelTimes(const int nx, const int ny, const int nz,
+                         const double x0, const double y0, const double z0,
+                         const double dx, const double dy, const double dz, 
+                         const double vel, const double xs[3],
+                         float *__restrict__ ttimes) 
+{
+    double dist, dist2, slow, x, y, z;
+    int indx, ix, iy, iz;
+    slow = 1.0/vel;
+    for (iz=0; iz<nz; iz++)
+    {   
+        for (iy=0; iy<ny; iy++)
+        {
+            for (ix=0; ix<nx; ix++)
+            {
+                x = (double) ix*dx + x0;
+                y = (double) iy*dy + y0; 
+                z = (double) iz*dz + z0; 
+                dist2 = pow(x - xs[0], 2)
+                      + pow(y - xs[1], 2)
+                      + pow(z - xs[2], 2);
+                dist = sqrt(dist2); 
+                indx = iz*nx*ny + nx*iy + ix;
+                ttimes[indx] = (float) (dist*slow);
+            }
+        }
+    }
+    return EXIT_SUCCESS;
+}

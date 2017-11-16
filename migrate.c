@@ -345,6 +345,78 @@ int xcloc_migrate_setCrossCorrelations(const int ldxc, const int lxc,
 }
 //============================================================================//
 /*!
+ * @brief Sets a the travel time table on the grid.  Note that the table will
+ *        be divided by the sampling period and converted to an integer.
+ *
+ * @param[in] it           Travel time table index.  This must be in range
+ *                         [0, migrate->ntables - 1].
+ * @param[in] ngrd         Number of grid points.  This should equal
+ *                         migrate->ngrd.
+ * @parma[in] precision    Precision of the table.
+ * @param[in] ttimes       Travel times (second) to put on the structure.
+ *                         This is an array of dimension [ngrd] whose type,
+ *                         float or double, is defined by precision.
+ *
+ * @param[in,out] migrate  On input holds the number of tables and the
+ *                         space to collect the tables. \n
+ *                         On exit holds the it'th travel-time table.
+ *
+ * @result 0 indicates success.
+ * 
+ * @copyright Ben Baker distributed under the MIT license.
+ *
+ */
+int xcloc_migrate_setTable(const int it, const int ngrd,
+                           const enum xclocPrecision_enum precision,
+                           const void *__restrict__ ttimes,
+                           struct migrate_struct *migrate)
+{
+    const double *ttimes64;
+    const float *ttimes32;
+    double dt;
+    int i, indx;
+    if (ngrd > migrate->mgrd || ttimes == NULL)
+    {   
+        if (ngrd > migrate->mgrd)
+        {
+            fprintf(stderr, "%s: Insufficient space for table %d (%d > %d)\n",
+                    __func__, it, ngrd, migrate->mgrd);
+        }
+        if (ttimes == NULL){fprintf(stderr, "%s: ttimes is NULL\n", __func__);}
+        return -1; 
+    }   
+    if (ngrd != migrate->ngrd)
+    {   
+        fprintf(stdout, "%s: ngrd=%d != migrate->ngrd=%d; expect problems\n",
+                __func__, ngrd, migrate->ngrd);
+    }
+    indx = it*migrate->mgrd;
+    dt = migrate->dt;
+    if (precision == XCLOC_SINGLE_PRECISION)
+    {
+        ttimes32 = (const float *) ttimes;
+        for (i=0; i<ngrd; i++)
+        {
+            migrate->ttimesInt[indx+i] = (int) (round((double) ttimes32[i]/dt));
+        } 
+    }
+    else if (precision == XCLOC_DOUBLE_PRECISION)
+    {
+        ttimes64 = (const double *) ttimes;
+        for (i=0; i<ngrd; i++)
+        {
+            migrate->ttimesInt[indx+i] = (int) (round(ttimes64[i]/dt));
+        }
+    }
+    else
+    {
+        fprintf(stderr, "%s: Invalid precision %d\n", __func__, (int)precision);
+        return -1;
+    }
+    return 0;
+}
+//============================================================================//
+/*!
  * @brief Sets a double precision travel time table on the grid.  Note that
  *        the double precision grid will be converted to single preicison.
  *
@@ -488,9 +560,11 @@ int xcloc_migrate_computeMigrationImage(struct migrate_struct *migrate)
     float *xcs      __attribute__((aligned(DALES_MEM_ALIGNMENT)));
     int *xcPairs    __attribute__((aligned(DALES_MEM_ALIGNMENT)));
     int *ttimesInt, *ttimesIntPtr1, *ttimesIntPtr2, indxXC, lxc2; 
-    int chunkSize, ib, igrd, it1, it2, ixc, ldxc, lxc, ngrd, ngrdLoc, nxc;
+    int chunkSize, ib, igrd, it1, it2, ixc, ldxc, lxc, mgrd, ngrd, ngrdLoc, nxc;
+    if (migrate->nxc == 0){return 0;} // Nothing to do
     if (migrate->chunkSize%DALES_MEM_ALIGNMENT != 0 || migrate->ngrd < 1 ||
-        migrate->migrate == NULL)
+        migrate->dt <= 0.0 || migrate->migrate == NULL ||
+        migrate->xcPairs == NULL || migrate->ttimesInt == NULL)
     {
         if (migrate->ngrd < 1)
         {
@@ -502,13 +576,27 @@ int xcloc_migrate_computeMigrationImage(struct migrate_struct *migrate)
             fprintf(stderr, "%s: chunkSize=%d not divisible by alignment=%d\n",
                     __func__, migrate->chunkSize, DALES_MEM_ALIGNMENT);
         }
+        if (migrate->dt <= 0.0)
+        {
+            fprintf(stderr, "%s: Sampling period %e must be positive\n",
+                    __func__, migrate->dt);
+        }
         if (migrate->migrate == NULL)
         {
             fprintf(stderr, "%s: migration image is NULL\n", __func__);
         }
+        if (migrate->xcPairs == NULL)
+        {
+            fprintf(stderr, "%s: xcPairs is NULL\n", __func__);
+        }
+        if (migrate->ttimesInt == NULL)
+        {
+            fprintf(stderr, "%s: ttimesInt is NULL\n", __func__);
+        }
         return -1; 
     } 
     // Set some constants and get pointers
+    mgrd = migrate->mgrd;
     chunkSize = migrate->chunkSize;
     lxc = migrate->lxc;
     ldxc = migrate->ldxc;
@@ -534,10 +622,10 @@ int xcloc_migrate_computeMigrationImage(struct migrate_struct *migrate)
     // try to access the same page containing imagePtr (this can yield false
     // sharing).
     #pragma omp parallel for default(none) \
-     firstprivate(lxc2, ngrd, nxc) \
+     firstprivate(lxc2, mgrd, ngrd, nxc) \
      private(ib, igrd, imagePtr, indxXC, it1, it2, ixc, \
              ngrdLoc, ttimesIntPtr1, ttimesIntPtr2, xc)  \
-     shared(chunkSize, image, ldxc, ttimesInt, xcPairs, migrate, xcs)
+     shared(chunkSize, image, ldxc, ttimesInt, xcPairs, xcs)
     for (ib=0; ib<ngrd; ib=ib+chunkSize)
     {
         ngrdLoc = MIN(ngrd - ib, chunkSize);
@@ -549,8 +637,8 @@ int xcloc_migrate_computeMigrationImage(struct migrate_struct *migrate)
             it1 = xcPairs[2*ixc];
             it2 = xcPairs[2*ixc+1];
             xc = (float *) &xcs[ldxc*ixc];
-            ttimesIntPtr1 = (int *) &ttimesInt[it1*migrate->mgrd+ib];
-            ttimesIntPtr2 = (int *) &ttimesInt[it2*migrate->mgrd+ib];
+            ttimesIntPtr1 = (int *) &ttimesInt[it1*mgrd+ib];
+            ttimesIntPtr2 = (int *) &ttimesInt[it2*mgrd+ib];
             // Update image
             #pragma omp simd \
              aligned(ttimesIntPtr1,ttimesIntPtr2,imagePtr: DALES_MEM_ALIGNMENT)
@@ -853,43 +941,96 @@ int xcloc_migrate_getImage64f(const int ngrd,
     return 0;
 }
 //============================================================================//
-//                             Functions to deprecate                         //
-//============================================================================//
-int xcloc_migrate_migrateSignalsOnGrid(
-    const int ld1, const int ld2,
-    const int n1, const int n2, const int n3, 
-    const int npts, const float dt, 
-    const float *__restrict__ signal,
-    const float *__restrict__ ttimes,
-    float *__restrict__ migrate) 
+/*!
+ * @brief This is a utility routine which will compute the maximum differential
+ *        time.  This function will help a user determine the maximum amount
+ *        of samples in their cross-correlations to avoid a segfault.
+ *
+ * @param[in] migrate    The initialized migration structure with the travel
+ *                       time tables and cross-correlation pairs.
+ *
+ * @param[out] absMaxDT  Absolute value of the max differential travel-time
+ *                       in seconds.
+ *
+ * @result 0 indicates success.
+ *
+ * @copyright Ben Baker distributed under the MIT license.
+ *
+ */
+int xcloc_migrate_computeMaxDifferentialTime(
+    const struct migrate_struct migrate, double *absMaxDT)
 {
-    float *ttimesPtr, *migratePtr, dti;
-    int i, indxModel, indx, j, k;
-    dti = 1.0f/dt;
-    // Loop on grid - e.g., z, y, x
-    #pragma omp parallel default(none) \
-            shared(migrate, ttimes, npts) \
-            firstprivate(dti, signal) \
-            private(ttimesPtr, migratePtr, i, j, k, indxModel, indx)
+    int *xcPairs    __attribute__((aligned(DALES_MEM_ALIGNMENT)));
+    int *ttimesInt, *ttimesIntPtr1, *ttimesIntPtr2, indxXC;
+    int chunkSize, ib, igrd, it1, it2, ixc, mgrd, ngrd, ngrdLoc, nxc;
+    *absMaxDT = 0.0;
+    if (migrate.nxc == 0){return 0;} // Nothing to do
+    if (migrate.chunkSize%DALES_MEM_ALIGNMENT != 0 || migrate.ngrd < 1 ||
+        migrate.dt <= 0.0 || migrate.xcPairs == NULL ||
+        migrate.ttimesInt == NULL)
     {
-    #pragma omp for collapse(2)
-    for (k=0; k<n3; k=k++)
-    {
-        for (j=0; j<n2; j=j++)
+        if (migrate.ngrd < 1)
         {
-            indxModel = k*ld1*ld2 + j*ld2;
-            ttimesPtr  = (float *) &ttimes[indxModel];
-            migratePtr = (float *) &migrate[indxModel];
-            #pragma omp simd aligned(ttimesPtr, migratePtr: 64)
-            for (i=0; i<n1; i=i++)
+            fprintf(stderr, "%s: No grid points in migration structure\n",
+                    __func__);
+        }
+        if (migrate.chunkSize%DALES_MEM_ALIGNMENT != 0)
+        {
+            fprintf(stderr, "%s: chunkSize=%d not divisible by alignment=%d\n",
+                    __func__, migrate.chunkSize, DALES_MEM_ALIGNMENT);
+        }
+        if (migrate.dt <= 0.0)
+        {
+            fprintf(stderr, "%s: Sampling period %e must be positive\n",
+                    __func__, migrate.dt);
+        }
+        if (migrate.xcPairs == NULL)
+        {
+            fprintf(stderr, "%s: xcPairs is NULL\n", __func__);
+        }
+        if (migrate.ttimesInt == NULL)
+        {
+            fprintf(stderr, "%s: ttimesInt is NULL\n", __func__);
+        }
+        return -1; 
+    }
+    // Set some constants and get pointers
+    indxXC = 0;
+    mgrd = migrate.mgrd;
+    chunkSize = migrate.chunkSize;
+    xcPairs = migrate.xcPairs;
+    nxc = migrate.nxc;
+    ngrd = migrate.ngrd;
+    ttimesInt = migrate.ttimesInt;
+    // Loop on grid chunks
+    #pragma omp parallel for default(none) \
+     firstprivate(mgrd, ngrd, nxc) \
+     private(ib, igrd, it1, it2, ixc, \
+             ngrdLoc, ttimesIntPtr1, ttimesIntPtr2)  \
+     shared(chunkSize, ttimesInt, xcPairs) \
+     reduction(max: indxXC)
+    for (ib=0; ib<ngrd; ib=ib+chunkSize)
+    {
+        ngrdLoc = MIN(ngrd - ib, chunkSize);
+        // Loop on cross-correlation pairs
+        for (ixc=0; ixc<nxc; ixc++)
+        {
+            it1 = xcPairs[2*ixc];
+            it2 = xcPairs[2*ixc+1];
+            ttimesIntPtr1 = (int *) &ttimesInt[it1*mgrd+ib];
+            ttimesIntPtr2 = (int *) &ttimesInt[it2*mgrd+ib];
+            // Update max differential time 
+            #pragma omp simd reduction(max:indxXC) \
+             aligned(ttimesIntPtr1,ttimesIntPtr2: DALES_MEM_ALIGNMENT)
+            for (igrd=0; igrd<ngrdLoc; igrd++)
             {
-                 // Compute the index in the signal
-                 indx = (int) roundf(ttimesPtr[i]*dti);
-                 // Stack the cross-correlation value
-                 migratePtr[i] = migratePtr[i] + signal[indx];
-            } // Loop on dimension 1
-        } // Loop on dimension 2
-    } // Loop on dimension 3
-    } // End parallel
+                indxXC = MAX(indxXC,
+                             abs(ttimesIntPtr1[igrd] - ttimesIntPtr2[igrd]));
+            }
+        } // Loop on cross-correlation pairs
+    } // Loop on cross-correlation blocks
+    xcPairs = NULL;
+    ttimesInt = NULL;
+    *absMaxDT = (double) indxXC*migrate.dt;
     return 0;
 }

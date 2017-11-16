@@ -927,9 +927,9 @@ int dales_xcfftMPI_computePartition(const bool verbose,
         {
             if (i >= low && i < high)
             {
-               //printf("%d %d %d\n", i, ip, mySignal[i]);
-               myOps[i] = ip;
-               nOps[ip] = nOps[ip] + 1;
+                //printf("%d %d %d\n", i, ip, mySignal[i]);
+                myOps[i] = ip;
+                nOps[ip] = nOps[ip] + 1;
             }
         }
     }

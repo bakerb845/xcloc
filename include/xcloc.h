@@ -9,6 +9,7 @@
 #include "xcloc_envelope.h"
 #include "xcloc_rmsFilter.h"
 #ifdef XCLOC_USE_MPI
+#include "xcloc_migrateMPI.h"
 #include "xcloc_xcfftMPI.h"
 //#include "xcloc_migrateMPI.h"
 #endif
@@ -36,6 +37,7 @@ struct xclocParms_struct
                          will be greatly diminished.  In this case it may be
                          advantageous to pad the transforms. */
     int chunkSize;  /*!< Chunksize in migration grid. */
+    int ngrd;       /*!< Number of grid points in model. */
     bool lphaseXCs; /*!< If true then the compute phase correlations. \n
                           Otherwise, compute the cross-correlations. */
 };
@@ -44,6 +46,7 @@ struct xcloc_struct
 {
     struct xcfftMPI_struct xcfftMPI; /*!< Array of FFT structures.  This has
                                            dimension [nSignalGroups]. */
+    struct migrateMPI_struct migrateMPI;
     struct migrate_struct migrate;   /*!< Migration structure. */
     int *nsignals;       /*!< Number of signals in each group.  This is an array
                               of dimension [nSignalGroups]. */
@@ -70,14 +73,16 @@ struct xcloc_struct
     int ntablesLoc;      /*!< Number of tables process will end up owning. */
     int ntfSignalsLoc;   /*!< Number of transforms process will end up owning. */
     int nTotalSignals;   /*!< Cumulative number of signals. */
-    int npts;           /*!< Number of points in signals. */
-    int nptsPad;        /*!< Number of points to pad signals prior to
-                             cross-correlating.  Note, that the correlation
-                             length will be 2*nptsPad-1. */
+    int npts;            /*!< Number of points in signals. */
+    int nptsPad;         /*!< Number of points to pad signals prior to
+                              cross-correlating.  Note, that the correlation
+                              length will be 2*nptsPad-1. */
+    int lxc;             /*!< Length of cross-correlations = 2*nptsPad-1. */
     int nTotalXCs;       /*!< Cumulative number of cross-correlations. */
     int nSignalGroups;   /*!< Number of signal groups.  For example if processing
                               P and S waves then this would be 2. */
     int root;            /*!< Rank of root process.  Will be 0. */
+    int ngrd;            /*!< Total number of grid points in model. */
     bool ldoFFT;         /*!< If true then I will compute the FFTs. */
     bool lphaseXCs;      /*!< If true then compute the phase correlations. \n
                               Otherwise, compute the cross-correlations. */
@@ -96,6 +101,10 @@ int xcloc_initialize(const MPI_Comm comm,
 int xcloc_makeXCPairs(struct xcloc_struct *xcloc);
 int xcloc_finalize(struct xcloc_struct *xcloc);
 int xcloc_apply(struct xcloc_struct *xcloc);
+int xcloc_setTableFromRoot(const int itIn, const int ngrdIn,
+                           const enum xclocPrecision_enum precisionIn,
+                           const void *__restrict__ ttimes,
+                           struct xcloc_struct *xcloc);
 int xcloc_scatterDataFromRoot(const int nsignals,
                               const int lds, const int npts,
                               const MPI_Datatype sendType, 

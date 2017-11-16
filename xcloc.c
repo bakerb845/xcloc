@@ -40,6 +40,12 @@ int xcloc_checkParameters(const struct xclocParms_struct xclocParms)
                 __func__, xclocParms.chunkSize, DALES_MEM_ALIGNMENT);
         ierr = 1;
     }
+    if (xclocParms.ngrd < 1)
+    {
+        fprintf(stderr, "%s: ngrd=%d must be positive\n", __func__,
+                xclocParms.ngrd);
+        ierr = 1;
+    }
     if (xclocParms.signalGroup == NULL)
     {
         fprintf(stdout, "%s: Assuming all signals in group 0\n", __func__);
@@ -63,7 +69,7 @@ int xcloc_initialize(const MPI_Comm comm,
                      const struct xclocParms_struct xclocParms,
                      struct xcloc_struct *xcloc)
 {
-    int color, ierr, ierrAll, ift, ig, ir, is, key, mpiInit, pMin, pMax;
+    int color, ierr, ierrAll, ift, ig, is, key, mpiInit, pMin, pMax;
     const int root = 0;
     ierr = 0;
     memset(xcloc, 0, sizeof(struct xcloc_struct));
@@ -119,7 +125,9 @@ int xcloc_initialize(const MPI_Comm comm,
         xcloc->nmigrateGroups = xcloc->nfftProcs;
         xcloc->npts    = xclocParms.npts;
         xcloc->nptsPad = xclocParms.nptsPad;
+        xcloc->ngrd    = xclocParms.ngrd;
         xcloc->lphaseXCs = xclocParms.lphaseXCs;
+        xcloc->lxc = 2*xcloc->nptsPad - 1;
         ippsMax_32s(xclocParms.signalGroup, xclocParms.nsignals, &pMax);
         ippsMin_32s(xclocParms.signalGroup, xclocParms.nsignals, &pMin);
         xcloc->nSignalGroups = pMax - pMin + 1;
@@ -156,6 +164,8 @@ BCAST_ERROR:;
     MPI_Bcast(&xcloc->nfftProcs,      1, MPI_INT, root, xcloc->globalComm);
     MPI_Bcast(&xcloc->npts,           1, MPI_INT, root, xcloc->globalComm);
     MPI_Bcast(&xcloc->nptsPad,        1, MPI_INT, root, xcloc->globalComm);
+    MPI_Bcast(&xcloc->lxc,            1, MPI_INT, root, xcloc->globalComm);
+    MPI_Bcast(&xcloc->ngrd,           1, MPI_INT, root, xcloc->globalComm);
     MPI_Bcast(&xcloc->nTotalSignals,  1, MPI_INT, root, xcloc->globalComm);
     MPI_Bcast(&xcloc->nSignalGroups,  1, MPI_INT, root, xcloc->globalComm);
     MPI_Bcast(&xcloc->lphaseXCs, 1, MPI_C_BOOL, root, xcloc->globalComm);
@@ -186,6 +196,7 @@ BCAST_ERROR:;
         fprintf(stdout, "%s: Failed making fftComm\n", __func__);
         return -1;
     }
+/*
     // Make the migration communicator
     color = MPI_UNDEFINED;
     key = 0;
@@ -211,6 +222,7 @@ BCAST_ERROR:;
     MPI_Comm_rank(xcloc->migrateComm, &xcloc->migrateCommRank);
     MPI_Comm_size(xcloc->migrateComm, &xcloc->migrateCommSize);
     // Make the global XC pairs
+*/
     ierr = xcloc_makeXCPairs(xcloc);
     if (ierr != 0)
     {
@@ -245,6 +257,23 @@ BCAST_ERROR:;
     }
     MPI_Allreduce(&ierr, &ierrAll, 1, MPI_INT, MPI_SUM, xcloc->globalComm);
     if (ierrAll != 0){return -1;} 
+    // Initialize the migration communicator
+    if (xcloc->globalCommRank == 0)
+    {
+        fprintf(stdout, "%s: Initializing migration...\n", __func__);
+    }
+    ierr = xcloc_migrateMPI_initialize(xcloc->globalComm,
+                                       xcloc->nmigrateGroups,
+                                       xcloc->nTotalSignals,
+                                       xcloc->nTotalXCs,
+                                       xcloc->chunkSize, 
+                                       xcloc->ngrd,
+                                       xcloc->lxc, xcloc->dt,
+                                       xcloc->xcfftMPI.xcrPairs,
+                                       &xcloc->migrateMPI);
+    MPI_Allreduce(&ierr, &ierrAll, 1, MPI_INT, MPI_SUM, xcloc->globalComm);
+    //if (ierrAll != 0){return -1;}
+/*
     // Inform the migration processes of their local migration pairs
     if (xcloc->migrateCommRank == root)
     {
@@ -260,6 +289,7 @@ BCAST_ERROR:;
     }
     MPI_Bcast(xcloc->xcPairsLoc, 2*xcloc->ntfSignalsLoc, MPI_INT,
               root, xcloc->migrateComm);
+*/
     // All done
     xcloc->linit = true;
     return 0;
@@ -273,9 +303,16 @@ int xcloc_setTravelTimeTableFromRoot(const int ngrd,
 }
 */
 //============================================================================//
+/*!
+ * @brief Computes the Fourier transforms, the envelopes, and the migration
+ *        image.
+ *
+ * @coyright Ben Baker distributed under the MIT license.
+ *
+ */
 int xcloc_apply(struct xcloc_struct *xcloc)
 {
-    int ierr;
+    int ierr, ierrAll;
     if (!xcloc->linit)
     {
         fprintf(stderr, "%s: xcloc not initialized\n", __func__);
@@ -291,13 +328,54 @@ int xcloc_apply(struct xcloc_struct *xcloc)
                     __func__, xcloc->globalCommRank);
             ierr = 1;
         }
+        MPI_Allreduce(&ierr, &ierrAll, 1, MPI_INT, MPI_SUM, xcloc->fftComm);
     }
-    MPI_Bcast(&ierr, 1, MPI_INT, xcloc->root, xcloc->migrateComm);
-    if (ierr != 0){return -1;}
+    MPI_Bcast(&ierrAll, 1, MPI_INT, xcloc->root, xcloc->globalComm);
+    if (ierrAll != 0){return -1;}
     // Distribute the correlograms to the process on the migration grid
 
     return 0;
 }
+//============================================================================//
+/*!
+ * @brief Sets the it'th travel time table.
+ *
+ * @copyright Ben Baker distributed under the MIT license.
+ *
+ */
+int xcloc_setTableFromRoot(const int itIn, const int ngrdIn,
+                           const enum xclocPrecision_enum precisionIn,
+                           const void *__restrict__ ttimes,
+                           struct xcloc_struct *xcloc)
+{
+    int ierr, ierrAll, it, ngrd, precIn;
+    enum xclocPrecision_enum precision;
+    ierr = 0;
+    if (!xcloc->linit)
+    {
+        fprintf(stderr, "%s: xcloc not initialized\n", __func__);
+        return -1;
+    }
+    if (xcloc->globalCommRank == xcloc->root)
+    {
+        it = itIn;
+        ngrd = ngrdIn;
+        precIn = (int) precisionIn;
+    }
+    MPI_Bcast(&it,     1, MPI_INT, xcloc->root, xcloc->globalComm);
+    MPI_Bcast(&ngrd,   1, MPI_INT, xcloc->root, xcloc->globalComm);
+    MPI_Bcast(&precIn, 1, MPI_INT, xcloc->root, xcloc->globalComm);
+    precision = (enum xclocPrecision_enum) precIn;
+    ierr = xcloc_migrateMPI_setTableFromRoot(it, ngrd, precision, ttimes, 
+                                             &xcloc->migrateMPI);
+    if (ierr != 0)
+    {
+        fprintf(stderr, "%s: Error setting table\n", __func__);
+        ierr = 1;
+    }
+    MPI_Allreduce(&ierr, &ierrAll, 1, MPI_INT, MPI_SUM, xcloc->globalComm); 
+    return ierrAll;
+} 
 //============================================================================//
 int xcloc_scatterDataFromRoot(const int nsignals,
                               const int lds, const int npts,
@@ -431,7 +509,8 @@ int xcloc_finalize(struct xcloc_struct *xcloc)
         xcloc_xcfftMPI_finalize(&xcloc->xcfftMPI);
         MPI_Comm_free(&xcloc->fftComm);
     }
-    MPI_Comm_free(&xcloc->migrateComm);
+    xcloc_migrateMPI_finalize(&xcloc->migrateMPI); 
+    //MPI_Comm_free(&xcloc->migrateComm);
     MPI_Comm_free(&xcloc->globalComm);
     memset(xcloc, 0, sizeof(struct xcloc_struct));
     return 0;

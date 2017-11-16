@@ -97,7 +97,7 @@ int main(int argc, char *argv[])
 {
     struct xclocHDF5Grid_struct h5io;
     struct xcfft_struct xcfft;
-    struct xcfftMPI_struct xcfftMPI;
+    //struct xcfftMPI_struct xcfftMPI;
     struct xcfftRMSFilter_struct rms;
     struct migrate_struct migrate;
     struct xclocEnvelope_struct envelope;
@@ -204,26 +204,25 @@ int main(int argc, char *argv[])
     int npts = nptsSig;
     int nptsPad = nptsSig;
     ierr = xcloc_xcfft_initialize(npts, nptsPad, nsignals, &xcfft);
-    ierr = xcloc_xcfftMPI_initialize(npts, nptsPad, nsignals, -1,
-                                     MPI_COMM_WORLD,
-                                     master, NULL, &xcfftMPI);
+    //ierr = xcloc_xcfftMPI_initialize(npts, nptsPad, nsignals, -1,
+    //                                 MPI_COMM_WORLD,
+    //                                 master, NULL, &xcfftMPI);
     if (ierr != 0)
     {
         fprintf(stderr, "%s: Error initializing xcfft structure\n", __func__);
         return EXIT_FAILURE;
     }
     ierr = xcloc_envelope_initialize(envWindowLen,
-                                     xcfftMPI.xcInv.precision,
-                                     XCLOC_HIGH_ACCURACY, //xcfftMPI.xcInv.accuracy,
+                                     xcfft.precision,
+                                     XCLOC_HIGH_ACCURACY, //xcfft.accuracy,
                                      &envelope);
     if (ierr != 0)
     {
         fprintf(stderr, "%s: Error creating envelope filter\n", __func__);
         return EXIT_FAILURE;
     }
-    ierr = xcloc_rmsFilter_initialize(winLen, xcfftMPI.xcInv.lxc,
-                                      xcfftMPI.xcInv.precision,
-                                      &rms); 
+    ierr = xcloc_rmsFilter_initialize(winLen, xcfft.lxc,
+                                      xcfft.precision, &rms); 
     if (ierr != 0)
     {
         fprintf(stderr, "%s: Error creating RMS filter\n", __func__);
@@ -271,6 +270,7 @@ int main(int argc, char *argv[])
                 MPI_Abort(MPI_COMM_WORLD, 30);
             }
         }
+/*
         ierr = xcloc_xcfftMPI_scatterData(master, nsignals, nptsSig, nptsSig,
                                           MPI_DOUBLE, obsPtr, &xcfftMPI);
         if (ierr != 0)
@@ -278,6 +278,7 @@ int main(int argc, char *argv[])
             fprintf(stderr, "%s: Error scattering data\n", __func__);
             MPI_Abort(MPI_COMM_WORLD, 30);
         }
+*/
         ierr = xcloc_xcfft_computePhaseCorrelation(&xcfft);
         if (ierr != 0)
         {
@@ -285,6 +286,7 @@ int main(int argc, char *argv[])
                     __func__);
             MPI_Abort(MPI_COMM_WORLD, 30);
         }
+/*
         ierr = xcloc_xcfftMPI_computePhaseCorrelation(&xcfftMPI);
         if (ierr != 0)
         {
@@ -292,6 +294,7 @@ int main(int argc, char *argv[])
                     __func__);
             MPI_Abort(MPI_COMM_WORLD, 30);
         }
+*/
         ierr = xcloc_envelope_apply(xcfft.ntfSignals,
                                     xcfft.dataOffset,
                                     xcfft.lxc,
@@ -375,7 +378,9 @@ int main(int argc, char *argv[])
                                  dx, dy, dz, 
                                  vel, &xr[3*irec], tTable);
         }
-        ierr = xcloc_migrate_setTable32f(irec, ngrd, tTable, &migrate);
+        ierr = xcloc_migrate_setTable(irec, ngrd, XCLOC_SINGLE_PRECISION,
+                                      tTable, &migrate); 
+        //ierr = xcloc_migrate_setTable32f(irec, ngrd, tTable, &migrate);
         if (ierr != 0)
         {
             fprintf(stderr, "%s: Failed to set it'th=%d table\n",
@@ -436,7 +441,7 @@ int main(int argc, char *argv[])
     }
     ierr = xcloc_h5ioGrid_close(&h5io);
     ierr = xcloc_xcfft_finalize(&xcfft);
-    ierr = xcloc_xcfftMPI_finalize(&xcfftMPI);
+    //ierr = xcloc_xcfftMPI_finalize(&xcfftMPI);
     ierr = xcloc_migrate_finalize(&migrate);
     ierr = xcloc_envelope_finalize(&envelope);
     ierr = xcloc_rmsFilter_finalize(&rms);
