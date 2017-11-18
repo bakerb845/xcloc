@@ -433,7 +433,117 @@ int xcloc_migrateMPI_createLocalXCPairs(struct migrateMPI_struct *migrateMPI)
               migrateMPI->root, migrateMPI->globalComm);
     return 0;
 }
-
+//============================================================================//
+/*!
+ * @brief Sets the cross-correlograms on all process on the intraComm
+ *        in the migration structure.
+ *
+ * @param[in] ldxcIn          Leading dimension of y1.
+ * @param[in] lxcIn           Length of the cross-correlations.
+ * @param[in] nxcIn           Number of cross-correlations.
+ * @param[in] precisionIn     The precision, single or double, defined on the
+ *                            root process.
+ * @param[in] lbcastXCs       If true then xcs will be broadcast to all
+ *                            processes. \n
+ *                            Otherwise, xcs is already defined on all processes.
+ *
+ * @param[in,out] xcs         This is an array holding the cross-correlagrams.
+ *                            If lbcast is true then xcs is defined on the root
+ *                            process and broadcast to all other processes. \n
+ *                            Otherwise, xcs is defined on all processes.
+ *                            In both cases, xcs is an array of dimension 
+ *                            [ldxcIn x nxcIn] with leading dimension ldxcIn
+ *                            with space allocated on all processes.  It's
+ *                            precision is defined by precisionIn.
+ * @param[in,out] migrateMPI  On input contains the initialize migrateMPI
+ *                            structure. \n
+ *                            On exit the cross-correlations have been set on
+ *                            all processes on the intra-communicator.
+ *
+ * @result 0 indicates success.
+ *
+ * @copyright Ben Baker distributed under the MIT license.
+ *
+ */
+int xcloc_migrateMPI_setCrossCorrelations(
+    const int ldxcIn, const int lxcIn,
+    const int nxcIn,
+    const enum xclocPrecision_enum precisionIn,
+    const bool lbcastXCs, void *__restrict__ xcs,
+    struct migrateMPI_struct *migrateMPI)
+{
+    int iv[6], ierr, lxc, ldxc, myid, nbcast, nxc, prec;
+    bool lbcast;
+    enum xclocPrecision_enum precision;
+    ierr = 0;
+    MPI_Comm_rank(migrateMPI->intraComm, &myid);
+    if (myid == migrateMPI->root)
+    {
+        ldxc = ldxcIn;
+        lxc  = lxcIn;
+        nxc  = nxcIn;
+        prec = (int) precisionIn;
+        if (ldxc < lxc || lxc != migrateMPI->lxc || nxc != migrateMPI->nxcLoc)
+        {
+            if (lxc != migrateMPI->lxc)
+            {
+                fprintf(stderr, "%s: Error lxc=%d != migrateMPI->lxc=%d\n",
+                        __func__, lxc, migrateMPI->lxc);
+            }
+            if (ldxc < lxc)
+            {
+                fprintf(stderr, "%s: Error ldxc=%d < lxc=%d\n",
+                        __func__, ldxc, lxc);
+            }
+            if (nxc != migrateMPI->nxcLoc)
+            {
+                fprintf(stderr, "%s: Error nxc=%d ! migrateMPI->nxcLoc=%d\n",
+                        __func__, nxc, migrateMPI->nxcLoc);
+            } 
+            ierr = 1;
+        } 
+        iv[0] = ierr;
+        iv[1] = ldxc;
+        iv[2] = lxc;
+        iv[3] = nxc;
+        iv[4] = prec;
+        iv[5] = (int) lbcastXCs;
+    }
+    // Send input paramters as a vector
+    MPI_Bcast(iv, 6, MPI_INT, migrateMPI->root, migrateMPI->intraComm);
+    // Unpack the vector
+    ierr = iv[0];
+    ldxc = iv[1];
+    lxc  = iv[2];
+    nxc  = iv[3];
+    precision = (enum xclocPrecision_enum) iv[4];
+    lbcast = (bool) iv[5];
+    nbcast = ldxc*nxc;
+    if (ierr != 0){return -1;}
+    if (precision == XCLOC_SINGLE_PRECISION)
+    {
+        if (lbcast)
+        {
+            MPI_Bcast(xcs, nbcast, MPI_FLOAT,
+                      migrateMPI->root, migrateMPI->intraComm);
+        }
+        ierr = xcloc_migrate_setCrossCorrelations(ldxc, lxc, nxc, xcs,
+                                                  XCLOC_SINGLE_PRECISION,
+                                                  &migrateMPI->migrate);
+    }
+    else
+    {
+        if (lbcast)
+        {
+            MPI_Bcast(xcs, nbcast, MPI_DOUBLE,
+                      migrateMPI->root, migrateMPI->intraComm);
+        }
+        ierr = xcloc_migrate_setCrossCorrelations(ldxc, lxc, nxc, xcs,
+                                                  XCLOC_DOUBLE_PRECISION, 
+                                                  &migrateMPI->migrate); 
+    }
+    return ierr;
+}
 //============================================================================//
 /*!
  * @brief Sets the travel-time table on the appropriate migration groups.

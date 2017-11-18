@@ -76,6 +76,13 @@ int xcloc_migrateMPI_setTableFromRoot(const int itIn, const int ngrdIn,
                                       const enum xclocPrecision_enum precision,
                                       const void *__restrict__ ttimes,
                                       struct migrateMPI_struct *migrateMPI);
+/*! Sets the cross-correlations. */
+int xcloc_migrateMPI_setCrossCorrelations(
+    const int ldxcIn, const int lxcIn,
+    const int nxcIn,
+    const enum xclocPrecision_enum precisionIn,
+    const bool lbcastXCs, void *__restrict__ xcs,
+    struct migrateMPI_struct *migrateMPI);
 /*! Computes the migration image. */
 int xcloc_migrateMPI_computeMigrationImage(
     struct migrateMPI_struct *migrateMPI);

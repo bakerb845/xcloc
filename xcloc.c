@@ -303,19 +303,26 @@ BCAST_ERROR:;
     if (xcloc->ldoFFT)
     {
         xcloc->ntfSignalsLoc = xcloc->xcfftMPI.ntfSignalsLoc;
+        xcloc->ldxc          = xcloc->xcfftMPI.xcInv.dataOffset;
     }
     MPI_Bcast(&xcloc->ntfSignalsLoc, 1, MPI_INT, xcloc->root,
               xcloc->migrateMPI.intraComm);
-    xcloc->leny = xcloc->lxc*xcloc->ntfSignalsLoc;
+    MPI_Bcast(&xcloc->ldxc,          1, MPI_INT, xcloc->root,
+              xcloc->migrateMPI.intraComm);
+    xcloc->leny = xcloc->ldxc*xcloc->ntfSignalsLoc;
     if (xcloc->precision == XCLOC_SINGLE_PRECISION)
     {
-        xcloc->y1 = aligned_alloc(XCLOC_MEM_ALIGNMENT, (size_t) xcloc->leny*sizeof(float)); 
-        xcloc->y2 = aligned_alloc(XCLOC_MEM_ALIGNMENT, (size_t) xcloc->leny*sizeof(float));
+        xcloc->y1 = aligned_alloc(XCLOC_MEM_ALIGNMENT,
+                                  (size_t) xcloc->leny*sizeof(float)); 
+        xcloc->y2 = aligned_alloc(XCLOC_MEM_ALIGNMENT,
+                                  (size_t) xcloc->leny*sizeof(float));
     }
     else
     {
-        xcloc->y1 = aligned_alloc(XCLOC_MEM_ALIGNMENT, (size_t) xcloc->leny*sizeof(double));
-        xcloc->y2 = aligned_alloc(XCLOC_MEM_ALIGNMENT, (size_t) xcloc->leny*sizeof(double));
+        xcloc->y1 = aligned_alloc(XCLOC_MEM_ALIGNMENT,
+                                  (size_t) xcloc->leny*sizeof(double));
+        xcloc->y2 = aligned_alloc(XCLOC_MEM_ALIGNMENT,
+                                  (size_t) xcloc->leny*sizeof(double));
     }
     // All done
     xcloc->linit = true;
@@ -331,21 +338,23 @@ int xcloc_setTravelTimeTableFromRoot(const int ngrd,
 */
 //============================================================================//
 /*!
- * @brief Computes the Fourier transforms, the envelopes, and the migration
+ * @brief Computes the phase-correlations, the envelopes, and the migration
  *        image.
+ *
+ * @param[in,out]
  *
  * @coyright Ben Baker distributed under the MIT license.
  *
  */
 int xcloc_apply(struct xcloc_struct *xcloc)
 {
-    float *yf1, *yf2;
     int ierr, ierrAll;
     if (!xcloc->linit)
     {
         fprintf(stderr, "%s: xcloc not initialized\n", __func__);
         return -1;
     }
+    ierrAll = 0;
     // Compute the correlograms
     if (xcloc->ldoFFT)
     {
@@ -361,69 +370,99 @@ int xcloc_apply(struct xcloc_struct *xcloc)
     MPI_Bcast(&ierrAll, 1, MPI_INT, xcloc->root, xcloc->globalComm);
     if (ierrAll != 0){return -1;}
     // Distribute the correlograms to the process on the migration grid
+    ierrAll = 0;
     if (xcloc->precision == XCLOC_SINGLE_PRECISION)
     {
         if (xcloc->ldoFFT)
         {
             xcloc_xcfft_getAllXCData(xcloc->ntfSignalsLoc, 
-                                     xcloc->lxc,
+                                     xcloc->ldxc,
                                      xcloc->lxc,
                                      XCLOC_SINGLE_PRECISION,
                                      xcloc->xcfftMPI.xcInv,
                                      xcloc->y1);
         }
-        MPI_Bcast(xcloc->y1, xcloc->leny, MPI_FLOAT,
-                  xcloc->root, xcloc->migrateMPI.intraComm); 
     }
     else
     {
         if (xcloc->ldoFFT)
         {
             xcloc_xcfft_getAllXCData(xcloc->ntfSignalsLoc,
-                                     xcloc->lxc,
+                                     xcloc->ldxc,
                                      xcloc->lxc,
                                      XCLOC_DOUBLE_PRECISION,
                                      xcloc->xcfftMPI.xcInv,
                                      xcloc->y1);
         }
-        MPI_Bcast(xcloc->y1, xcloc->leny, MPI_DOUBLE,
-                  xcloc->root, xcloc->migrateMPI.intraComm);
     }
     // Apply the envelope
     if (xcloc->lenvelope)
     {
-        float *work = aligned_alloc(XCLOC_MEM_ALIGNMENT, xcloc->leny*sizeof(float));
-        memset(work, 0, xcloc->leny*sizeof(float));
-/*
-        double di = round((double) xcloc->ntfSignalsLoc/(double) xcloc->xcloc->nProcsPerGroup);
-        for (int i=0; i<xcloc->migrateMPI.nProcsPerGroup; i++)
-        { 
-
+        if (xcloc->precision == XCLOC_SINGLE_PRECISION)
+        {
+            xcloc_envelope_applyMPI(xcloc->migrateMPI.intraComm,
+                                    xcloc->root,
+                                    xcloc->ntfSignalsLoc,
+                                    xcloc->ldxc,
+                                    xcloc->lxc,
+                                    MPI_FLOAT,
+                                    &xcloc->envelope,
+                                    xcloc->y1, xcloc->y2);
         }
-*/
-        MPI_Allreduce(work, xcloc->y2, xcloc->leny, MPI_FLOAT, MPI_SUM, 
-                      xcloc->migrateMPI.intraComm);
-        free(work); 
+        else
+        {
+            xcloc_envelope_applyMPI(xcloc->migrateMPI.intraComm,
+                                    xcloc->root,
+                                    xcloc->ntfSignalsLoc,
+                                    xcloc->ldxc,
+                                    xcloc->lxc,
+                                    MPI_DOUBLE,
+                                    &xcloc->envelope,
+                                    xcloc->y1, xcloc->y2);
+        }
+        // Set the crosss-correlograms on the migration structure 
+        ierr = xcloc_migrateMPI_setCrossCorrelations(
+                                          xcloc->ldxc, xcloc->lxc,
+                                          xcloc->ntfSignalsLoc,
+                                          xcloc->precision,
+                                          false, xcloc->y2,
+                                          &xcloc->migrateMPI);
     }
+    // Otherwise, just copy the data
     else
     {
-        memcpy(xcloc->y2, xcloc->y1, xcloc->leny*sizeof(float));
+        // Set the crosss-correlograms on the migration structure 
+        ierr = xcloc_migrateMPI_setCrossCorrelations(
+                                          xcloc->ldxc, xcloc->lxc,
+                                          xcloc->ntfSignalsLoc,
+                                          xcloc->precision,
+                                          true, xcloc->y1,
+                                          &xcloc->migrateMPI);
     }
-    xcloc_migrate_setCrossCorrelations(xcloc->lxc, xcloc->lxc,
-                                       xcloc->ntfSignalsLoc,
-                                       xcloc->y2,
-                                       xcloc->precision,
-                                       &xcloc->migrateMPI.migrate);
-/*
-int xcloc_migrate_setCrossCorrelation(const int lxc, const int ixc, 
-                                      const void *__restrict__ xcs, 
-                                      const enum xclocPrecision_enum precision,
-                                      struct migrate_struct *migrate)
-*/
-
-    // Compute the migration image
-    xcloc_migrateMPI_computeMigrationImage(&xcloc->migrateMPI);
-    return 0;
+    if (ierr != 0)
+    {
+        fprintf(stderr, "%s: Error setting cross-correlations on %d\n",
+                __func__, xcloc->globalCommRank);
+        ierrAll = 1;
+    }
+    // Compute the migration image.  Note, that the image will be distributed
+    // on the 0'th group. 
+    ierr = xcloc_migrateMPI_computeMigrationImage(&xcloc->migrateMPI);
+    if (ierr != 0)
+    {
+        fprintf(stderr, "%s: Error computing migration on %d\n",
+                __func__, xcloc->globalCommRank);
+        ierrAll = ierrAll + 1;
+    }
+    MPI_Allreduce(&ierrAll, &ierr, 1, MPI_INT, MPI_SUM, xcloc->globalComm);
+    if (ierr != 0)
+    {
+        if (xcloc->globalCommRank == xcloc->root)
+        {
+            fprintf(stderr, "%s: Errors encountered\n", __func__);
+        }
+    }
+    return ierr;
 }
 //============================================================================//
 /*!

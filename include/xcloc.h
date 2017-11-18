@@ -81,6 +81,7 @@ struct xcloc_struct
     int nptsPad;         /*!< Number of points to pad signals prior to
                               cross-correlating.  Note, that the correlation
                               length will be 2*nptsPad-1. */
+    int ldxc;            /*!< Leading dimension of cross-correlations. */
     int lxc;             /*!< Length of cross-correlations = 2*nptsPad-1. */
     int nTotalXCs;       /*!< Cumulative number of cross-correlations. */
     int nSignalGroups;   /*!< Number of signal groups.  For example if processing

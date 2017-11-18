@@ -3,6 +3,9 @@
 #include <stdbool.h>
 #include "xcloc_config.h"
 #include "xcloc_enum.h"
+#ifdef XCLOC_USE_MPI
+#include <mpi.h>
+#endif
 
 struct xclocEnvelope_struct
 {
@@ -45,6 +48,15 @@ int xcloc_envelope_apply(const int nsignals,
                           struct xclocEnvelope_struct *envelope,
                           const void *__restrict__ x,
                           void *__restrict__ xfilt);
+#ifdef XCLOC_USE_MPI
+int xcloc_envelope_applyMPI(const MPI_Comm comm, const int root,
+                            const int nsignalsIn, const int ldsIn,
+                            const int nptsIn,
+                            const MPI_Datatype dataType,
+                            struct xclocEnvelope_struct *envelope,
+                            const void *__restrict__ x,
+                            void *__restrict__ xfilt);
+#endif
 /*! Finalizes the envelope structure. */
 int xcloc_envelope_finalize(struct xclocEnvelope_struct *envelope);
 #ifdef __cplusplus

@@ -3,6 +3,9 @@
 #include <math.h>
 #include <string.h>
 #include "xcloc_envelope.h"
+#ifdef XCLOC_USE_MPI
+#include <mpi.h>
+#endif
 #include <mkl.h>
 #include <ipps.h>
 
@@ -171,6 +174,108 @@ int xcloc_envelope_finalize(struct xclocEnvelope_struct *envelope)
     memset(envelope, 0, sizeof(struct xclocEnvelope_struct));
     return 0;
 }
+#ifdef XCLOC_USE_MPI
+int xcloc_envelope_applyMPI(const MPI_Comm comm, const int root,
+                            const int nsignalsIn, const int ldsIn,
+                            const int nptsIn,
+                            const MPI_Datatype dataType,
+                            struct xclocEnvelope_struct *envelope,
+                            const void *__restrict__ x,
+                            void *__restrict__ xfilt)
+{
+    void *xwork1, *xwork2;
+    double dPart;
+    int *displs, *sendCounts, *sendPtr, ip, ierr, lds, myid, nprocs,
+        npts, nsignals, recvCount;
+    MPI_Comm_size(comm, &nprocs);
+    MPI_Comm_rank(comm, &myid);
+    if (nprocs == 1)
+    {
+        if (dataType == MPI_DOUBLE)
+        {
+            ierr = xcloc_envelope_apply(nsignalsIn, ldsIn, nptsIn,
+                                        XCLOC_DOUBLE_PRECISION, envelope,
+                                        x, xfilt);
+        }
+        else
+        {
+            ierr = xcloc_envelope_apply(nsignalsIn, ldsIn, nptsIn,
+                                        XCLOC_SINGLE_PRECISION, envelope,
+                                        x, xfilt);
+        }
+        if (ierr != 0)
+        {
+            fprintf(stderr, "%s: Error applying envelope\n", __func__);
+            ierr = 1;
+        }
+        return ierr;
+    }
+    if (myid == root)
+    {
+        nsignals = nsignalsIn;
+        lds = ldsIn;
+        npts = nptsIn;
+    } 
+    MPI_Bcast(&nsignals, 1, MPI_INT, root, comm);
+    MPI_Bcast(&lds,      1, MPI_INT, root, comm);
+    MPI_Bcast(&npts,     1, MPI_INT, root, comm);
+    // Split the grid
+    dPart = (double) nsignals/(double) nprocs;
+    displs     = (int *) calloc((size_t) nprocs, sizeof(int));
+    sendCounts = (int *) calloc((size_t) nprocs, sizeof(int));
+    sendPtr    = (int *) calloc((size_t) nprocs + 1, sizeof(int));
+    for (ip=0; ip<nprocs; ip++)
+    {
+        sendPtr[ip] = (int) round((double) ip*dPart);
+        if (ip == 0){sendPtr[ip] = 0;}
+        sendPtr[ip] = MIN(sendPtr[ip], nsignals);
+    }
+    sendPtr[nprocs] = nsignals;
+    recvCount = sendPtr[myid+1] - sendPtr[myid];
+    for (ip=0; ip<nprocs; ip++)
+    {
+        sendCounts[ip] = sendPtr[ip+1] - sendPtr[ip];
+        displs[ip] = sendPtr[ip]*lds; 
+    }
+    if (dataType == MPI_DOUBLE)
+    {
+        xwork1 = aligned_alloc(XCLOC_MEM_ALIGNMENT,
+                               (size_t) (recvCount*lds)*sizeof(double));
+        xwork2 = aligned_alloc(XCLOC_MEM_ALIGNMENT,
+                               (size_t) (recvCount*lds)*sizeof(double));
+        MPI_Scatterv(x, sendCounts, displs,
+                     MPI_DOUBLE, xwork1, recvCount,
+                     MPI_DOUBLE, root, comm);
+        ierr = xcloc_envelope_apply(recvCount,
+                                    lds, npts,
+                                    XCLOC_DOUBLE_PRECISION,
+                                    envelope,
+                                    xwork1, xwork2);
+        MPI_Allgatherv(xwork2, recvCount, MPI_DOUBLE,
+                       xfilt, sendCounts, displs, MPI_DOUBLE, comm);
+    }
+    else
+    {
+        xwork1 = aligned_alloc(XCLOC_MEM_ALIGNMENT,
+                               (size_t) (recvCount*lds)*sizeof(float));
+        xwork2 = aligned_alloc(XCLOC_MEM_ALIGNMENT,
+                               (size_t) (recvCount*lds)*sizeof(float));
+        MPI_Scatterv(x, sendCounts, displs,
+                     MPI_FLOAT, xwork1, recvCount,
+                     MPI_FLOAT, root, comm);
+        ierr = xcloc_envelope_apply(recvCount,
+                                    lds, npts,
+                                    XCLOC_SINGLE_PRECISION,
+                                    envelope,
+                                    xwork1, xwork2);
+        MPI_Allgatherv(xwork2, recvCount, MPI_DOUBLE,
+                       xfilt, sendCounts, displs, MPI_DOUBLE, comm);
+    }
+    free(xwork1);
+    free(xwork2);
+    return 0;
+}
+#endif
 //============================================================================//
 /*!
  * @brief Computes the envelope of a group of signals.
@@ -197,11 +302,11 @@ int xcloc_envelope_finalize(struct xclocEnvelope_struct *envelope)
  *
  */
 int xcloc_envelope_apply(const int nsignals,
-                          const int lds, const int npts, 
-                          const enum xclocPrecision_enum precision,
-                          struct xclocEnvelope_struct *envelope,
-                          const void *__restrict__ x,
-                          void *__restrict__ xfilt)
+                         const int lds, const int npts, 
+                         const enum xclocPrecision_enum precision,
+                         struct xclocEnvelope_struct *envelope,
+                         const void *__restrict__ x,
+                         void *__restrict__ xfilt)
 {
     IppsFIRSpec_64f *pSpec64R, *pSpec64I;
     IppsFIRSpec_32f *pSpec32R, *pSpec32I;
