@@ -385,7 +385,7 @@ int xcloc_xdmf_writeGrid(const char *xdmfFile,
         rc = xmlTextWriterEndElement(writer); CHECKRC(rc);
     } // Loop on datasets
     // </Grid>
-    if (xdmf.nDataSets > 1){rc = xmlTextWriterEndElement(writer); CHECKRC(rc);}
+    if (xdmf.nDataSets >= 1){rc = xmlTextWriterEndElement(writer); CHECKRC(rc);}
     rc = xmlTextWriterEndElement(writer); CHECKRC(rc); //</Domain>
     rc = xmlTextWriterEndElement(writer); CHECKRC(rc); //</Xdmf>
     // Finally copy the char * XML message
