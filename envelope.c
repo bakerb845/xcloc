@@ -186,7 +186,7 @@ int xcloc_envelope_applyMPI(const MPI_Comm comm, const int root,
     void *xwork1, *xwork2;
     double dPart;
     int *displs, *sendCounts, *sendPtr, ip, ierr, lds, myid, nprocs,
-        npts, nsignals, recvCount;
+        npts, nsignals, nsignalsLoc, recvCount;
     MPI_Comm_size(comm, &nprocs);
     MPI_Comm_rank(comm, &myid);
     if (nprocs == 1)
@@ -231,22 +231,23 @@ int xcloc_envelope_applyMPI(const MPI_Comm comm, const int root,
         sendPtr[ip] = MIN(sendPtr[ip], nsignals);
     }
     sendPtr[nprocs] = nsignals;
-    recvCount = sendPtr[myid+1] - sendPtr[myid];
+    nsignalsLoc = sendPtr[myid+1] - sendPtr[myid]; 
+    recvCount = nsignalsLoc*lds;
     for (ip=0; ip<nprocs; ip++)
     {
-        sendCounts[ip] = sendPtr[ip+1] - sendPtr[ip];
+        sendCounts[ip] = (sendPtr[ip+1] - sendPtr[ip])*lds;
         displs[ip] = sendPtr[ip]*lds; 
     }
     if (dataType == MPI_DOUBLE)
     {
         xwork1 = aligned_alloc(XCLOC_MEM_ALIGNMENT,
-                               (size_t) (recvCount*lds)*sizeof(double));
+                               (size_t) (nsignalsLoc*lds)*sizeof(double));
         xwork2 = aligned_alloc(XCLOC_MEM_ALIGNMENT,
-                               (size_t) (recvCount*lds)*sizeof(double));
+                               (size_t) (nsignalsLoc*lds)*sizeof(double));
         MPI_Scatterv(x, sendCounts, displs,
                      MPI_DOUBLE, xwork1, recvCount,
                      MPI_DOUBLE, root, comm);
-        ierr = xcloc_envelope_apply(recvCount,
+        ierr = xcloc_envelope_apply(nsignalsLoc,
                                     lds, npts,
                                     XCLOC_DOUBLE_PRECISION,
                                     envelope,
@@ -257,19 +258,19 @@ int xcloc_envelope_applyMPI(const MPI_Comm comm, const int root,
     else
     {
         xwork1 = aligned_alloc(XCLOC_MEM_ALIGNMENT,
-                               (size_t) (recvCount*lds)*sizeof(float));
+                               (size_t) (nsignalsLoc*lds)*sizeof(float));
         xwork2 = aligned_alloc(XCLOC_MEM_ALIGNMENT,
-                               (size_t) (recvCount*lds)*sizeof(float));
+                               (size_t) (nsignalsLoc*lds)*sizeof(float));
         MPI_Scatterv(x, sendCounts, displs,
                      MPI_FLOAT, xwork1, recvCount,
                      MPI_FLOAT, root, comm);
-        ierr = xcloc_envelope_apply(recvCount,
+        ierr = xcloc_envelope_apply(nsignalsLoc,
                                     lds, npts,
                                     XCLOC_SINGLE_PRECISION,
                                     envelope,
                                     xwork1, xwork2);
-        MPI_Allgatherv(xwork2, recvCount, MPI_DOUBLE,
-                       xfilt, sendCounts, displs, MPI_DOUBLE, comm);
+        MPI_Allgatherv(xwork2, recvCount, MPI_FLOAT,
+                       xfilt, sendCounts, displs, MPI_FLOAT, comm);
     }
     free(xwork1);
     free(xwork2);

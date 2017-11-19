@@ -47,11 +47,27 @@ int xcloc_migrateMPI_initialize(const MPI_Comm globalComm,
             lxc < 1 || dt <= 0.0 ||
             nMigrateGroups > ngrd || xcrPairs == NULL)
         {
-printf("input error\n");
             if (nxc < 1)
             {
                 fprintf(stderr, "%s: No correlations\n", __func__);
             }
+            if (nsignals < 1){fprintf(stderr, "%s: No signals\n", __func__);}
+            if (ngrd < 1){fprintf(stderr, "%s: No grid points\n", __func__);}
+            if (chunkSize%XCLOC_MEM_ALIGNMENT != 0)
+            {
+                fprintf(stderr, "%s: chunkSize=%d must be divisible by %d\n", 
+                        __func__, chunkSize, XCLOC_MEM_ALIGNMENT);
+            }
+            if (lxc < 1){fprintf(stderr, "%s: No points in xcs\n", __func__);}
+            if (nMigrateGroups > 1)
+            {
+                fprintf(stderr, "%s: nMigrateGroups=%d > ngrd=%d\n",
+                        __func__, nMigrateGroups, ngrd);
+            }
+            if (xcrPairs == NULL)
+            {
+                fprintf(stderr, "%s: xcrPairs is NULL\n", __func__);
+            } 
             ierr = 1;
             goto BCAST_ERROR; 
         }
@@ -727,6 +743,104 @@ int xcloc_migrateMPI_setTableFromRoot(const int itIn, const int ngrdIn,
     return ierr;
 }
 //============================================================================//
+
+int xcloc_migrateMPI_computeMaxDifferentialTime(
+    const struct migrateMPI_struct migrateMPI, double *absMaxDT)
+{
+    double absMaxDTLoc;
+    int ierr, ierrAll;
+    ierr = xcloc_migrate_computeMaxDifferentialTime(migrateMPI.migrate,
+                                                    &absMaxDTLoc);
+    if (ierr != 0)
+    {
+        fprintf(stderr, "%s: Error computing max differential time on %d\n",
+                __func__, migrateMPI.globalCommRank);
+        ierr = 1;
+    }
+    MPI_Allreduce(&absMaxDTLoc, absMaxDT, 1, MPI_DOUBLE,
+                  MPI_MAX, migrateMPI.globalComm);
+    MPI_Allreduce(&ierr, &ierrAll, 1, MPI_INT, MPI_SUM, migrateMPI.globalComm);
+    if (ierrAll != 0){*absMaxDT = 0.0;}
+    return ierrAll;
+}
+//============================================================================//
+/*!
+ * @brief Gathers the migration onto the root process.
+ *
+ * @param[in] ngrd        Number of grid points.  This is only pertinent to the
+ *                        root process.
+ * @param[in] migrateMPI  The initialized MPI migration structure that contains
+ *                        the distributed migration image.
+ *
+ * @param[out] image      The image reduced onto the root.  On the root this
+ *                        must be an array of dimension [ngrd].  Otherwise,
+ *                        it is not accessed.
+ *
+ * @result 0 indicates success.
+ *
+ * @copyright Ben Baker distributed under the MIT license.
+ *
+ */
+int xcloc_migrateMPI_gatherMigrationImage(
+    const int ngrd,
+    const struct migrateMPI_struct migrateMPI,
+    float *image)
+{
+    const float *imageLoc;
+    int *displs, *recvCounts, ierr, ip, sendCount;
+    ierr = 0;
+    if (migrateMPI.globalCommRank == migrateMPI.root)
+    {
+        if (ngrd != migrateMPI.ngrd)
+        {
+            fprintf(stderr, "%s: Error ngrd=%d != migrateMPI.ngrd=%d\n", 
+                    __func__, ngrd, migrateMPI.ngrd);
+            ierr = 1;
+        }
+        if (image == NULL)
+        {
+            fprintf(stderr, "%s: Error image is NULL\n", __func__);
+            ierr = 1;
+        }
+    }
+    MPI_Bcast(&ierr, 1, MPI_INT, migrateMPI.root, migrateMPI.globalComm);
+    if (ierr != 0){return ierr;}
+    // Gather the images
+    if (migrateMPI.myMigrateGroup == migrateMPI.root)
+    {
+        imageLoc  = migrateMPI.imageLoc; //migrate.migrate;
+        sendCount = migrateMPI.ngrdLoc;
+        displs = NULL;
+        recvCounts = NULL;
+        if (migrateMPI.globalCommRank == migrateMPI.root)
+        {
+            recvCounts = (int *) calloc((size_t) migrateMPI.nProcsPerGroup,
+                                        sizeof(int));
+            displs     = (int *) calloc((size_t) migrateMPI.nProcsPerGroup,
+                                        sizeof(int));
+            for (ip=0; ip<migrateMPI.nProcsPerGroup; ip++)
+            {
+                displs[ip]     = migrateMPI.proc2GridPtr[ip];
+                recvCounts[ip] = migrateMPI.proc2GridPtr[ip+1]
+                               - migrateMPI.proc2GridPtr[ip]; 
+            }
+        }
+/*
+float pMax;
+ippsMax_32f(migrateMPI.migrate.migrate, sendCount, &pMax);
+printf("%e\n", pMax);
+*/
+        MPI_Gatherv(imageLoc, sendCount, MPI_FLOAT,
+                    image, recvCounts, displs,
+                    MPI_FLOAT, migrateMPI.root, migrateMPI.intraComm); 
+       if (recvCounts != NULL){free(recvCounts);}
+       if (displs != NULL){free(displs);}
+       imageLoc = NULL;
+    }
+    MPI_Barrier(migrateMPI.globalComm);
+    return 0;
+}
+//============================================================================//
 /*!
  * @brief Computes the migration image of the cross-correlograms.  Note, that 
  *        this will leave the image distributed on the 0'th migration group. 
@@ -754,5 +868,12 @@ int xcloc_migrateMPI_computeMigrationImage(struct migrateMPI_struct *migrateMPI)
                migrateMPI->migrate.ngrd, MPI_FLOAT,
                MPI_SUM, migrateMPI->root, migrateMPI->interComm);
     MPI_Allreduce(&ierr, &ierrAll, 1, MPI_INT, MPI_SUM, migrateMPI->globalComm);
+    if (ierrAll != 0)
+    {
+        if (migrateMPI->globalCommRank == 0)
+        {
+            fprintf(stderr, "%s: Failed computing migration image\n", __func__);
+        }
+    }
     return ierrAll;
 }

@@ -408,6 +408,11 @@ int xcloc_apply(struct xcloc_struct *xcloc)
                                     MPI_FLOAT,
                                     &xcloc->envelope,
                                     xcloc->y1, xcloc->y2);
+/*
+ float pMax;
+ ippsMin_32f(xcloc->y2, xcloc->leny, &pMax);
+ printf("%d %e\n", xcloc->migrateMPI.myMigrateGroup, pMax);
+*/
         }
         else
         {
@@ -446,7 +451,7 @@ int xcloc_apply(struct xcloc_struct *xcloc)
         ierrAll = 1;
     }
     // Compute the migration image.  Note, that the image will be distributed
-    // on the 0'th group. 
+    // on the 0'th group.
     ierr = xcloc_migrateMPI_computeMigrationImage(&xcloc->migrateMPI);
     if (ierr != 0)
     {
@@ -460,6 +465,23 @@ int xcloc_apply(struct xcloc_struct *xcloc)
         if (xcloc->globalCommRank == xcloc->root)
         {
             fprintf(stderr, "%s: Errors encountered\n", __func__);
+        }
+    }
+    return ierr;
+}
+//============================================================================//
+int xcloc_gatherMigrationImage(
+    const int ngrd,
+    const struct xcloc_struct xcloc,
+    float *image)
+{
+    int ierr;
+    ierr = xcloc_migrateMPI_gatherMigrationImage(ngrd, xcloc.migrateMPI, image);
+    if (ierr != 0)
+    {
+        if (xcloc.globalCommRank == xcloc.root)
+        {
+            fprintf(stderr, "%s: Error gathering image\n", __func__);
         }
     }
     return ierr;

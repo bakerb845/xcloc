@@ -86,7 +86,14 @@ int xcloc_migrateMPI_setCrossCorrelations(
 /*! Computes the migration image. */
 int xcloc_migrateMPI_computeMigrationImage(
     struct migrateMPI_struct *migrateMPI);
-
+/*! Gathers the MPI image. */
+int xcloc_migrateMPI_gatherMigrationImage(
+    const int ngrd,
+    const struct migrateMPI_struct migrateMPI,
+    float *image);
+/*! Convenience function to get max lag time */
+int xcloc_migrateMPI_computeMaxDifferentialTime(
+    const struct migrateMPI_struct migrateMPI, double *absMaxDT);
 /*! Private function */
 int xcloc_migrateMPI_createLocalXCPairs(struct migrateMPI_struct *migrateMPI);
 

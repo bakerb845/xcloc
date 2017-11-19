@@ -112,6 +112,10 @@ int xcloc_initialize(const MPI_Comm comm,
 int xcloc_makeXCPairs(struct xcloc_struct *xcloc);
 int xcloc_finalize(struct xcloc_struct *xcloc);
 int xcloc_apply(struct xcloc_struct *xcloc);
+int xcloc_gatherMigrationImage(
+    const int ngrd,
+    const struct xcloc_struct xcloc,
+    float *image);
 int xcloc_setTableFromRoot(const int itIn, const int ngrdIn,
                            const enum xclocPrecision_enum precisionIn,
                            const void *__restrict__ ttimes,

@@ -33,6 +33,7 @@ int computeTravelTimes(const int nrec,
 
 int main(int argc, char *argv[])
 {
+    struct xclocHDF5Grid_struct h5io;
     struct xclocParms_struct xclocParms;
     struct xcloc_struct xcloc;
     int i, ierr, ierrAll, it, myid, nprocs, provided;
@@ -71,6 +72,7 @@ int main(int argc, char *argv[])
     double *stf = NULL;
     double *ttimes = NULL;
     double *xr = NULL;
+    float *image = NULL;
     float *tt = NULL;
     const int master = 0;
     double t0, tAll;
@@ -79,6 +81,7 @@ int main(int argc, char *argv[])
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
     iscl_init();
     // Initialize xcloc
+    memset(&h5io, 0, sizeof(struct xclocHDF5Grid_struct)); 
     memset(&xclocParms, 0, sizeof(struct xclocParms_struct));
     memset(&xcloc, 0, sizeof(struct xcloc_struct));
     if (myid == master)
@@ -170,7 +173,7 @@ int main(int argc, char *argv[])
                  compute3DTravelTimes(nx, ny, nz,
                                       x0, y0, z0,
                                       dx, dy, dz,
-                                      vp, xs,
+                                      vp, &xr[3*it],
                                       tt);
             }
             else
@@ -178,7 +181,7 @@ int main(int argc, char *argv[])
                  compute3DTravelTimes(nx, ny, nz,
                                       x0, y0, z0,
                                       dx, dy, dz,
-                                      vs, xs,
+                                      vs, &xr[3*(it-N_P_SIGNALS)],
                                       tt);
             } 
         }
@@ -227,6 +230,40 @@ int main(int argc, char *argv[])
         fprintf(stdout, "%s: Average executing time: %6.3f (s)\n",
                 __func__, tAll/1.0);
     }
+    // Get the image
+    if (myid == master)
+    {
+        fprintf(stdout, "%s: Initializing H5 archive\n", __func__);
+        ierr = xcloc_h5ioGrid_open("./vpvs.h5", "./vpvs.xdmf",
+                                   "/migrate",
+                                   nx, ny, nz, 
+                                   dx, dy, dz, 
+                                   x0, y0, z0, 
+                                   &h5io);
+        if (ierr != 0)
+        {
+            fprintf(stderr, "%s: Error initializing H5 file\n", __func__);
+            MPI_Abort(MPI_COMM_WORLD, 30);
+        }
+        fprintf(stdout, "%s: Gathering image...\n", __func__);
+        image = (float *) calloc((size_t) ngrd, sizeof(float));
+    }
+    ierr = xcloc_gatherMigrationImage(ngrd, xcloc, image);
+    if (myid == master)
+    {
+        if (ierr == 0)
+        {
+            fprintf(stdout, "%s: Writing image...\n", __func__);
+            ierr = xcloc_h5ioGrid_writeDataSet32f("vpvs", nx, ny, nz,
+                                                  image, &h5io);
+            ierr = xcloc_h5ioGrid_close(&h5io);
+        }
+        else
+        {
+            fprintf(stderr, "%s: Error gathering migration image\n", __func__);
+        }
+    }
+    if (image != NULL){free(image);}
 END:;
     // Finalize xcloc
     xcloc_finalize(&xcloc);
