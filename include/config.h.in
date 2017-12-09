@@ -22,8 +22,10 @@
 #define XCLOC_MEM_ALIGNMENT 64
 #define XCLOC_MEM_PADDING   XCLOC_MEM_ALIGNMENT
 
+/*
 #define DALES_MEM_ALIGNMENT 64
 #define DALES_MEM_PADDING   DALES_MEM_ALIGNMENT
+*/
 
 #ifndef MIN
 #define MIN(x,y) (((x) < (y)) ? (x) : (y))
@@ -65,6 +67,7 @@
  padding; \
 })
 
+/*
 #define DALES_PAD_COMPLEX32(ALIGNMENT, n) \
 ({ \
  size_t paddingElements = ALIGNMENT/sizeof(float complex); \
@@ -92,7 +95,7 @@
  size_t padding = n + (paddingElements - n%paddingElements); \
  padding; \
 })
-  
+*/
 
 #endif /* XCLOC_CONFIG_H__ */
 

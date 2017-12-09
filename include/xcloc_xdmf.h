@@ -7,8 +7,10 @@
 struct xclocXDMFGrid_struct
 {
     enum xclocPrecision_enum *precision; /*!< Precision of datsets. */
-    char **h5flNames; /*!< Number of HDF5 file names. */
-    char **dataSets;  /*!< Names of datasets. */
+    char **h5flNames; /*!< HDF5 file name holding the data set.  This is
+                           an array of dimension [mDataSets]. */
+    char **dataSets;  /*!< Names of datasets. This is an array of 
+                           dimemsnion [mDataSets]. */
     double x0;        /*!< x origin (meters). */
     double y0;        /*!< y origin (meters). */
     double z0;        /*!< z origin (meters). */

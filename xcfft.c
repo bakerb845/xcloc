@@ -14,16 +14,8 @@
 #include <fftw/fftw3_mkl.h>
 #include <mkl_cblas.h>
 
-#define PADDING   DALES_MEM_PADDING 
-#define ALIGNMENT DALES_MEM_ALIGNMENT 
-
-#define CHECK_FFT(status) \
-if (status && !DftiErrorClass(status, DFTI_NO_ERROR)) \
-{ \
-  fprintf(stderr, "%s: Error: %s on line %d\n", __func__, \
-           DftiErrorMessage(status), __LINE__); \
-  return -1; \
-};
+#define PADDING   XCLOC_MEM_PADDING 
+#define ALIGNMENT XCLOC_MEM_ALIGNMENT 
 
 static int computePadding32f(const int n);
 static int computePadding64f(const int n);

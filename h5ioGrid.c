@@ -6,6 +6,16 @@
 #include "xcloc_hdf5.h"
 #include "iscl/os/os.h"
 
+static char *strdup(const char *string)
+{
+    char *copy;
+    size_t lenos;
+    lenos = strlen(string);
+    copy = (char *) calloc(lenos+1, sizeof(char));
+    strcpy(copy, string);
+    return copy;
+}
+
 /*!
  * @brief Deallocates memory on the HDF5 structure.
  *

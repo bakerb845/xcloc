@@ -7,9 +7,6 @@
 #include "xcloc_xcfftMPI.h"
 #include <ipps.h>
 
-#define PADDING   DALES_MEM_PADDING 
-#define ALIGNMENT DALES_MEM_ALIGNMENT
-
 static int cmp_int(const void *x, const void *y) 
 {
     int xx = *(int *) x;
@@ -1035,7 +1032,7 @@ int xcloc_xcfftMPI_finalize(struct xcfftMPI_struct *xcfftMPI)
  */
 int xcloc_xcfftMPI_fourierTransform(struct xcfftMPI_struct *xcfftMPI)
 {
-    void *ftsSrc __attribute__((aligned(ALIGNMENT)));
+    void *ftsSrc __attribute__((aligned(XCLOC_MEM_ALIGNMENT)));
     void *ftsDst;
     int ftOffset, ierr, ierrLoc, nsignals;
     size_t nbytes;

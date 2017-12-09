@@ -207,7 +207,7 @@ int main(int argc, char *argv[])
                                          MPI_DOUBLE, obs, &xcloc);
         if (ierr != 0)
         {
-            fprintf(stdout, "%s: Error scattering data\n", __func__);
+            fprintf(stderr, "%s: Error scattering data\n", __func__);
             ierr = 1;
         }
         MPI_Allreduce(&ierr, &ierrAll, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
@@ -216,7 +216,7 @@ int main(int argc, char *argv[])
         ierr = xcloc_apply(&xcloc);
         if (ierr != 0)
         {
-            fprintf(stdout, "%s: Error applying migration\n", __func__);
+            fprintf(stderr, "%s: Error applying migration\n", __func__);
             ierr = 1;
         }
         MPI_Allreduce(&ierr, &ierrAll, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);

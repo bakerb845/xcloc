@@ -49,10 +49,10 @@ int xcloc_migrate_checkParameters(const int ntables, const int ngrd,
         fprintf(stderr, "%s: xcPairs is NULL\n", __func__);
         ierr = 1;
     }
-    if (chunkSize%DALES_MEM_ALIGNMENT != 0)
+    if (chunkSize%XCLOC_MEM_ALIGNMENT != 0)
     {
         fprintf(stderr, "%s: chunkSize=%d not divisible by alignment=%d\n",
-                __func__, chunkSize, DALES_MEM_ALIGNMENT);
+                __func__, chunkSize, XCLOC_MEM_ALIGNMENT);
         ierr = 1;
     }
     // Get the min and max of xcPairs and make sure they are in range
@@ -120,11 +120,11 @@ int xcloc_migrate_initialize(const int ntables, const int ngrd,
     migrate->nxc = nxc;
     migrate->lxc = lxc;
     migrate->ngrd = ngrd;
-    migrate->ldxc = DALES_PAD_FLOAT32(DALES_MEM_ALIGNMENT, migrate->lxc);
-    migrate->mgrd = DALES_PAD_FLOAT32(DALES_MEM_ALIGNMENT, migrate->ngrd);
+    migrate->ldxc = XCLOC_PAD_FLOAT32(XCLOC_MEM_ALIGNMENT, migrate->lxc);
+    migrate->mgrd = XCLOC_PAD_FLOAT32(XCLOC_MEM_ALIGNMENT, migrate->ngrd);
     // Allocate space and NULL it out
     nbytes = (size_t) (migrate->nxc*2*sizeof(int));
-    migrate->xcPairs = (int *) aligned_alloc(DALES_MEM_ALIGNMENT, nbytes);
+    migrate->xcPairs = (int *) aligned_alloc(XCLOC_MEM_ALIGNMENT, nbytes);
     if (migrate->xcPairs == NULL)
     {
         fprintf(stderr, "%s: Failed to set space for xcPairs\n", __func__);
@@ -133,7 +133,7 @@ int xcloc_migrate_initialize(const int ntables, const int ngrd,
     ippsCopy_32s(xcPairs, migrate->xcPairs, 2*migrate->nxc);
 
     nbytes = (size_t) (migrate->nxc*migrate->ldxc)*sizeof(float);
-    migrate->xcs = (float *) aligned_alloc(DALES_MEM_ALIGNMENT, nbytes);
+    migrate->xcs = (float *) aligned_alloc(XCLOC_MEM_ALIGNMENT, nbytes);
     if (migrate->xcs == NULL)
     {
         fprintf(stderr, "%s: Failed to set space for xcs\n", __func__);
@@ -142,7 +142,7 @@ int xcloc_migrate_initialize(const int ntables, const int ngrd,
     memset(migrate->xcs, 0, nbytes);
 
     nbytes = (size_t) migrate->mgrd*sizeof(float);
-    migrate->migrate = (float *) aligned_alloc(DALES_MEM_ALIGNMENT, nbytes);
+    migrate->migrate = (float *) aligned_alloc(XCLOC_MEM_ALIGNMENT, nbytes);
     if (migrate->migrate == NULL)
     {
         fprintf(stderr, "%s: Failed to set space for migrate\n", __func__);
@@ -150,7 +150,7 @@ int xcloc_migrate_initialize(const int ntables, const int ngrd,
     }
 
     nbytes = (size_t) (migrate->mgrd*ntables)*sizeof(int);
-    migrate->ttimesInt = (int *) aligned_alloc(DALES_MEM_ALIGNMENT, nbytes);
+    migrate->ttimesInt = (int *) aligned_alloc(XCLOC_MEM_ALIGNMENT, nbytes);
     if (migrate->ttimesInt == NULL)
     {
         fprintf(stderr, "%s: Failed to set space for tables\n", __func__);
@@ -164,10 +164,10 @@ int xcloc_migrate_setChunkSize(const int chunkSize,
                                struct migrate_struct *migrate)
 {
     migrate->chunkSize = 2048;
-    if (chunkSize%DALES_MEM_ALIGNMENT != 0)
+    if (chunkSize%XCLOC_MEM_ALIGNMENT != 0)
     {
         fprintf(stderr, "%s: chunkSize=%d not divisible by alignment=%d\n",
-                __func__, chunkSize, DALES_MEM_ALIGNMENT);
+                __func__, chunkSize, XCLOC_MEM_ALIGNMENT);
         return -1;
     }
     migrate->chunkSize = chunkSize;
@@ -554,15 +554,15 @@ int xcloc_migrate_setImageToZero(struct migrate_struct *migrate)
  */
 int xcloc_migrate_computeMigrationImage(struct migrate_struct *migrate)
 {
-    float *image    __attribute__((aligned(DALES_MEM_ALIGNMENT)));
-    float *imagePtr __attribute__((aligned(DALES_MEM_ALIGNMENT)));
-    float *xc       __attribute__((aligned(DALES_MEM_ALIGNMENT)));
-    float *xcs      __attribute__((aligned(DALES_MEM_ALIGNMENT)));
-    int *xcPairs    __attribute__((aligned(DALES_MEM_ALIGNMENT)));
+    float *image    __attribute__((aligned(XCLOC_MEM_ALIGNMENT)));
+    float *imagePtr __attribute__((aligned(XCLOC_MEM_ALIGNMENT)));
+    float *xc       __attribute__((aligned(XCLOC_MEM_ALIGNMENT)));
+    float *xcs      __attribute__((aligned(XCLOC_MEM_ALIGNMENT)));
+    int *xcPairs    __attribute__((aligned(XCLOC_MEM_ALIGNMENT)));
     int *ttimesInt, *ttimesIntPtr1, *ttimesIntPtr2, indxXC, lxc2; 
     int chunkSize, ib, igrd, it1, it2, ixc, ldxc, lxc, mgrd, ngrd, ngrdLoc, nxc;
     if (migrate->nxc == 0){return 0;} // Nothing to do
-    if (migrate->chunkSize%DALES_MEM_ALIGNMENT != 0 || migrate->ngrd < 1 ||
+    if (migrate->chunkSize%XCLOC_MEM_ALIGNMENT != 0 || migrate->ngrd < 1 ||
         migrate->dt <= 0.0 || migrate->migrate == NULL ||
         migrate->xcPairs == NULL || migrate->ttimesInt == NULL)
     {
@@ -571,10 +571,10 @@ int xcloc_migrate_computeMigrationImage(struct migrate_struct *migrate)
             fprintf(stderr, "%s: No grid points in migration structure\n",
                     __func__);
         }
-        if (migrate->chunkSize%DALES_MEM_ALIGNMENT != 0)
+        if (migrate->chunkSize%XCLOC_MEM_ALIGNMENT != 0)
         {
             fprintf(stderr, "%s: chunkSize=%d not divisible by alignment=%d\n",
-                    __func__, migrate->chunkSize, DALES_MEM_ALIGNMENT);
+                    __func__, migrate->chunkSize, XCLOC_MEM_ALIGNMENT);
         }
         if (migrate->dt <= 0.0)
         {
@@ -641,7 +641,7 @@ int xcloc_migrate_computeMigrationImage(struct migrate_struct *migrate)
             ttimesIntPtr2 = (int *) &ttimesInt[it2*mgrd+ib];
             // Update image
             #pragma omp simd \
-             aligned(ttimesIntPtr1,ttimesIntPtr2,imagePtr: DALES_MEM_ALIGNMENT)
+             aligned(ttimesIntPtr1,ttimesIntPtr2,imagePtr: XCLOC_MEM_ALIGNMENT)
             for (igrd=0; igrd<ngrdLoc; igrd++)
             {
                 // Compute the differential times.  Recall that the correlations
@@ -764,10 +764,10 @@ int xcloc_migrate_updateXCDSMImage(const int it1, const int it2,
                                    const int ixc,
                                    struct migrate_struct *migrate)
 {
-    int *ttimesIntPtr1 __attribute__((aligned(DALES_MEM_ALIGNMENT)));
-    int *ttimesIntPtr2 __attribute__((aligned(DALES_MEM_ALIGNMENT)));
-    float *migratePtr __attribute__((aligned(DALES_MEM_ALIGNMENT)));
-    float *xc __attribute__((aligned(DALES_MEM_ALIGNMENT)));
+    int *ttimesIntPtr1 __attribute__((aligned(XCLOC_MEM_ALIGNMENT)));
+    int *ttimesIntPtr2 __attribute__((aligned(XCLOC_MEM_ALIGNMENT)));
+    float *migratePtr __attribute__((aligned(XCLOC_MEM_ALIGNMENT)));
+    float *xc __attribute__((aligned(XCLOC_MEM_ALIGNMENT)));
     int igrd, indxXC, lxc, lxc2, ngrd;
     if ((it1 < 0 || it1 > migrate->ntables - 1) ||
         (it2 < 0 || it2 > migrate->ntables - 1))
@@ -804,7 +804,7 @@ int xcloc_migrate_updateXCDSMImage(const int it1, const int it2,
             shared(lxc, migratePtr, ngrd, ttimesIntPtr1, ttimesIntPtr2) \
             firstprivate(lxc2, xc) \
             private(igrd, indxXC) \
-            aligned(ttimesIntPtr1,ttimesIntPtr2,migratePtr: DALES_MEM_ALIGNMENT)
+            aligned(ttimesIntPtr1,ttimesIntPtr2,migratePtr: XCLOC_MEM_ALIGNMENT)
     for (igrd=0; igrd<ngrd; igrd++)
     {
         // Compute the differential times.  Recall that the correlations imply
@@ -960,12 +960,12 @@ int xcloc_migrate_getImage64f(const int ngrd,
 int xcloc_migrate_computeMaxDifferentialTime(
     const struct migrate_struct migrate, double *absMaxDT)
 {
-    int *xcPairs    __attribute__((aligned(DALES_MEM_ALIGNMENT)));
+    int *xcPairs    __attribute__((aligned(XCLOC_MEM_ALIGNMENT)));
     int *ttimesInt, *ttimesIntPtr1, *ttimesIntPtr2, indxXC;
     int chunkSize, ib, igrd, it1, it2, ixc, mgrd, ngrd, ngrdLoc, nxc;
     *absMaxDT = 0.0;
     if (migrate.nxc == 0){return 0;} // Nothing to do
-    if (migrate.chunkSize%DALES_MEM_ALIGNMENT != 0 || migrate.ngrd < 1 ||
+    if (migrate.chunkSize%XCLOC_MEM_ALIGNMENT != 0 || migrate.ngrd < 1 ||
         migrate.dt <= 0.0 || migrate.xcPairs == NULL ||
         migrate.ttimesInt == NULL)
     {
@@ -974,10 +974,10 @@ int xcloc_migrate_computeMaxDifferentialTime(
             fprintf(stderr, "%s: No grid points in migration structure\n",
                     __func__);
         }
-        if (migrate.chunkSize%DALES_MEM_ALIGNMENT != 0)
+        if (migrate.chunkSize%XCLOC_MEM_ALIGNMENT != 0)
         {
             fprintf(stderr, "%s: chunkSize=%d not divisible by alignment=%d\n",
-                    __func__, migrate.chunkSize, DALES_MEM_ALIGNMENT);
+                    __func__, migrate.chunkSize, XCLOC_MEM_ALIGNMENT);
         }
         if (migrate.dt <= 0.0)
         {
@@ -1021,7 +1021,7 @@ int xcloc_migrate_computeMaxDifferentialTime(
             ttimesIntPtr2 = (int *) &ttimesInt[it2*mgrd+ib];
             // Update max differential time 
             #pragma omp simd reduction(max:indxXC) \
-             aligned(ttimesIntPtr1,ttimesIntPtr2: DALES_MEM_ALIGNMENT)
+             aligned(ttimesIntPtr1,ttimesIntPtr2: XCLOC_MEM_ALIGNMENT)
             for (igrd=0; igrd<ngrdLoc; igrd++)
             {
                 indxXC = MAX(indxXC,

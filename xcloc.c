@@ -28,16 +28,26 @@ int xcloc_checkParameters(const struct xclocParms_struct xclocParms)
                 __func__);
         return -1;
     }
+    if (xclocParms.nfftProcs < 1)
+    {
+        fprintf(stderr, "%s: Error nfftProcs must be positive\n", __func__); 
+        return -1;
+    }
+    if (xclocParms.ngridProcs < 1)
+    {
+        fprintf(stderr, "%s: Error ngridProcs must be positive\n", __func__);
+        return -1;
+    }
     if (xclocParms.dt <= 0.0)
     {
         fprintf(stderr, "%s: Error dt=%e must be positive\n",
                 __func__, xclocParms.dt);
         ierr = 1;
     }
-    if (xclocParms.chunkSize%DALES_MEM_ALIGNMENT != 0)
+    if (xclocParms.chunkSize%XCLOC_MEM_ALIGNMENT != 0)
     {
         fprintf(stderr, "%s: chunkSize=%d not divisible by alignment=%d\n",
-                __func__, xclocParms.chunkSize, DALES_MEM_ALIGNMENT);
+                __func__, xclocParms.chunkSize, XCLOC_MEM_ALIGNMENT);
         ierr = 1;
     }
     if (xclocParms.ngrd < 1)
@@ -65,6 +75,20 @@ int xcloc_checkParameters(const struct xclocParms_struct xclocParms)
     return ierr;
 }
 //============================================================================//
+/*!
+ * @brief Initializes the xcloc structure.
+ *
+ * @param[in] comm        This is the global communicator that will be split
+ *                        to make up the communicators used in the
+ *                        cross-correlation step and migration step.
+ * @param[in] xclocParms  The xcloc parameters.
+ *
+ * @param[out] xcloc      On exit this is the initialized xcloc structure.
+ *
+ * @result 0 indicates success.
+ *
+ * @copyright Ben Baker distributed under the MIT license.
+ */
 int xcloc_initialize(const MPI_Comm comm,
                      const struct xclocParms_struct xclocParms,
                      struct xcloc_struct *xcloc)
@@ -329,14 +353,6 @@ BCAST_ERROR:;
     return 0;
 }
 //============================================================================//
-/*
-int xcloc_setTravelTimeTableFromRoot(const int ngrd,
-                                     const xcloc_struct *xcloc)
-{
-
-}
-*/
-//============================================================================//
 /*!
  * @brief Computes the phase-correlations, the envelopes, and the migration
  *        image.
@@ -470,6 +486,22 @@ int xcloc_apply(struct xcloc_struct *xcloc)
     return ierr;
 }
 //============================================================================//
+/*!
+ * @brief Gathers the migration image onto the root process.
+ *
+ * @param[in] ngrd    Number of grid points in image.  This must be equal to
+ *                    xcloc.ngrd.  This is only pertinent to the root process.
+ * @param[in] xcloc   Structure containing the migrated image.
+ *
+ * @param[out] image  The image reduced onto the root process.  On this root
+ *                    process this must be an array of dimension [ngrd].  
+ *                    Otherwise, it will not be accessed.
+ * 
+ * @result 0 indicates success.
+ *
+ * @copyright Ben Baker distributed under the MIT license.
+ *
+ */
 int xcloc_gatherMigrationImage(
     const int ngrd,
     const struct xcloc_struct xcloc,
@@ -490,6 +522,19 @@ int xcloc_gatherMigrationImage(
 /*!
  * @brief Sets the it'th travel time table.
  *
+ * @param[in] itIn         The table number (C indexed) to set on xcloc.  This
+ *                         must be set on the root process.
+ * @param[in] ngrdIn       Number of grid points in the domain.  This must be
+ *                         set on the root process and match xcloc.ngrd.
+ * @param[in] precisionIn  The precision (float or double) of the travel
+ *                         time table.
+ * @param[in] ttimes       The travel times (seconds) to all points in the grid
+ *                         from the receiver.  On the root process this is an
+ *                         array of dimension [ngrdIn].  Otherwise, it will not
+ *                         be accessed.
+ *
+ * @result 0 indicates success.
+ * 
  * @copyright Ben Baker distributed under the MIT license.
  *
  */

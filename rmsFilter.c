@@ -258,9 +258,9 @@ int xcloc_rmsFilter_apply(const int nsignals,
         {
         pBuf = (Ipp8u *) rms->pBuf;
         pSpec32 = (IppsFIRSpec_32f *) rms->pSpec;
-        xcSqr32 = (float *) aligned_alloc(DALES_MEM_ALIGNMENT, nbytes);
-        xcFiltered32 = (float *) aligned_alloc(DALES_MEM_ALIGNMENT, nbytes);
-        xwork32 = (float *) aligned_alloc(DALES_MEM_ALIGNMENT, nbytes);
+        xcSqr32 = (float *) aligned_alloc(XCLOC_MEM_ALIGNMENT, nbytes);
+        xcFiltered32 = (float *) aligned_alloc(XCLOC_MEM_ALIGNMENT, nbytes);
+        xwork32 = (float *) aligned_alloc(XCLOC_MEM_ALIGNMENT, nbytes);
         memset(xcSqr32, 0, nbytes);  // Pre-pad signal 
         // Loop on the transform signals and compute RMS
         //#pragma omp for
@@ -312,9 +312,9 @@ int xcloc_rmsFilter_apply(const int nsignals,
          shared(lds, lfilter, nbytes, npts, nsignals, winLen2, x, xfilt) \
          firstprivate(pSpec64, pBuf)
         {
-        xcSqr64 = (double *) aligned_alloc(DALES_MEM_ALIGNMENT, nbytes);
-        xcFiltered64 = (double *) aligned_alloc(DALES_MEM_ALIGNMENT, nbytes);
-        xwork64 = (double *) aligned_alloc(DALES_MEM_ALIGNMENT, nbytes);
+        xcSqr64 = (double *) aligned_alloc(XCLOC_MEM_ALIGNMENT, nbytes);
+        xcFiltered64 = (double *) aligned_alloc(XCLOC_MEM_ALIGNMENT, nbytes);
+        xwork64 = (double *) aligned_alloc(XCLOC_MEM_ALIGNMENT, nbytes);
         memset(xcSqr64, 0, nbytes);  // Pre-pad signal 
         // Loop on the transform signals and compute RMS
         #pragma omp for
