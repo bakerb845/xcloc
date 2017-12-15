@@ -8,5 +8,5 @@ Of course, differential travel-times and migration in homogeneous media is a bit
   2.  Then, the RMS averaging window or envelope of the phase-correlograms are computed.  
   3.  Finally, the processed phase-correlograms are migrated in the provided travel-time models.  
 
-While this algorithm is quite simple and only requires a few lines of Python code the actual implementation is much more complicated.  Particularly because of parallelism.  
+While this algorithm is quite simple and only requires a few lines of Python code the actual implementation is much more complicated.  Particularly because of parallelism and performance are essential.   
 
