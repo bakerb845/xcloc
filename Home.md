@@ -28,6 +28,8 @@ However, these will eventually become project submodules and wrangled into the C
 
 ## Configuring CMake
 
+I typically find it useful to generate a configuration script like the one below
+
     #!/bin/sh
     export CC=/opt/intel/bin/icc
     export CXX=/opt/intel/bin/icpc
@@ -62,4 +64,16 @@ However, these will eventually become project submodules and wrangled into the C
     -DINIPARSER_LIBRARY=/home/bakerb25/C/iniparser/libiniparser.a \
     -DADVISOR_INCLUDE_DIR=/opt/intel/advisor/include
 
+and run it in the root source directory.  After CMake has been successfully configured one then simply types
 
+    make
+
+in the root source directory and
+
+    make install
+
+to install the library and executables.  If [Doxygen](http://www.stack.nl/~dimitri/doxygen/) is available then the developer level documentation can be built by specifying
+
+    doxygen Doxyfile
+
+in the root source directory.
