@@ -17,6 +17,7 @@ To build it is required that one have
 - [Intel Performance Primitives](https://software.intel.com/en-us/intel-ipp)
 - [HDF5](https://support.hdfgroup.org/HDF5/)
 - [libxml2](http://xmlsoft.org/) 
+- [iniparser](https://github.com/ndevilla/iniparser)
 
 Optionally, for compiling the unit tests, one much also build
 
@@ -28,12 +29,21 @@ However, these will eventually become project submodules and wrangled into the C
 ## Configuring CMake
 
     #!/bin/sh
-    /usr/bin/cmake ./ \
+    export CC=/opt/intel/bin/icc
+    export CXX=/opt/intel/bin/icpc
+    if [ -f CMakeCache.txt ]; then
+      echo "Removing CMakeCache.txt"
+      rm CMakeCache.txt
+    fi
+    cmake ./ \
     -DCMAKE_INSTALL_PREFIX=./ \
     -DCMAKE_C_COMPILER=icc \
+    -DCMAKE_CXX_COMPILER=icpc \
     -DCMAKE_C_FLAGS="-g3 -O2 -xCORE-AVX2 -std=c11 -qopenmp -Wall -Wcomment -Wunused -Wcheck -qopt-report=5" \
+    -DCMAKE_CXX_FLAGS="-g3 -O2 -qopenmp -std=c++11 -Wall -Wcomment -Wunused -Wcheck -qopt-report=5" \
     -DXCLOC_USE_MPI=TRUE \
     -DXCLOC_USE_INTEL=TRUE \
+    -DXCLOC_PROFILE=TRUE \
     -DMKL_INCLUDE_DIR=/opt/intel/mkl/include \
     -DMKL_LIBRARY="/opt/intel/mkl/lib/intel64_lin/libmkl_intel_lp64.so;/opt/intel/mkl/lib/intel64_lin/libmkl_sequential.so;/opt/intel/mkl/lib/intel64_lin/libmkl_core.so" \
     -DIPP_INCLUDE_DIR=/opt/intel/ipp/include \
@@ -47,5 +57,9 @@ However, these will eventually become project submodules and wrangled into the C
     -DISCL_LIBRARY=/home/bakerb25/C/libiscl/lib/libiscl_shared.so \
     -DISCL_INCLUDE_DIR=/home/bakerb25/C/libiscl/include \
     -DXML2_INCLUDE_DIR=/usr/include/libxml2 \
-    -DXML2_LIBRARY=/usr/lib/x86_64-linux-gnu/libxml2.so
+    -DXML2_LIBRARY=/usr/lib/x86_64-linux-gnu/libxml2.so \
+    -DINIPARSER_INCLUDE_DIR=/home/bakerb25/C/iniparser/src \
+    -DINIPARSER_LIBRARY=/home/bakerb25/C/iniparser/libiniparser.a \
+    -DADVISOR_INCLUDE_DIR=/opt/intel/advisor/include
+
 
