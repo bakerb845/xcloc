@@ -75,6 +75,11 @@ int main(int argc, char *argv[])
         // Do something until user gives me a better idea
         xclocParms.nfftProcs = 1;
         xclocParms.ngridProcs = nprocs;
+        if (nprocs == 4)
+        {
+            xclocParms.nfftProcs = 2;
+            xclocParms.ngridProcs = 2;
+        }
         // Read parameters from ini file
         fprintf(stdout, "%s: Reading ini file...\n", __func__);
         ierr = interloc_readIni(iniFile,
@@ -215,6 +220,7 @@ BCAST_ERROR:;
         fprintf(stdout, "%s: Beginning the processing...\n", __func__);
     }
     // Loop on the windows in the observation file
+    t0 = MPI_Wtime();
     for (iwin=0; iwin<nwin; iwin++)
     {
         if (myid == master)
@@ -254,7 +260,6 @@ BCAST_ERROR:;
         MPI_Allreduce(&ierr, &ierrAll, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
         if (ierr != 0){goto EXIT_MPI;}
         // Apply
-        t0 = MPI_Wtime();
         ierr = xcloc_apply(&xcloc); 
         if (ierr != 0)
         {
@@ -270,7 +275,12 @@ BCAST_ERROR:;
                     __func__, MPI_Wtime() - t0);
         } 
     }
-    if (myid == master){H5Fclose(dataFID);}
+    if (myid == master)
+    {
+        fprintf(stdout, "%s: Computation time: %e\n", 
+                __func__, MPI_Wtime() - t0);
+        H5Fclose(dataFID);
+    }
 
     // Get the image
     if (myid == master)
