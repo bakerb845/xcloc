@@ -12,6 +12,7 @@ To build it is required that one have
 
 - [CMake](https://cmake.org/) version at least 2.6
 - A fully C11 compliant C compiler.
+- A fully Fortran2003 compliant Fortran compiler.
 - Message Passing Interface version at least 3.  Recommended free versions are [MPICH](https://www.mpich.org/) and [OpenMPI](https://www.open-mpi.org/).
 - [Intel MKL](https://software.intel.com/en-us/mkl)
 - [Intel Performance Primitives](https://software.intel.com/en-us/intel-ipp)
@@ -33,6 +34,7 @@ I typically find it useful to generate a configuration script like the one below
     #!/bin/sh
     export CC=/opt/intel/bin/icc
     export CXX=/opt/intel/bin/icpc
+    export FC=/opt/intel/bin/ifort
     if [ -f CMakeCache.txt ]; then
       echo "Removing CMakeCache.txt"
       rm CMakeCache.txt
@@ -41,8 +43,10 @@ I typically find it useful to generate a configuration script like the one below
     -DCMAKE_INSTALL_PREFIX=./ \
     -DCMAKE_C_COMPILER=icc \
     -DCMAKE_CXX_COMPILER=icpc \
+    -DCMAKE_Fortran_COMPILER=ifort \
     -DCMAKE_C_FLAGS="-g3 -O2 -xCORE-AVX2 -std=c11 -qopenmp -Wall -Wcomment -Wunused -Wcheck -qopt-report=5" \
     -DCMAKE_CXX_FLAGS="-g3 -O2 -qopenmp -std=c++11 -Wall -Wcomment -Wunused -Wcheck -qopt-report=5" \
+    -DCMAKE_Fortran_FLAGS="-g3 -O -qopenmp -WB -W 1 -warn unused -align array64byte -qopt-report=4 -xHOST -nofor-main" \
     -DXCLOC_USE_MPI=TRUE \
     -DXCLOC_USE_INTEL=TRUE \
     -DXCLOC_PROFILE=TRUE \
