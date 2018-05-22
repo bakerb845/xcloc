@@ -3,7 +3,8 @@
 !> @copyright Ben Baker distributed under the MIT license.
 MODULE XCLOC_FDXC
       USE ISO_C_BINDING
-
+      USE XCLOC_CONSTANTS
+      USE XCLOC_IPPS
       !----------------------------------------------------------------------------------!
       !                                 Private Variables                                !
       !----------------------------------------------------------------------------------!
@@ -22,6 +23,8 @@ MODULE XCLOC_FDXC
       INTEGER, PRIVATE, SAVE :: dataOffset_ = 0
       !> The padding in the FTs.  This will be greater than or equal to nptsInFTs_. 
       INTEGER, PRIVATE, SAVE :: ftOffset_ = 0
+      !> Precision of module.
+      INTEGER, PRIVATE, SAVE :: precision_ = XCLOC_SINGLE_PRECISION
       !> The length of the signals to transform.  This can mitigate the pathologic
       !> case where the signal transform lengths are large (semi)prime numbers which
       !> make the DFT very expensive.
@@ -74,7 +77,10 @@ MODULE XCLOC_FDXC
       PUBLIC :: xcloc_fdxc_finalize
       PUBLIC :: xcloc_fdxc_setXCTableF
       PUBLIC :: xcloc_fdxc_computeDefaultXCTableF
-      PRIVATE :: initializeFFTW32f
+      PUBLIC :: xcloc_fdxc_setSignal32fF
+      PUBLIC :: xcloc_fdxc_setSignals32fF
+
+      PRIVATE :: xcloc_fdxc_initializeFFTW32f
       PRIVATE :: padLength
       CONTAINS
 !========================================================================================!
@@ -87,13 +93,14 @@ MODULE XCLOC_FDXC
 !>    @param[in] nptsPad   A tuning parameter to mitigate DFT lengths that could 
 !>                         potentially be large semi-prime numbers. 
 !>    @param[in] verbose   Controls the verbosity of the module.  0 is quiet.
+!>    @param[in] prec      Controls the precision of the module.  
 !>
 !>    @param[out] ierr     0 indicates success.
 !>
-      SUBROUTINE xcloc_fdxc_initialize(npts, nsignals, nptsPad, verbose, ierr) &
+      SUBROUTINE xcloc_fdxc_initialize(npts, nsignals, nptsPad, verbose, prec, ierr) &
       BIND(C, NAME='xcloc_fdxc_initialize')
       IMPLICIT NONE
-      INTEGER(C_INT), VALUE, INTENT(IN) :: npts, nptsPad, nsignals, verbose
+      INTEGER(C_INT), VALUE, INTENT(IN) :: npts, nptsPad, nsignals, verbose, prec
       INTEGER(C_INT), INTENT(OUT) :: ierr
       ierr = 0
       CALL xcloc_fdxc_finalize()
@@ -104,6 +111,10 @@ MODULE XCLOC_FDXC
          ierr = 1
          RETURN
       ENDIF
+      IF (prec /= XCLOC_SINGLE_PRECISION .AND. prec /= XCLOC_DOUBLE_PRECISION) THEN
+         WRITE(*,908) prec
+         ierr = 1
+      ENDIF 
       ! Set the input variables
       npts_       = npts
       nptsPad_    = nptsPad
@@ -112,11 +123,12 @@ MODULE XCLOC_FDXC
       nptsInXCs_  = 2*nptsPad_ - 1   ! Length of the cross-correlations
       nptsInFTs_  = nptsInXCs_/2 + 1 ! Number of points in the fourier transforms
       dataOffset_ = padLength(alignment, sizeof_float,         nptsInXCs_)
-      ftOffset_   = padLength(alignment, sizeof_float_complex, nptsInFTs_) 
+      ftOffset_   = padLength(alignment, sizeof_float_complex, nptsInFTs_)
       ! Format statements
   905 FORMAT("xcloc_fdxc_initialize: npts=", I8, "must be positive")
   906 FORMAT("xcloc_fdxc_initialize: nsignals=", I8, "must be at least 2")
   907 FORMAT("xcloc_fdxc_initialize: nptsPad=", I8, "must be greater than nts=", I8)
+  908 FORMAT("xcloc_fdxc_initialize: prec=", I4, "must be single=",I2, "or double=", I2)
       RETURN
       END
 !                                                                                        !
@@ -136,8 +148,8 @@ MODULE XCLOC_FDXC
       IF (ALLOCATED(xcs64f_))          DEALLOCATE(xcs64f_)
       IF (ALLOCATED(inputFTs32f_))     DEALLOCATE(inputFTs32f_)
       IF (ALLOCATED(inputFTs64f_))     DEALLOCATE(inputFTs64f_)
-      IF (ALLOCATED(xcFTs32f_))       DEALLOCATE(xcFTs32f_)
-      IF (ALLOCATED(xcFTs64f_))       DEALLOCATE(xcFTs64f_) 
+      IF (ALLOCATED(xcFTs32f_))        DEALLOCATE(xcFTs32f_)
+      IF (ALLOCATED(xcFTs64f_))        DEALLOCATE(xcFTs64f_) 
       IF (lhaveTable_) THEN
          CALL FFTWF_DESTROY_PLAN(forwardPlan_)
          CALL FFTWF_DESTROY_PLAN(inversePlan_)
@@ -182,14 +194,19 @@ MODULE XCLOC_FDXC
       ENDIF
       ! Allocate space and copy table
       ierr = 0
+      nxcs_ = nxcs
       IF (ALLOCATED(xcPairs_)) DEALLOCATE(xcPairs_)
-      ALLOCATE(xcPairs_(2*nxcs))
-      xcPairs_(1:2*nxcs) = xcPairs(1:2*nxcs) 
+      ALLOCATE(xcPairs_(2*nxcs_))
+      xcPairs_(1:2*nxcs_) = xcPairs(1:2*nxcs)
       lhaveTable_ = .TRUE.
+      ! Allocate rest of space
+      CALL xcloc_fdxc_initializeFFTW32f(ierr)
+      IF (ierr /= 0) WRITE(*,903)
       ! Format statements
   900 FORMAT('xcloc_fdxc_setXCTableF: Error nxcs must be positive', I5)
   901 FORMAT('xcloc_fdxc_setXCTableF: minval(xcPairs)', I4, 'must be positive')
   902 FORMAT('xcloc_fdxc_setXCTableF: minval(xcPairs)', I4, 'cannot exceed', I4)
+  903 FORMAT('xcloc_fdxc_setXCTableF: Error initializing FFTs')
       RETURN
       END
 !                                                                                        !
@@ -214,7 +231,7 @@ MODULE XCLOC_FDXC
 !>    @param[out] ierr         0 indicates success.
 !> 
       SUBROUTINE xcloc_fdxc_computeDefaultXCTableF(ldoAutoCorrs, nwork,   &
-                                                    nxcs, xcPairs, ierr) &
+                                                   nxcs, xcPairs, ierr) &
       BIND(C, NAME='xcloc_fdxc_computeDefaultXCTableF')
       IMPLICIT NONE
       LOGICAL(C_BOOL), VALUE, INTENT(IN) :: ldoAutoCorrs
@@ -240,9 +257,9 @@ MODULE XCLOC_FDXC
          ENDIF
          DO i=1,nsignals_
             DO j=i+1,nsignals_
-               indx = nsignals_*(i - 1) - (i*(i+1))/2 + j;
-               xcPairs(2*(indx-1)  ) = i
-               xcPairs(2*(indx-1)+1) = j
+               indx = nsignals_*(i - 1) - (i*(i+1))/2 + j
+               xcPairs(2*(indx-1)+1) = i
+               xcPairs(2*(indx-1)+2) = j
             ENDDO
          ENDDO
       ! Upper triangle (including diagonal)
@@ -256,27 +273,112 @@ MODULE XCLOC_FDXC
             RETURN
          ENDIF
          DO i=1,nsignals_
-            DO j=1,nsignals_
+            DO j=i,nsignals_
                indx = nsignals_*(i - 1) - ((i-1)*i)/2 + j
-               xcPairs(2*(indx-1)  ) = i
-               xcPairs(2*(indx-1)+1) = j
+               xcPairs(2*(indx-1)+1) = i
+               xcPairs(2*(indx-1)+2) = j
             ENDDO
          ENDDO
       ENDIF
  905  FORMAT('xcloc_fdxc_computeDefaultXCTableF: Error - nwork must be >=', I5)
       RETURN
       END
+!                                                                                        !
 !========================================================================================!
+!                                                                                        !
+!>    @brief Convenience routine to set all the signals on the module.
+!>    @param[in] ldx      Leading dimension of x.  This cannot be less than npts_.
+!>    @param[in] npts     Number of points in each signal.
+!>    @param[in] nsignals Number of signals.
+!>    @param[in] x        Signals to set.  This is an array of dimension [ldx x nsignals_].
+!>    @param[out] ierr    0 indicates success.
+      SUBROUTINE xcloc_fdxc_setSignals32fF(ldx, npts, nsignals, x, ierr)
+      INTEGER(C_INT), VALUE, INTENT(IN) :: ldx, npts
+      REAL(C_FLOAT), INTENT(IN) :: x(*)
+      INTEGER(C_INT), INTENT(OUT) :: ierr
+      INTEGER i
+      ierr = 0
+      IF (ldx < npts .OR. npts /= npts_ .OR. nsignals /= nsignals_) THEN
+         IF (ldx < npts) WRITE(*,900) ldx, npts
+         IF (npts /= npts_) WRITE(*,901) npts_
+         IF (nsignals /= nsignals_) WRITE(*,902) nsignals_
+         ierr = 1
+         RETURN
+      ENDIF
+      DO i=1,nsignals_
+         CALL xcloc_fdxc_setSignal32fF(i, npts, x((i-1)*ldx+1), ierr)
+         IF (ierr /= 0) THEN
+            WRITE(*,910) i
+            RETURN
+         ENDIF
+      ENDDO
+  900 FORMAT('xcloc_fdxc_setSignals32fF: Error ldx=', I6, '<', 'npts=', I6)
+  901 FORMAT('xcloc_fdxc_setSignals32fF: Error expecting npts=', I6)
+  902 FORMAT('xcloc_fdxc_setSignals32fF: Error expecting nsignals=', I6)
+  910 FORMAT('xcloc_fdxc_setSignals32fF: Error setting signal index', I4)
+      RETURN
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Sets the signalNumber'th input signal on the module.
+!>    @param[in] signalNumber  Number of signal to set.  This must be in the range
+!>                             [1, nsignals_].
+!>    @param[in] npts          Number of points in the signal.  This cannot exceed npts_.
+!>    @param[in] x             Signal to set.  This is an array of dimension [npts].
+!>    @param[out] ierr         0 indicates success.
+      SUBROUTINE xcloc_fdxc_setSignal32fF(signalNumber, npts, x, ierr) &
+      BIND(C, NAME='xcloc_fdxc_setSignal32fF')
+      IMPLICIT NONE
+      INTEGER(C_INT), VALUE, INTENT(IN) :: signalNumber, npts
+      REAL(C_FLOAT), INTENT(IN) :: x(npts)
+      INTEGER(C_INT), INTENT(OUT) :: ierr
+      INTEGER i1, i2
+      ierr = 1
+      IF (npts > npts_) THEN
+         WRITE(*,900) npts_
+         RETURN
+      ENDIF
+      IF (signalNumber < 1 .OR. signalNumber > nsignals_) THEN
+         WRITE(*,905) signalNumber
+         RETURN
+      ENDIF
+      ierr = 0 
+      i1 = (signalNumber - 1)*dataOffset_ + 1 
+      i2 = signalNumber*dataOffset_
+      IF (precision_ == XCLOC_SINGLE_PRECISION) THEN
+         inputSignals32f_(i1:i2) = x(1:npts)
+      ELSE
+         ierr = ippsConvert_32f64f(x, inputSignals64f_(i1), npts)
+      ENDIF
+  900 FORMAT('xcloc_fdxc_setSignal32fF: Error expecting npts=', I5)
+  905 FORMAT('xcloc_fdxc_setSignal32fF: Error signalNumber must be in range [1,',I4,']')
+      RETURN
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
 !>    @brief Initializes the FFTw descriptors. 
 !>    @result 0 indicates success.
-      SUBROUTINE initializeFFTW32f(ierr)
+      SUBROUTINE xcloc_fdxc_initializeFFTW32f(ierr)
+      IMPLICIT NONE
       INCLUDE 'fftw/fftw3.f03'
       INTEGER, INTENT(OUT) :: ierr
       INTEGER(C_INT) nf(1), ni(1), inembed(1), onembed(1)
       INTEGER(C_INT), PARAMETER :: rank = 1    ! Computing multiple 1D transforms
-      INTEGER(C_INT), PARAMETER :: itsride = 1 ! Distance elements in input column
+      INTEGER(C_INT), PARAMETER :: istride = 1 ! Distance elements in input column
       INTEGER(C_INT), PARAMETER :: ostride = 1 ! Distance elements in output column
       ierr = 0
+      IF (nsignals_ < 1 .OR. nptsInXCs_ < 1) RETURN ! Not enough info to initialize
+      IF (verbose_ > 0) WRITE(*,*) 'xcloc_fdxc_initializeFFTW32f: Initializing FFTs...'
+      IF (ALLOCATED(inputSignals32f_)) DEALLOCATE(inputSignals32f_)
+      IF (ALLOCATED(inputFTs32f_))     DEALLOCATE(inputFTs32f_)
+      IF (ALLOCATED(xcFTs32f_))        DEALLOCATE(xcFTs32f_)
+      IF (ALLOCATED(xcs32f_))          DEALLOCATE(xcs32f_)
+      ALLOCATE(inputSignals32f_(dataOffset_*nsignals_)); inputSignals32f_(:) = 0.0
+      ALLOCATE(inputFTs32f_(ftOffset_*nsignals_)); inputFTs32f_(:) = czero
+      ALLOCATE(xcFTs32f_(ftOffset_*nxcs_)); xcFTs32f_(:) = czero
+      ALLOCATE(xcs32f_(dataOffset_*nxcs_)); xcs32f_(:) = 0.0
       inembed(1) = 0
       onembed(1) = 0
       nf(1) = nptsInXCs_ ! Each signal has length nptsInXCs_

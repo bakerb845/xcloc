@@ -48,6 +48,7 @@ class fdxc:
                                                     c_int,
                                                     c_int,
                                                     c_int,
+                                                    c_int,
                                                     POINTER(c_int))
         xcloc_lib.xcloc_fdxc_finalize.argtypes = None 
         self.lib = xcloc_lib
@@ -56,7 +57,8 @@ class fdxc:
         self.finalize()
         return
 
-    def initialize(self, npts, nsignals, nptsPad=None, verbose=0):
+    def initialize(self, npts, nsignals, nptsPad=None,
+                   verbose=0, precision=0):
         """
         Initializes the Fourier domain based cross-correlation class.
         """
@@ -66,6 +68,9 @@ class fdxc:
             return -1
         if (nsignals < 2):
             print("nsignals=%d must exceed 2"%nsignals)
+            return -1
+        if (precision != 0 and precision != 1):
+            print("precision=%d must be 0 or 1"%precision)
             return -1
         # If nptsPad is set then check that it makes sense; otherwise set it
         if (nptsPad != None):
@@ -77,7 +82,7 @@ class fdxc:
         # Fire up the library
         ierr = c_int(1)
         self.lib.xcloc_fdxc_initialize(npts, nsignals, nptsPad, verbose,
-                                       byref(ierr))
+                                       precision, byref(ierr))
         return ierr 
 
     def finalize(self):

@@ -784,6 +784,8 @@ WARN_LOGFILE           =
 INPUT                  = ./xcloc.c \
                          ./xcfft.c \
                          ./fdxc.F90 \
+                         ./constants.F90 \
+                         ./ipps.F90 \
                          ./envelope.c \
                          ./migrate.c \
                          ./migrateMPI.c \

@@ -1,6 +1,7 @@
 #ifndef XCLOC_H__
 #define XCLOC_H__ 1
 #include "xcloc_config.h"
+#include "xcloc_finter.h"
 #include "xcloc_enum.h"
 #include "xcloc_xcfft.h"
 #include "xcloc_migrate.h"
