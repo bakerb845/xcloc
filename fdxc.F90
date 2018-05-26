@@ -756,15 +756,30 @@ MODULE XCLOC_FDXC
       ierr = 0
       linitFFTw_ = .FALSE.
       IF (nsignals_ < 1 .OR. nptsInXCs_ < 1) RETURN ! Not enough info to initialize
-      IF (verbose_ > 0) WRITE(*,*) 'xcloc_fdxc_initializeFFTW: Initializing FFTs...'
 #ifdef _OPENMP
       nthreads = OMP_GET_NUM_THREADS()
-      fftwSuccess =  fftw_init_threads()
-      IF (fftwSuccess == 0) THEN
-         WRITE(*,*) 'xcloc_fdxc_initializeFFTW: Error initializing threads'
-         ierr = 1
+      IF (verbose_ > 0) THEN
+         WRITE(*,*) 'xcloc_fdxc_initializeFFTW: Initializing FFTs with nthreads=',nthreads
+      ENDIF 
+      IF (precision_ == XCLOC_SINGLE_PRECISION) THEN
+         fftwSuccess =  fftwf_init_threads()
+         IF (fftwSuccess == 0) THEN
+            WRITE(*,*) 'xcloc_fdxc_initializeFFTW: Error initializing threads'
+            ierr = 1
+            RETURN
+         ENDIF
+         CALL fftwf_plan_with_nthreads(nthreads)
+      ELSE
+         fftwSuccess =  fftw_init_threads()
+         IF (fftwSuccess == 0) THEN
+            WRITE(*,*) 'xcloc_fdxc_initializeFFTW: Error initializing threads'
+            ierr = 1
+            RETURN
+         ENDIF
+         CALL fftw_plan_with_nthreads(nthreads)
       ENDIF
-      CALL fftw_plan_with_nthreads(nthreads)
+#else
+      IF (verbose_ > 0) WRITE(*,*) 'xcloc_fdxc_initializeFFTW: Initializing FFTs...'
 #endif
       IF (ALLOCATED(inputSignals32f_)) DEALLOCATE(inputSignals32f_)
       IF (ALLOCATED(inputFTs32f_))     DEALLOCATE(inputFTs32f_)
