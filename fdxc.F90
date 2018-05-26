@@ -5,6 +5,9 @@ MODULE XCLOC_FDXC
       USE ISO_C_BINDING
       USE XCLOC_CONSTANTS
       USE XCLOC_IPPS
+#ifdef _OPENMP
+      USE OMP_LIB
+#endif
       IMPLICIT NONE
       !----------------------------------------------------------------------------------!
       !                                 Private Variables                                !
@@ -67,7 +70,7 @@ MODULE XCLOC_FDXC
       !> Accuracy of the MKL computations.
       INTEGER(KIND=8), PRIVATE :: accuracy_
       !> Flag indicating FFTw has been initialized.
-      LOGICAL, PRIVATE, SAVE :: linitFFTw = .FALSE.
+      LOGICAL, PRIVATE, SAVE :: linitFFTw_ = .FALSE.
       INTEGER(C_SIZE_T), PRIVATE, PARAMETER :: alignment = 64
       INTEGER(C_SIZE_T), PRIVATE, PARAMETER :: sizeof_float = 4
       INTEGER(C_SIZE_T), PRIVATE, PARAMETER :: sizeof_double = 8
@@ -199,9 +202,16 @@ MODULE XCLOC_FDXC
       IF (ALLOCATED(inputFTs64f_))     DEALLOCATE(inputFTs64f_)
       IF (ALLOCATED(xcFTs32f_))        DEALLOCATE(xcFTs32f_)
       IF (ALLOCATED(xcFTs64f_))        DEALLOCATE(xcFTs64f_) 
-      IF (lhaveTable_) THEN
-         CALL FFTWF_DESTROY_PLAN(forwardPlan_)
-         CALL FFTWF_DESTROY_PLAN(inversePlan_)
+      IF (linitFFTw_) THEN
+         IF (precision_ == XCLOC_SINGLE_PRECISION) THEN
+            CALL FFTWF_DESTROY_PLAN(forwardPlan_)
+            CALL FFTWF_DESTROY_PLAN(inversePlan_)
+            CALL FFTWF_CLEANUP()
+         ELSE
+            CALL FFTW_DESTROY_PLAN(forwardPlan_)
+            CALL FFTW_DESTROY_PLAN(inversePlan_)
+            CALL FFTW_CLEANUP()
+         ENDIF
       ENDIF
       npts_ = 0
       nptsPad_ = 0
@@ -211,7 +221,7 @@ MODULE XCLOC_FDXC
       nptsInFTs_ = 0
       dataOffset_ = 0
       ftOffset_ = 0
-      linitFFTw = .FALSE.
+      linitFFTw_ = .FALSE.
       lhaveTable_ = .FALSE.
       RETURN
       END
@@ -553,18 +563,18 @@ MODULE XCLOC_FDXC
       REAL(C_DOUBLE), PARAMETER :: tol64 = EPSILON(1.d0)*10.d0 
       ierr = 0
       IF (precision_ == XCLOC_SINGLE_PRECISION) THEN
-!        !$OMP PARALLEL DEFAULT(NONE) &
-!        !$OMP SHARED(accuracy_, ftOffset_, inputFTs32f_, lphaseCorr, nxcs_) &
-!        !$OMP SHARED(nptsInFTs_, xcFTs32f_, xcPairs_) &
-!        !$OMP PRIVATE(i, indx, iw, ixc, j, jndx, kndx, mag32f_, n) &
-!        !$OMP FIRSTPRIVATE(xcPtr32c)
+         !$OMP PARALLEL DEFAULT(NONE) &
+         !$OMP SHARED(accuracy_, ftOffset_, inputFTs32f_, lphaseCorr, nxcs_) &
+         !$OMP SHARED(nptsInFTs_, xcFTs32f_, xcPairs_) &
+         !$OMP PRIVATE(i, indx, iw, ixc, j, jndx, kndx, mag32f_, n) &
+         !$OMP FIRSTPRIVATE(xcPtr32c)
          n = nptsInFTs_
          IF (lphaseCorr) THEN
             ALLOCATE(mag32f_(n))
             NULLIFY(xcPtr32c)
          ENDIF
          ! Loop on the number of cross-correlations
-!        !$OMP DO
+         !$OMP DO
          DO ixc=1,nxcs_
             i = xcPairs_(2*(ixc-1)+1)
             j = xcPairs_(2*(ixc-1)+2)
@@ -581,7 +591,7 @@ MODULE XCLOC_FDXC
                mag32f_(1:n) = MAX(mag32f_(1:n), tol32)
                ! Safely normalize
                xcPtr32c => xcFTs32f_(kndx:kndx+n-1)
-               !$OMP DO SIMD ALIGNED(xcPtr32c, mag32f_: 16)
+               !$OMP SIMD ALIGNED(xcPtr32c, mag32f_: 16)
                DO iw=1,n
                   xcPtr32c(iw) = xcPtr32c(iw)/mag32f_(iw)
                   !xcFTs32f_(kndx-1+iw) = xcFTs32f_(kndx-1+iw)/mag32f_(iw)
@@ -590,7 +600,7 @@ MODULE XCLOC_FDXC
             ENDIF
          ENDDO ! Loop on number of cross-correlations
          IF (lphaseCorr) DEALLOCATE(mag32f_)
-!        !$OMP END PARALLEL
+         !$OMP END PARALLEL
       ELSE
          !$OMP PARALLEL DEFAULT(NONE) &
          !$OMP SHARED(accuracy_, ftOffset_, inputFTs64f_, lphaseCorr, nxcs_) &
@@ -619,7 +629,7 @@ MODULE XCLOC_FDXC
                mag64f_(1:n) = MAX(mag64f_(1:n), tol64)
                ! Safely normalize
                xcPtr64z => xcFTs64f_(kndx:kndx+n-1) 
-               !$OMP DO SIMD ALIGNED(xcPtr64z, mag64f_: 16)
+               !$OMP SIMD ALIGNED(xcPtr64z, mag64f_: 16)
                DO iw=1,n
                   xcPtr64z(iw) = xcPtr64z(iw)/mag64f_(iw)
                ENDDO
@@ -642,7 +652,7 @@ MODULE XCLOC_FDXC
       INTEGER, INTENT(OUT) :: ierr
       ierr = 0
       IF (nsignals_ == 0) RETURN ! nothing to do
-      IF (.NOT.linitFFTw) THEN
+      IF (.NOT.linitFFTw_) THEN
          WRITE(*,900) 
          ierr = 1
          RETURN
@@ -664,22 +674,29 @@ MODULE XCLOC_FDXC
       IMPLICIT NONE
       INCLUDE 'fftw/fftw3.f03'
       INTEGER, INTENT(OUT) :: ierr
+      REAL(C_DOUBLE), ALLOCATABLE :: work64(:)
       REAL(C_FLOAT), ALLOCATABLE :: work32(:)
+      REAL(C_DOUBLE) scal64
       REAL(C_FLOAT) scal32
       INTEGER indx, jndx, ixc, ncopy1, ncopy2
       ierr = 0 
       IF (nsignals_ == 0) RETURN ! nothing to do
-      IF (.NOT.linitFFTw) THEN
+      IF (.NOT.linitFFTw_) THEN
          WRITE(*,900)
          ierr = 1
          RETURN
       ENDIF
       IF (precision_ == XCLOC_SINGLE_PRECISION) THEN
-         scal32 = 1.0/FLOAT(nptsInXCs_)
          CALL FFTWF_EXECUTE_DFT_C2R(inversePlan_, xcFTs32f_, xcs32f_)
-         ALLOCATE(work32(ftOffset_)); work32(:) = 0.0
+         !$OMP PARALLEL DEFAULT(NONE) &
+         !$OMP SHARED(ftOffset_, nxcs_, xcs32f_) &
+         !$OMP FIRSTPRIVATE(dataOffset_, nptsInXCs_) & 
+         !$OMP PRIVATE(indx, jndx, ncopy1, ncopy2, scal32, work32) 
+         ALLOCATE(work32(dataOffset_)); work32(:) = 0.0
+         scal32 = 1.0/FLOAT(nptsInXCs_)
          ncopy1 = nptsInXCs_/2
          ncopy2 = ncopy1 + 1
+         !$OMP DO
          DO ixc=1,nxcs_
             indx = (ixc - 1)*dataOffset_ + 1
             jndx = (ixc - 1)*dataOffset_ + ncopy2
@@ -694,8 +711,27 @@ MODULE XCLOC_FDXC
             !xcs32f_(indx:indx+ncopy2-1) = work32(1:ncopy2) 
          ENDDO
          DEALLOCATE(work32)
+         !$OMP END PARALLEL
       ELSE
          CALL FFTW_EXECUTE_DFT_C2R(inversePlan_, xcFTs64f_, xcs64f_)
+         !$OMP PARALLEL DEFAULT(NONE) &
+         !$OMP SHARED(ftOffset_, nxcs_, xcs64f_) &
+         !$OMP FIRSTPRIVATE(dataOffset_, nptsInXCs_) & 
+         !$OMP PRIVATE(indx, jndx, ncopy1, ncopy2, scal64, work64)
+         ALLOCATE(work64(dataOffset_)); work64(:) = 0.d0
+         scal64 = 1.d0/DBLE(nptsInXCs_)
+         ncopy1 = nptsInXCs_/2
+         ncopy2 = ncopy1 + 1
+         !$OMP DO
+         DO ixc=1,nxcs_
+            indx = (ixc - 1)*dataOffset_ + 1 
+            jndx = (ixc - 1)*dataOffset_ + ncopy2
+            work64(ncopy1+1:nptsInXCs_)     = xcs64f_(indx:indx+ncopy1)
+            work64(1:ncopy1) = xcs64f_(jndx+1:jndx+ncopy1)
+            xcs64f_(indx:indx+nptsInXCs_-1) = work64(1:nptsInXCs_)*scal64
+         ENDDO
+         DEALLOCATE(work64)
+         !$OMP END PARALLEL
       ENDIF
   900 FORMAT('xcloc_fdxc_inverseTransform: Transforms not yet initialized')
       RETURN
@@ -713,10 +749,23 @@ MODULE XCLOC_FDXC
       INTEGER(C_INT), PARAMETER :: rank = 1    ! Computing multiple 1D transforms
       INTEGER(C_INT), PARAMETER :: istride = 1 ! Distance elements in input column
       INTEGER(C_INT), PARAMETER :: ostride = 1 ! Distance elements in output column
+#ifdef _OPENMP
+      INTEGER :: fftwSuccess = 0
+      INTEGER :: nthreads = 1
+#endif
       ierr = 0
-      linitFFTw = .FALSE.
+      linitFFTw_ = .FALSE.
       IF (nsignals_ < 1 .OR. nptsInXCs_ < 1) RETURN ! Not enough info to initialize
       IF (verbose_ > 0) WRITE(*,*) 'xcloc_fdxc_initializeFFTW: Initializing FFTs...'
+#ifdef _OPENMP
+      nthreads = OMP_GET_NUM_THREADS()
+      fftwSuccess =  fftw_init_threads()
+      IF (fftwSuccess == 0) THEN
+         WRITE(*,*) 'xcloc_fdxc_initializeFFTW: Error initializing threads'
+         ierr = 1
+      ENDIF
+      CALL fftw_plan_with_nthreads(nthreads)
+#endif
       IF (ALLOCATED(inputSignals32f_)) DEALLOCATE(inputSignals32f_)
       IF (ALLOCATED(inputFTs32f_))     DEALLOCATE(inputFTs32f_)
       IF (ALLOCATED(xcFTs32f_))        DEALLOCATE(xcFTs32f_)
@@ -740,12 +789,6 @@ MODULE XCLOC_FDXC
                                                 inputFTs32f_, onembed,     &
                                                 ostride, ftOffset_,        &
                                                 FFTW_PATIENT)
-!        inversePlan_ = FFTWF_PLAN_MANY_DFT_R2C(rank, ni, nxcs_,      &
-!                                               xcs32f_, inembed,     &
-!                                               istride, dataOffset_, &
-!                                               xcFTs32f_, onembed,   &
-!                                               ostride, ftOffset_,   & 
-!                                               FFTW_PATIENT)
          inversePlan_ = FFTWF_PLAN_MANY_DFT_C2R(rank, ni, nxcs_,        &
                                                 xcFTs32f_, inembed,     &
                                                 istride, ftOffset_,     &
@@ -770,7 +813,7 @@ MODULE XCLOC_FDXC
                                                ostride, dataOffset_,   &
                                                FFTW_PATIENT)
       ENDIF
-      linitFFTw = .TRUE.
+      linitFFTw_ = .TRUE.
       RETURN
       END
 

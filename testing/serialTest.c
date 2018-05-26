@@ -5,6 +5,7 @@
 #include <float.h>
 #include "xcloc_finter.h"
 #include "xcloc_enum.h"
+#include "test_suite.h"
 
 void getReferenceSoln(int *npts, double *xc, double *phaseXC);
 int test_fdxc(void);
@@ -19,6 +20,7 @@ int test_fdxc(void);
 };
 #endif
 
+/*
 int main()
 {
     int ierr;
@@ -30,8 +32,9 @@ int main()
     }
     return EXIT_SUCCESS;
 }
+*/
 
-int test_fdxc(void)
+int test_serial_fdxc(void)
 {
     const int npts = 6;
     const int nptsPad = 10;
@@ -140,6 +143,7 @@ int test_fdxc(void)
             }
         }
     }
+    free(xcs);
     // Repeat for cross-correlograms
     xcloc_fdxc_computeCrossCorrelograms(&ierr);
     xcs = calloc((size_t) (nptsInXC*nxcs), sizeof(float));

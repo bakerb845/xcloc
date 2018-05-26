@@ -52,14 +52,16 @@ SET(UNIT_TESTS_SRC unit_tests/acousticGreens2D.c)
 ADD_LIBRARY(xcloc_shared SHARED ${SRC})
 #ADD_LIBRARY(xcloc_static STATIC ${SRCS})
 #ADD_EXECUTABLE(interloc interloc.c ${SRC})
-ADD_EXECUTABLE(xcf_tests unit_tests/serialTest.c ${UNIT_TESTS_SRC} ${SRC})
+ADD_EXECUTABLE(xcf_tests
+               testing/test_suite.c
+               testing/serialTest.c)
 #ADD_EXECUTABLE(xcfft unit_tests/check_xcfft.c ${UNIT_TESTS_SRC} ${SRC})
 #ADD_EXECUTABLE(xc2d unit_tests/check_2d.c ${UNIT_TESTS_SRC} ${SRC})
 #ADD_EXECUTABLE(xcloc unit_tests/xcloc.c ${UNIT_TESTS_SRC} ${SRC})
 #ADD_EXECUTABLE(scaling unit_tests/scaling.c ${UNIT_TESTS_SRC} ${SRC})
 
 TARGET_LINK_LIBRARIES(xcloc_shared ${LIB_ALL})
-TARGET_LINK_LIBRARIES(xcf_tests ${LIB_ALL})
+TARGET_LINK_LIBRARIES(xcf_tests xcloc_shared ${LIB_ALL})
 #TARGET_LINK_LIBRARIES(interloc ${LIB_ALL})
 #TARGET_LINK_LIBRARIES(xcfft ${LIB_ALL})
 #TARGET_LINK_LIBRARIES(xc2d ${LIB_ALL})
