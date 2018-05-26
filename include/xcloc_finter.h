@@ -14,6 +14,7 @@ void xcloc_fdxc_initialize(const int npts,
                            const int nptsPad,
                            const int verbose,
                            const int precision,
+                           const int accuracy,
                            int *ierr);
 /* Finalize the cross-correlation. */
 void xcloc_fdxc_finalize(void);
@@ -23,11 +24,24 @@ void xcloc_fdxc_setXCTableF(const int nxcs, const int xcPairs[], int *ierr);
 void xcloc_fdxc_computeDefaultXCTableF(const bool ldoAutoCorrs,
                                        const int nwork,
                                        int *nxcs, int xcPairs[], int *ierr);
+/* Sets many float signals. */
+void xcloc_fdxc_setSignals32fF(const int ldx, const int npts, const int nsignals,
+                               const float x[], int *ierr);
 /* Sets a float signal. */ 
 void xcloc_fdxc_setSignal32fF(const int signalNumber,
                               const int npts,
                               const float x[],
                               int *ierr);
+/* Gets all the cross-correlograms. */
+void xcloc_fdxc_getCorrelograms32f(const int ldxc, const int nxcs,
+                                   float xcs[], int *ierr); 
+/* Gets a cross-correlogram. */
+void xcloc_fdxc_getCorrelogram32fF(const int corrNumber, const int lwork,
+                                   float xc[], int *ierr);
+/* Computes the phase correlograms. */
+void xcloc_fdxc_computePhaseCorrelograms(int *ierr);
+/* Computes the cross-correlograms. */
+void xcloc_fdxc_computeCrossCorrelograms(int *ierr);
 
 
 #ifdef __cplusplus

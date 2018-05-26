@@ -37,13 +37,13 @@ IF (XCLOC_PROFILE)
   INCLUDE_DIRECTORIES(${ADVISOR_INCLUDE_DIR})
 ENDIF()
 
-SET(LIB_ALL ${SACIO_LIBRARY} ${ISCL_LIBRARY} ${MKL_LIBRARY} ${IPP_LIBRARY} ${XML2_LIBRARY} ${INIPARSER_LIBRARY} ${H5_LIBRARY} ${MPI_C_LIBRARIES} -ldl)
+SET(LIB_ALL ${SACIO_LIBRARY} ${ISCL_LIBRARY} ${MKL_LIBRARY} ${IPP_LIBRARY} ${XML2_LIBRARY} ${INIPARSER_LIBRARY} ${H5_LIBRARY} ${MPI_C_LIBRARIES} ${MPI_Fortran_LIBRARIES} -ldl)
 
 ADD_SUBDIRECTORY(include)
 
 SET(SRC xcloc.c envelope.c rmsFilter.c xcfft.c migrate.c h5ioGrid.c h5ioUtils.c xdmf.c)
 SET(SRC ${SRC} xcfftMPI.c migrateMPI.c)
-SET(SRC ${SRC} fdxc.F90 ipps.F90 constants.F90)
+SET(SRC ${SRC} fdxc.F90 ipps.F90 constants.F90 xcloc.F90)
 
 # Executables
 #ADD_EXECUTABLE(dales dales.c ${SRC})
