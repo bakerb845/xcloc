@@ -68,7 +68,7 @@ MODULE XCLOC_FDXC
       !> Plan for transforming from frequency domain to time domain correlograms.
       TYPE(C_PTR), PRIVATE, SAVE :: inversePlan_
       !> Accuracy of the MKL computations.
-      INTEGER(KIND=8), PRIVATE :: accuracy_
+      INTEGER(KIND=8), PRIVATE, SAVE :: accuracy_
       !> Flag indicating FFTw has been initialized.
       LOGICAL, PRIVATE, SAVE :: linitFFTw_ = .FALSE.
       INTEGER(C_SIZE_T), PRIVATE, PARAMETER :: alignment = 64

@@ -17,4 +17,6 @@ MODULE XCLOC_CONSTANTS
       COMPLEX(C_FLOAT_COMPLEX), PARAMETER :: czero = CMPLX(0.0, 0.0)
       !> Double complex 0.0
       COMPLEX(C_DOUBLE_COMPLEX), PARAMETER :: zzero = DCMPLX(0.d0, 0.d0)
+      !> Default block size for migration loop.
+      INTEGER(C_INT), PARAMETER :: XCLOC_DEFAULT_BLOCKSIZE = 1024
 END MODULE

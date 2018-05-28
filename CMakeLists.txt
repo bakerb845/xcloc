@@ -43,7 +43,7 @@ ADD_SUBDIRECTORY(include)
 
 SET(SRC xcloc.c envelope.c rmsFilter.c xcfft.c migrate.c h5ioGrid.c h5ioUtils.c xdmf.c)
 SET(SRC ${SRC} xcfftMPI.c migrateMPI.c)
-SET(SRC ${SRC} fdxc.F90 ipps.F90 constants.F90 xcloc.F90)
+SET(SRC ${SRC} fdxc.F90 ipps.F90 constants.F90 xcloc.F90 dsmxc.F90)
 
 # Executables
 #ADD_EXECUTABLE(dales dales.c ${SRC})
