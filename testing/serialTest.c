@@ -20,20 +20,6 @@ int test_fdxc(void);
 };
 #endif
 
-/*
-int main()
-{
-    int ierr;
-    ierr = test_fdxc();
-    if (ierr != 0)
-    {
-        fprintf(stderr, "Error in fdxc test\n");
-        return EXIT_FAILURE;
-    }
-    return EXIT_SUCCESS;
-}
-*/
-
 int test_serial_fdxc(void)
 {
     const int npts = 6;
@@ -120,8 +106,8 @@ int test_serial_fdxc(void)
     free(xcPairs); xcPairs = NULL;
     // Set the signals
     int ldx = nptsPad;
-    xcloc_fdxc_setSignals32fF(ldx, npts, nsignals, xall, &ierr);
-    CHKERR(ierr, "xcloc_fdxc_setSignals32fF");
+    xcloc_fdxc_setSignals32f(ldx, npts, nsignals, xall, &ierr);
+    CHKERR(ierr, "xcloc_fdxc_setSignals32f");
     // Compute the phase correlograms
     xcloc_fdxc_computePhaseCorrelograms(&ierr);
     CHKERR(ierr, "xcloc_fdxc_computePhaseCorrelograms");

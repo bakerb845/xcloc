@@ -83,11 +83,22 @@ MODULE XCLOC_FDXC
       PUBLIC :: xcloc_fdxc_finalize
       PUBLIC :: xcloc_fdxc_setXCTableF
       PUBLIC :: xcloc_fdxc_computeDefaultXCTableF
+      PUBLIC :: xcloc_fdxc_setSignal64fF
       PUBLIC :: xcloc_fdxc_setSignal32fF
-      PUBLIC :: xcloc_fdxc_setSignals32fF
+      PUBLIC :: xcloc_fdxc_setSignals64f
+      PUBLIC :: xcloc_fdxc_setSignals32f
+      PUBLIC :: xcloc_fdxc_getCorrelogram32fF
+      PUBLIC :: xcloc_fdxc_getCorrelogram64fF
+      PUBLIC :: xcloc_fdxc_getCorrelograms64f
+      PUBLIC :: xcloc_fdxc_getCorrelograms32f
+      PUBLIC :: xcloc_fdxc_getCorrelogramLength
+      PUBLIC :: xcloc_fdxc_getNumberOfCorrelograms
+      PUBLIC :: xcloc_fdxc_getNumberOfSignals
+      PUBLIC :: xcloc_fdxc_getPrecision
       PUBLIC :: xcloc_fdxc_computePhaseCorrelograms
       PUBLIC :: xcloc_fdxc_computeCrossCorrelograms
 
+      PRIVATE :: xcloc_fdxc_setAccuracy
       PRIVATE :: xcloc_fdxc_computeFDCorrelations
       PRIVATE :: xcloc_fdxc_initializeFFTW
       PRIVATE :: xcloc_fdxc_forwardTransform
@@ -128,7 +139,8 @@ MODULE XCLOC_FDXC
       IF (prec /= XCLOC_SINGLE_PRECISION .AND. prec /= XCLOC_DOUBLE_PRECISION) THEN
          WRITE(*,908) prec
          ierr = 1
-      ENDIF 
+      ENDIF
+      precision_ = prec
       CALL xcloc_fdxc_setAccuracy(accuracy, ierr)
       ! Set the input variables
       npts_       = npts
@@ -139,6 +151,17 @@ MODULE XCLOC_FDXC
       nptsInFTs_  = nptsInXCs_/2 + 1 ! Number of points in the fourier transforms
       dataOffset_ = padLength(alignment, sizeof_float,         nptsInXCs_)
       ftOffset_   = padLength(alignment, sizeof_float_complex, nptsInFTs_)
+      IF (ALLOCATED(inputSignals32f_)) DEALLOCATE(inputSignals32f_)
+      IF (ALLOCATED(inputSignals64f_)) DEALLOCATE(inputSignals64f_)
+      IF (ALLOCATED(inputFTs32f_))     DEALLOCATE(inputFTs32f_)
+      IF (ALLOCATED(inputFTs64f_))     DEALLOCATE(inputFTs64f_)
+      IF (precision_ == XCLOC_SINGLE_PRECISION) THEN
+         ALLOCATE(inputSignals32f_(dataOffset_*nsignals_)); inputSignals32f_(:) = 0.0
+         ALLOCATE(inputFTs32f_(ftOffset_*nsignals_)); inputFTs32f_(:) = czero
+      ELSE
+         ALLOCATE(inputSignals64f_(dataOffset_*nsignals_)); inputSignals64f_(:) = 0.d0
+         ALLOCATE(inputFTs64f_(ftOffset_*nsignals_)); inputFTs64f_(:) = zzero
+      ENDIF
       ! Format statements
   905 FORMAT("xcloc_fdxc_initialize: npts=", I8, "must be positive")
   906 FORMAT("xcloc_fdxc_initialize: nsignals=", I8, "must be at least 2")
@@ -187,8 +210,6 @@ MODULE XCLOC_FDXC
 !========================================================================================!
 !                                                                                        !
 !>    @brief Releases the memory in the module and reset the variables.
-!>
-!>    @copyright Ben Baker distributed under the MIT license.
       SUBROUTINE xcloc_fdxc_finalize( ) & 
       BIND(C, NAME='xcloc_fdxc_finalize')
       IMPLICIT NONE
@@ -264,8 +285,8 @@ MODULE XCLOC_FDXC
       IF (ierr /= 0) WRITE(*,903)
       ! Format statements
   900 FORMAT('xcloc_fdxc_setXCTableF: Error nxcs must be positive', I5)
-  901 FORMAT('xcloc_fdxc_setXCTableF: minval(xcPairs)', I4, 'must be positive')
-  902 FORMAT('xcloc_fdxc_setXCTableF: minval(xcPairs)', I4, 'cannot exceed', I4)
+  901 FORMAT('xcloc_fdxc_setXCTableF: minval(xcPairs)=', I6, ' must be positive')
+  902 FORMAT('xcloc_fdxc_setXCTableF: minval(xcPairs)=', I6, ' cannot exceed', I4)
   903 FORMAT('xcloc_fdxc_setXCTableF: Error initializing FFTs')
       RETURN
       END
@@ -353,8 +374,48 @@ MODULE XCLOC_FDXC
 !>    @param[in] x         Signals to set.  This is an [ldx x nsignal] matrix.
 !>                         with leading dimension ldx. 
 !>    @param[out] ierr     0 indicates success.
-      SUBROUTINE xcloc_fdxc_setSignals32fF(ldx, npts, nsignals, x, ierr)  &
-      BIND(C, NAME='xcloc_fdxc_setSignals32fF')
+      SUBROUTINE xcloc_fdxc_setSignals64f(ldx, npts, nsignals, x, ierr)  &
+      BIND(C, NAME='xcloc_fdxc_setSignals64f')
+      USE ISO_C_BINDING
+      IMPLICIT NONE
+      INTEGER(C_INT), VALUE, INTENT(IN) :: ldx, npts, nsignals
+      REAL(C_DOUBLE), INTENT(IN) :: x(ldx*nsignals)
+      INTEGER(C_INT), INTENT(OUT) :: ierr 
+      INTEGER i, ix
+      ierr = 0
+      IF (ldx < npts .OR. npts /= npts_ .OR. nsignals /= nsignals_) THEN 
+         IF (ldx < npts) WRITE(*,900) ldx, npts 
+         IF (npts /= npts_) WRITE(*,901) npts_
+         IF (nsignals /= nsignals_) WRITE(*,902) nsignals_
+         ierr = 1
+         RETURN
+      ENDIF
+      DO i=1,nsignals_
+         ix = (i - 1)*ldx + 1
+         CALL xcloc_fdxc_setSignal64fF(i, npts, x(ix), ierr)
+         IF (ierr /= 0) THEN 
+            WRITE(*,910) i
+            RETURN
+         ENDIF
+      ENDDO
+  900 FORMAT('xcloc_fdxc_setSignals64f: Error ldx=', I6, '<', 'npts=', I6)
+  901 FORMAT('xcloc_fdxc_setSignals64f: Error expecting npts=', I6)
+  902 FORMAT('xcloc_fdxc_setSignals64f: Error expecting nsignals=', I6)
+  910 FORMAT('xcloc_fdxc_setSignals64f: Error setting signal index', I4)
+      RETURN
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Convenience routine to set all the signals on the module.
+!>    @param[in] ldx       Leading dimension of x.  This cannot be less than npts_.
+!>    @param[in] npts      Number of points in each signal.
+!>    @param[in] nsignals  Number of signals.
+!>    @param[in] x         Signals to set.  This is an [ldx x nsignal] matrix.
+!>                         with leading dimension ldx. 
+!>    @param[out] ierr     0 indicates success.
+      SUBROUTINE xcloc_fdxc_setSignals32f(ldx, npts, nsignals, x, ierr)  &
+      BIND(C, NAME='xcloc_fdxc_setSignals32f')
       USE ISO_C_BINDING
       IMPLICIT NONE
       INTEGER(C_INT), VALUE, INTENT(IN) :: ldx, npts, nsignals
@@ -377,15 +438,124 @@ MODULE XCLOC_FDXC
             RETURN
          ENDIF
       ENDDO
-  900 FORMAT('xcloc_fdxc_setSignals32fF: Error ldx=', I6, '<', 'npts=', I6)
-  901 FORMAT('xcloc_fdxc_setSignals32fF: Error expecting npts=', I6)
-  902 FORMAT('xcloc_fdxc_setSignals32fF: Error expecting nsignals=', I6)
-  910 FORMAT('xcloc_fdxc_setSignals32fF: Error setting signal index', I4)
+  900 FORMAT('xcloc_fdxc_setSignals32f: Error ldx=', I6, '<', 'npts=', I6)
+  901 FORMAT('xcloc_fdxc_setSignals32f: Error expecting npts=', I6)
+  902 FORMAT('xcloc_fdxc_setSignals32f: Error expecting nsignals=', I6)
+  910 FORMAT('xcloc_fdxc_setSignals32f: Error setting signal index', I4)
       RETURN
       END
 !                                                                                        !
 !========================================================================================!
 !                                                                                        !
+!>    @brief Returns the number of correlograms to be computed.
+!>    @param[out] nxcs   Number of correlograms.
+!>    @param[out] ierr   0 indicates success.
+      SUBROUTINE xcloc_fdxc_getNumberOfCorrelograms(nxcs, ierr) &
+      BIND(C, NAME='xcloc_fdxc_getNumberOfCorrelograms')
+      IMPLICIT NONE
+      INTEGER(C_INT), INTENT(OUT) :: nxcs, ierr
+      ierr = 0
+      nxcs = nxcs_
+      IF (nxcs_ < 1) THEN
+         ierr = 1
+         WRITE(*,900)
+      ENDIF 
+  900 FORMAT('xcloc_fdxc_getNumberOfCorrelograms: Correlation table never set!')
+      RETURN
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Returns the number of input time domain signals.
+!>    @param[out] nsignals  Number of time domain input signals to correlate.
+!>    @parma[out] ierr      0 indicates success. 
+      SUBROUTINE xcloc_fdxc_getNumberOfSignals(nsignals, ierr) &
+      BIND(C, NAME='xcloc_fdxc_getNumberOfSignals')
+      IMPLICIT NONE
+      INTEGER(C_INT), INTENT(OUT) :: nsignals, ierr
+      ierr = 0 
+      nsignals = nsignals_
+      IF (nsignals_ < 1) THEN
+         ierr = 1 
+         WRITE(*,900)
+      ENDIF
+  900 FORMAT('xcloc_fdxc_getNumberOfSignals: No signals!')
+      RETURN
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Returns the number of points in the time domain correlations.
+!>    @param[out] nptsInXCs  Number of points in the correlograms.
+!>    @param[out] ierr       0 indicates success.
+      SUBROUTINE xcloc_fdxc_getCorrelogramLength(nptsInXCs, ierr) &
+      BIND(C, NAME='xcloc_fdxc_getCorrelogramLength')
+      IMPLICIT NONE
+      INTEGER(C_INT), INTENT(OUT) :: nptsInXCs, ierr
+      ierr = 0
+      nptsInXCs = nptsInXCs_
+      IF (nptsInXCs_ < 1) THEN
+         ierr = 1
+         WRITE(*,900) 
+      ENDIF 
+  900 FORMAT('xcloc_fdxc_getCorrelogramLength: Correlogram length is 0')
+      RETURN
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Gets the precision of the module.
+!>    @param[out] prec   Precision of module - e.g., XCLOC_SINGLE_PRECISION or 
+!>                       XCLOC_DOUBLE_PRECISION.
+      SUBROUTINE xcloc_fdxc_getPrecision(prec) BIND(C, NAME='xcloc_fdxc_getPrecision')
+      IMPLICIT NONE
+      INTEGER(C_INT), INTENT(OUT) :: prec
+      prec = precision_
+      RETURN
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Gets all the correlograms.
+!>    @param[in] ldxc   Leading dimension of xcs.  This must be at least nptsInXCs_
+!>    @param[in] nxcs   Number of cross corrrelations.  This must be nxcs_.
+!>    @param[out] xcs   Cross-correlograms.  This is an array of dimension [ldxc x nxcs]
+!>                      with leading dimension ldxc.
+!>    @param[out] ierr  0 indicates success.
+!>
+      SUBROUTINE xcloc_fdxc_getCorrelograms64f(ldxc, nxcs, xcs, ierr)  &
+      BIND(C, NAME='xcloc_fdxc_getCorrelograms64f')
+      USE ISO_C_BINDING
+      IMPLICIT NONE
+      INTEGER(C_INT), VALUE, INTENT(IN) :: ldxc, nxcs
+      REAL(C_DOUBLE), INTENT(OUT) :: xcs(ldxc*nxcs)
+      INTEGER(C_INT), INTENT(OUT) :: ierr
+      INTEGER i1, ixc 
+      ierr = 0 
+      IF (ldxc < nptsInXCs_) THEN
+         ierr = 1 
+         RETURN
+      ENDIF
+      IF (nxcs < nxcs_) THEN
+         ierr = 1 
+         RETURN
+      ENDIF
+      DO ixc=1,nxcs_
+         i1 = (ixc - 1)*ldxc + 1 
+         CALL xcloc_fdxc_getCorrelogram64fF(ixc, ldxc, xcs(i1), ierr)
+      ENDDO
+      RETURN
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Gets all the correlograms.
+!>    @param[in] ldxc   Leading dimension of xcs.  This must be at least nptsInXCs_
+!>    @param[in] nxcs   Number of cross corrrelations.  This must be nxcs_.
+!>    @param[out] xcs   Cross-correlograms.  This is an array of dimension [ldxc x nxcs]
+!>                      with leading dimension ldxc.
+!>    @param[out] ierr  0 indicates success.
+!>
       SUBROUTINE xcloc_fdxc_getCorrelograms32f(ldxc, nxcs, xcs, ierr)  &
       BIND(C, NAME='xcloc_fdxc_getCorrelograms32f')
       USE ISO_C_BINDING
@@ -420,6 +590,48 @@ MODULE XCLOC_FDXC
 !>                           [lwork] however only the first nptsInXCs_ points are
 !>                           accessed.
 !>    @param[out] ierr       0 indicates success.
+!>
+      SUBROUTINE xcloc_fdxc_getCorrelogram64fF(corrNumber, lwork, xc, ierr) &
+      BIND(C, NAME='xcloc_fdxc_getCorrelogram64fF')
+      USE ISO_C_BINDING
+      IMPLICIT NONE
+      INTEGER(C_INT), VALUE, INTENT(IN) :: corrNumber, lwork
+      REAL(C_DOUBLE), INTENT(OUT) :: xc(*)
+      INTEGER(C_INT), INTENT(OUT) :: ierr
+      INTEGER i1
+      ierr = 0 
+      IF (lwork < nptsInXCs_) THEN
+         WRITE(*,900) lwork, nptsInXCs_
+         ierr = 1
+         RETURN
+      ENDIF
+      IF (corrNumber < 1 .OR. corrNumber > nxcs_) THEN
+         WRITE(*,905) corrNumber, nxcs_,  nxcs_
+         ierr = 1
+         RETURN
+      ENDIF
+      i1 = (corrNumber - 1)*dataOffset_ + 1 
+      IF (precision_ == XCLOC_DOUBLE_PRECISION) THEN
+         xc(1:nptsInXCs_) = xcs64f_(i1:i1+nptsInXCs_-1)
+      ELSE
+         ierr = ippsConvert_32f64f(xcs32f_(i1), xc, nptsInXCs_)
+      ENDIF
+  900 FORMAT('xcloc_fdxc_getCorrelogram32fF: lworC=', I6, 'must be at least', I6) 
+  905 FORMAT('xcloc_fdxc_getCorrelogram32fF: corrNumber',I6, 'must be in range [1',I6,']')
+      RETURN 
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Gets the corrNumber'th cross-correlation on the module.
+!>    @param[in] corrNumber  Correlation number to get.  This must be in the rnage
+!>                           [1, nxcs_].
+!>    @param[in] lwork       Space allocated to xc.
+!>    @param[out] xc         The corrNumber'th cross-correlation.  This has dimension
+!>                           [lwork] however only the first nptsInXCs_ points are
+!>                           accessed.
+!>    @param[out] ierr       0 indicates success.
+!>
       SUBROUTINE xcloc_fdxc_getCorrelogram32fF(corrNumber, lwork, xc, ierr) &
       BIND(C, NAME='xcloc_fdxc_getCorrelogram32fF')
       USE ISO_C_BINDING
@@ -448,6 +660,45 @@ MODULE XCLOC_FDXC
   900 FORMAT('xcloc_fdxc_getCorrelogram32fF: lworC=', I6, 'must be at least', I6)
   905 FORMAT('xcloc_fdxc_getCorrelogram32fF: corrNumber',I6, 'must be in range [1',I6,']')
       RETURN 
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Sets the signalNumber'th input signal on the module.
+!>    @param[in] signalNumber  Number of signal to set.  This must be in the range
+!>                             [1, nsignals_].
+!>    @param[in] npts          Number of points in the signal.  This cannot exceed npts_.
+!>    @param[in] x             Signal to set.  This is an array of dimension [npts].
+!>    @param[out] ierr         0 indicates success.
+      SUBROUTINE xcloc_fdxc_setSignal64fF(signalNumber, npts, x, ierr) &
+      BIND(C, NAME='xcloc_fdxc_setSignal64fF')
+      USE ISO_C_BINDING
+      IMPLICIT NONE
+      INTEGER(C_INT), VALUE, INTENT(IN) :: signalNumber, npts
+      REAL(C_DOUBLE), INTENT(IN) :: x(npts)
+      INTEGER(C_INT), INTENT(OUT) :: ierr
+      INTEGER i1, i2
+      ierr = 1 
+      IF (npts < 1) RETURN ! nothing to do
+      IF (npts > npts_) THEN
+         WRITE(*,900) npts_
+         RETURN
+      ENDIF
+      IF (signalNumber < 1 .OR. signalNumber > nsignals_) THEN
+         WRITE(*,905) signalNumber
+         RETURN
+      ENDIF
+      ierr = 0 
+      i1 = (signalNumber - 1)*dataOffset_ + 1 
+      i2 = signalNumber*dataOffset_
+      IF (precision_ == XCLOC_DOUBLE_PRECISION) THEN
+         inputSignals64f_(i1:i1+npts-1) = x(1:npts)
+      ELSE
+         ierr = ippsConvert_64f32f(x, inputSignals32f_(i1), npts)
+      ENDIF
+  900 FORMAT('xcloc_fdxc_setSignal64fF: Error expecting npts=', I5) 
+  905 FORMAT('xcloc_fdxc_setSignal64fF: Error signalNumber must be in range [1,',I4,']')
+      RETURN
       END
 !                                                                                        !
 !========================================================================================!
@@ -781,12 +1032,8 @@ MODULE XCLOC_FDXC
 #else
       IF (verbose_ > 0) WRITE(*,*) 'xcloc_fdxc_initializeFFTW: Initializing FFTs...'
 #endif
-      IF (ALLOCATED(inputSignals32f_)) DEALLOCATE(inputSignals32f_)
-      IF (ALLOCATED(inputFTs32f_))     DEALLOCATE(inputFTs32f_)
       IF (ALLOCATED(xcFTs32f_))        DEALLOCATE(xcFTs32f_)
       IF (ALLOCATED(xcs32f_))          DEALLOCATE(xcs32f_)
-      IF (ALLOCATED(inputSignals64f_)) DEALLOCATE(inputSignals64f_)
-      IF (ALLOCATED(inputFTs64f_))     DEALLOCATE(inputFTs64f_)
       IF (ALLOCATED(xcFTs64f_))        DEALLOCATE(xcFTs64f_)
       IF (ALLOCATED(xcs64f_))          DEALLOCATE(xcs64f_)
       inembed(1) = 0
@@ -794,8 +1041,6 @@ MODULE XCLOC_FDXC
       nf(1) = nptsInXCs_ ! Each signal has length nptsInXCs_
       ni(1) = nptsInXCs_ ! Each signal has length nptsInXCs_
       IF (precision_ == XCLOC_SINGLE_PRECISION) THEN
-         ALLOCATE(inputSignals32f_(dataOffset_*nsignals_)); inputSignals32f_(:) = 0.0
-         ALLOCATE(inputFTs32f_(ftOffset_*nsignals_)); inputFTs32f_(:) = czero
          ALLOCATE(xcFTs32f_(ftOffset_*nxcs_)); xcFTs32f_(:) = czero
          ALLOCATE(xcs32f_(dataOffset_*nxcs_)); xcs32f_(:) = 0.0
          forwardPlan_ = FFTWF_PLAN_MANY_DFT_R2C(rank, nf, nsignals_,       &
@@ -811,8 +1056,6 @@ MODULE XCLOC_FDXC
                                                 ostride, dataOffset_,   & 
                                                 FFTW_PATIENT)
       ELSE
-         ALLOCATE(inputSignals64f_(dataOffset_*nsignals_)); inputSignals64f_(:) = 0.d0
-         ALLOCATE(inputFTs64f_(ftOffset_*nsignals_)); inputFTs64f_(:) = zzero
          ALLOCATE(xcFTs64f_(ftOffset_*nxcs_)); xcFTs64f_(:) = zzero
          ALLOCATE(xcs64f_(dataOffset_*nxcs_)); xcs64f_(:) = 0.d0
          forwardPlan_ = FFTW_PLAN_MANY_DFT_R2C(rank, nf, nsignals_,       &
