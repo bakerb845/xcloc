@@ -4,17 +4,24 @@
 MODULE XCLOC_DSMXC
       USE ISO_C_BINDING
       USE XCLOC_CONSTANTS
+      USE XCLOC_IPPS
+      USE XCLOC_MEMORY
 #ifdef _OPENMP
       USE OMP_LIB
 #endif
-      !> Holds the travel time tables.  This is an array of dimension [ldg x ntables_]
+      !> Holds the cross-correlograms.  This is an array of dimension
+      !> [dataOffset_ x nxcs_] stored in column major format. 
+      REAL(C_FLOAT), PRIVATE, TARGET, ALLOCATABLE, SAVE :: xcs32f_(:)
+      !> Holds the travel time tables.  This is an array of dimension [ldg_ x ntables_]
       !> stored in column major format.
-      REAL(C_INT), PRIVATE, TARGET, ALLOCATABLE, SAVE :: ttimes32f_(:)
+      REAL(C_INT), PRIVATE, TARGET, ALLOCATABLE, SAVE :: ttimes_(:)
       !> Holds the migration image.  This is an array of dimension [ngrd_].
       REAL(C_FLOAT), PRIVATE, TARGET, ALLOCATABLE, SAVE :: image32f_(:)
       !> Maps from the ixc'th correlation to the table pairs.  This in an array of
       !> dimension [2 x nxcPairs_] stored in column major format.
       INTEGER, PRIVATE, ALLOCATABLE, SAVE :: xcPairs_(:)
+      !> Sampling period (seconds) of signals.
+      REAL(C_DOUBLE), PRIVATE, SAVE :: dt_ = 0.d0
       !> Leading dimension of the travel time table.
       INTEGER, PRIVATE, SAVE :: ldg_ = 0
       !> Number of grid points in each table.
@@ -25,11 +32,20 @@ MODULE XCLOC_DSMXC
       INTEGER, PRIVATE, SAVE :: ntables_ = 0
       !> Number of cross-correlation pairs.
       INTEGER, PRIVATE, SAVE :: nxcPairs_ = 0
+      !> Leading dimension of correlograms.
+      INTEGER, PRIVATE, SAVE :: dataOffset_ = 0
       !> A tuning parameter that can improve performance by emphasizing cache coherency.
       INTEGER, PRIVATE, SAVE :: blockSize_ = XCLOC_DEFAULT_BLOCKSIZE 
+      !> The data alignment.
+      INTEGER(C_SIZE_T), PRIVATE, PARAMETER :: dataAlignment = 64
+      !> The size of a float.
+      INTEGER(C_SIZE_T), PRIVATE, PARAMETER :: sizeof_float = 4
 
       PUBLIC :: xcloc_dsmxc_initialize
+      PUBLIC :: xcloc_dsmxc_finalize
       PUBLIC :: xcloc_dsmxc_setBlockSize
+      PUBLIC :: xcloc_dsmxc_setTable64fF
+      PUBLIC :: xcloc_dsmxc_setTable32fF
       CONTAINS
 !----------------------------------------------------------------------------------------!
 !                                   Begin the Code                                       !
@@ -45,7 +61,7 @@ MODULE XCLOC_DSMXC
 !>                          [2 x nxcPairs].
 !>    @param[out] ierr      0 indicates success.  
       SUBROUTINE xcloc_dsmxc_initialize(ntables, ngrd, nxcPairs, nptsInXCs, &
-                                        dt, xcPairs, ierr) &
+                                        dt, xcPairs, ierr)                  &
       BIND(C, NAME='xcloc_dsmxc_initialize')
       IMPLICIT NONE
       INTEGER(C_INT), VALUE, INTENT(IN) :: ntables, ngrd, nptsInXCs, nxcPairs
@@ -54,6 +70,7 @@ MODULE XCLOC_DSMXC
       INTEGER(C_INT), INTENT(OUT) :: ierr
       ! Check the variables
       ierr = 0
+      CALL xcloc_dsmxc_finalize()
       IF (ngrd < 1) THEN
          WRITE(*,900)
          ierr = 1
@@ -82,6 +99,9 @@ MODULE XCLOC_DSMXC
       nptsInXCs_ = nptsInXCs_
       ntables_ = ntables
       nxcPairs_ = nxcPairs
+      dt_ = dt
+      dataOffset_ = xcloc_memory_padLength(dataAlignment, sizeof_float, nptsInXCs_) 
+      ALLOCATE(xcs32f_(dataOffset_*nptsInXCs_)); xcs32f_(:) = 0.0
       ALLOCATE(image32f_(ngrd_)); image32f_(:) = 0.0
   900 FORMAT('xcloc_dsmxc_initialize: No grid points')
   901 FORMAT('xcloc_dsmxc_initialize: No correlation pairs')
@@ -95,7 +115,22 @@ MODULE XCLOC_DSMXC
 !                                                                                        !
 !========================================================================================!
 !                                                                                        !
-
+      SUBROUTINE xcloc_dsmxc_finalize( ) &
+      BIND(C, NAME='xcloc_dsmxc_finalize')
+      IF (ALLOCATED(xcs32f_))   DEALLOCATE(xcs32f_)
+      IF (ALLOCATED(ttimes_))   DEALLOCATE(ttimes_)
+      IF (ALLOCATED(image32f_)) DEALLOCATE(image32f_)
+      IF (ALLOCATED(xcPairs_))  DEALLOCATE(xcPairs_)
+      dt_  = 0.d0
+      ldg_ = 0 
+      ngrd_ = 0 
+      nptsInXCs_ = 0 
+      ntables_ = 0 
+      nxcPairs_ = 0 
+      dataOffset_ = 0 
+      blockSize_ = XCLOC_DEFAULT_BLOCKSIZE
+      RETURN
+      END
 !                                                                                        !
 !========================================================================================!
 !                                                                                        !
@@ -128,17 +163,72 @@ MODULE XCLOC_DSMXC
 !========================================================================================!
 !                                                                                        !
 !>    @brief Sets a travel time table.
-      SUBROUTINE xcloc_dsmxc_setTable32f(ngrd, table, ierr) &
-      BIND(C, NAME='xcloc_dsmxc_setTable32f') 
-      INTEGER(C_INT), VALUE, INTENT(IN) :: ngrd
-      REAL(C_FLOAT), INTENT(IN) :: table(ngrd)
+!>    @param[in] tableNumber  Table index to set.  This must be in the range 
+!>                            [1, ntables_].
+!>    @param[in] ngrd         Number of grid points in the table.  This must equal ngrd_.
+!>    @param[in] table        The travel times from the source to all points in the
+!>                            grid in seconds.  This has dimension [ngrd].
+!>    @param[out] ierr        0 indicates success.
+      SUBROUTINE xcloc_dsmxc_setTable64fF(tableNumber, ngrd, table, ierr) &
+      BIND(C, NAME='xcloc_dsmxc_setTable64fF')
+      IMPLICIT NONE
+      INTEGER(C_INT), VALUE, INTENT(IN) :: tableNumber, ngrd
+      REAL(C_DOUBLE), INTENT(IN) :: table(ngrd)
       INTEGER(C_INT), INTENT(OUT) :: ierr
-      ierr = 0
-      IF (ngrd /= ngrd_) THEN
-         WRITE(*,900) ngrd, ngrd_
+      INTEGER i, igrd
+      ierr = 0 
+      IF (tableNumber < 1 .OR. tableNumber > ntables_) THEN
+         WRITE(*,900) tableNumber, ntables_ 
          ierr = 1 
       ENDIF
-  900 FORMAT('xcloc_dsmxc_setTable32f: ngrd=', I6, 'expecting ngrd_=', I6)
+      IF (ngrd /= ngrd_) THEN
+         WRITE(*,905) ngrd, ngrd_
+         ierr = 1 
+      ENDIF
+      IF (ierr /= 0) RETURN
+      igrd = (tableNumber - 1)*ldg_
+      DO i=1,ngrd_
+         ttimes_(igrd+i) = INT(table(i)/dt_ + 0.5d0)
+      ENDDO
+  900 FORMAT('xcloc_dsmxc_setTable64fF: tableNumber=', I4, ' must be in range [1,',I4,']')
+  905 FORMAT('xcloc_dsmxc_setTable64fF: ngrd=', I6, ' expecting ngrd_=', I6) 
+      RETURN
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Sets a travel time table.
+!>    @param[in] tableNumber  Table index to set.  This must be in the range 
+!>                            [1, ntables_].
+!>    @param[in] ngrd         Number of grid points in the table.  This must equal ngrd_.
+!>    @param[in] table        The travel times from the source to all points in the
+!>                            grid in seconds.  This has dimension [ngrd].
+!>    @param[out] ierr        0 indicates success.
+      SUBROUTINE xcloc_dsmxc_setTable32fF(tableNumber, ngrd, table, ierr) &
+      BIND(C, NAME='xcloc_dsmxc_setTable32fF')
+      IMPLICIT NONE
+      INTEGER(C_INT), VALUE, INTENT(IN) :: tableNumber, ngrd
+      REAL(C_FLOAT), INTENT(IN) :: table(ngrd)
+      INTEGER(C_INT), INTENT(OUT) :: ierr
+      REAL(C_FLOAT) dt4
+      INTEGER i, igrd
+      ierr = 0
+      IF (tableNumber < 1 .OR. tableNumber > ntables_) THEN
+         WRITE(*,900) tableNumber, ntables_ 
+         ierr = 1
+      ENDIF
+      IF (ngrd /= ngrd_) THEN
+         WRITE(*,905) ngrd, ngrd_
+         ierr = 1
+      ENDIF
+      IF (ierr /= 0) RETURN
+      igrd = (tableNumber - 1)*ldg_
+      dt4 = REAL(dt_)
+      DO i=1,ngrd_
+         ttimes_(igrd+i) = INT(table(i)/dt4 + 0.5)
+      ENDDO
+  900 FORMAT('xcloc_dsmxc_setTable32fF: tableNumber=', I4, ' must be in range [1,',I4,']')
+  905 FORMAT('xcloc_dsmxc_setTable32fF: ngrd=', I6, ' expecting ngrd_=', I6)
       RETURN
       END
 !                                                                                        !
@@ -175,6 +265,9 @@ MODULE XCLOC_DSMXC
             jgrd2 = (it1 - 1)*ldg + igrd2
             kgrd1 = (it2 - 1)*ldg + igrd1 
             kgrd2 = (it2 - 1)*ldg + igrd2
+            tt1 => ttimes_(jgrd1:jgrd2)
+            tt2 => ttimes_(kgrd1:kgrd2)
+            !$OMP SIMD ALIGNED(imagePtr32f, tt1, tt2: 64)
             DO i=1,ngrdLoc
                indxXC = lxc2 + tt1(i) - tt2(igrd)
                !imagePtr32f(i) = imagePtr32f(i) + xcPtr32f(indxXC)

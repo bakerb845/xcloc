@@ -15,6 +15,7 @@ SET(XCLOC_VERSION ${XCLOC_VERSION_MAJOR}.${XCLOC_VERSION_MINOR}.${XCLOC_VERSION_
 MESSAGE("Configuring version: " ${XCLOC_VERSION})
 # Add modules for finding requisites
 SET(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/CMakeModules)
+SET(CMAKE_Fortran_MODULE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/modules)
 SET(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/testing)
 SET(CMAKE_TESTING_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/testing)
 SET(CMAKE_BINARY_DIR  ${CMAKE_CURRENT_SOURCE_DIR}/bin)
@@ -43,7 +44,7 @@ ADD_SUBDIRECTORY(include)
 
 SET(SRC xcloc.c envelope.c rmsFilter.c xcfft.c migrate.c h5ioGrid.c h5ioUtils.c xdmf.c)
 SET(SRC ${SRC} xcfftMPI.c migrateMPI.c)
-SET(SRC ${SRC} fdxc.F90 ipps.F90 constants.F90 xcloc.F90 dsmxc.F90)
+SET(SRC ${SRC} fdxc.F90 ipps.F90 constants.F90 memory.F90 xcloc.F90 dsmxc.F90)
 
 # Executables
 #ADD_EXECUTABLE(dales dales.c ${SRC})

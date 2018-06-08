@@ -5,6 +5,7 @@ MODULE XCLOC_FDXC
       USE ISO_C_BINDING
       USE XCLOC_CONSTANTS
       USE XCLOC_IPPS
+      USE XCLOC_MEMORY
 #ifdef _OPENMP
       USE OMP_LIB
 #endif
@@ -103,7 +104,6 @@ MODULE XCLOC_FDXC
       PRIVATE :: xcloc_fdxc_initializeFFTW
       PRIVATE :: xcloc_fdxc_forwardTransform
       PRIVATE :: xcloc_fdxc_inverseTransform
-      PRIVATE :: padLength
       CONTAINS
 !========================================================================================!
 !                                     Begin the Code                                     !
@@ -149,8 +149,13 @@ MODULE XCLOC_FDXC
       verbose_    = verbose
       nptsInXCs_  = 2*nptsPad_ - 1   ! Length of the cross-correlations
       nptsInFTs_  = nptsInXCs_/2 + 1 ! Number of points in the fourier transforms
-      dataOffset_ = padLength(alignment, sizeof_float,         nptsInXCs_)
-      ftOffset_   = padLength(alignment, sizeof_float_complex, nptsInFTs_)
+      IF (precision_ == XCLOC_SINGLE_PRECISION) THEN
+         dataOffset_ = xcloc_memory_padLength(alignment, sizeof_float,         nptsInXCs_)
+         ftOffset_   = xcloc_memory_padLength(alignment, sizeof_float_complex, nptsInFTs_)
+      ELSE
+         dataOffset_ = xcloc_memory_padLength(alignment, sizeof_double,        nptsInXCs_)
+         ftOffset_   = xcloc_memory_padLength(alignment, sizeof_double_complex,nptsInFTs_)
+      ENDIF
       IF (ALLOCATED(inputSignals32f_)) DEALLOCATE(inputSignals32f_)
       IF (ALLOCATED(inputSignals64f_)) DEALLOCATE(inputSignals64f_)
       IF (ALLOCATED(inputFTs32f_))     DEALLOCATE(inputFTs32f_)
@@ -677,7 +682,7 @@ MODULE XCLOC_FDXC
       INTEGER(C_INT), VALUE, INTENT(IN) :: signalNumber, npts
       REAL(C_DOUBLE), INTENT(IN) :: x(npts)
       INTEGER(C_INT), INTENT(OUT) :: ierr
-      INTEGER i1, i2
+      INTEGER i1
       ierr = 1 
       IF (npts < 1) RETURN ! nothing to do
       IF (npts > npts_) THEN
@@ -690,7 +695,6 @@ MODULE XCLOC_FDXC
       ENDIF
       ierr = 0 
       i1 = (signalNumber - 1)*dataOffset_ + 1 
-      i2 = signalNumber*dataOffset_
       IF (precision_ == XCLOC_DOUBLE_PRECISION) THEN
          inputSignals64f_(i1:i1+npts-1) = x(1:npts)
       ELSE
@@ -716,7 +720,7 @@ MODULE XCLOC_FDXC
       INTEGER(C_INT), VALUE, INTENT(IN) :: signalNumber, npts
       REAL(C_FLOAT), INTENT(IN) :: x(npts)
       INTEGER(C_INT), INTENT(OUT) :: ierr
-      INTEGER i1, i2
+      INTEGER i1
       ierr = 1
       IF (npts < 1) RETURN ! nothing to do
       IF (npts > npts_) THEN
@@ -729,7 +733,6 @@ MODULE XCLOC_FDXC
       ENDIF
       ierr = 0 
       i1 = (signalNumber - 1)*dataOffset_ + 1 
-      i2 = signalNumber*dataOffset_
       IF (precision_ == XCLOC_SINGLE_PRECISION) THEN
          inputSignals32f_(i1:i1+npts-1) = x(1:npts)
       ELSE
@@ -1074,19 +1077,5 @@ MODULE XCLOC_FDXC
       linitFFTw_ = .TRUE.
       RETURN
       END
-
-      INTEGER(C_INT) FUNCTION padLength(alignment, sizeof_dataType, n) &
-      BIND(C, NAME='padLength')
-      USE ISO_C_BINDING
-      IMPLICIT NONE
-      INTEGER(C_SIZE_T), VALUE, INTENT(IN) :: alignment, sizeof_dataType
-      INTEGER(C_INT), VALUE, INTENT(IN) :: n
-      INTEGER(C_INT) xmod
-      padLength = 0 
-      xmod = MOD(n*sizeof_dataType, INT(alignment))
-      IF (xmod /= 0) padLength = (INT(alignment) - xmod)/sizeof_dataType
-      padLength = n + padLength
-      RETURN
-      END FUNCTION
 
 END MODULE

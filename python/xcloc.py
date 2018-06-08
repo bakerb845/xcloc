@@ -4,6 +4,7 @@ Python interface to the xcloc interferometric location software.
 
 Copyright: Ben Baker distributed under the MIT license.
 """
+import sys
 from ctypes import cdll
 from ctypes import c_int
 from ctypes import c_bool
@@ -385,7 +386,37 @@ class fdxc:
         self.lib.xcloc_finalizeF()
         return
 
- 
+def unit_test(xcloc_path):
+    xcloc = xcloc(xcloc_path=[xcloc_path])
+    npts = 10     # Length of signal
+    nsignals = 5  # Number of signals
+    # Initialize - default is single precision + high accuracy
+    ierr = xcloc.fdxc.initialize(npts, nsignals)
+    if (ierr != 0):
+        sys.exit("initialization failed")
+    # Create the correlation pairs - default is no auto-correlations
+    xcPairs = xcloc.fdxc.computeDefaultXCTable(ldoAutoCorrs = True)
+    ierr = xcloc.fdxc.setXCTable(xcPairs)
+    if (ierr != 0):
+        sys.exit("failed to set table") 
+    # Set some signals to correlate
+    signals = zeros([nsignals, npts])
+    signals[0,:] = [ 1, 2, 3, 4, 5, -1,  0, 0,  0,  0]
+    signals[1,:] = [ 3, 2, 1, 3, 2,  1,  0, 0,  0,  0]
+    signals[2,:] = [-1, 2,-1,-2, 1, -1,  0, 0,  0,  0]
+    signals[3,:] = [ 4,-2, 3,-1, 5, -1,  0, 0,  0,  0]
+    signals[4,:] = [ 0,-3,-4, 5,-2,  3,  0, 0,  0,  0]
+    ierr = xcloc.fdxc.setSignals(signals)
+    if (ierr != 0):
+        sys.exit("failed to set signals")
+    # Compute the correlograms
+    xcs = xcloc.fdxc.computeCrossCorrelograms()
+    if xcs is None:
+        print("failed to compute correlograms")
+    print(xcs)
+    # Clean up
+    xcloc.fdxc.finalize()
+    return 
 
 if __name__ == "__main__":
     xcloc = xcloc(xcloc_path=['/home/bakerb25/C/xcloc/lib'])
