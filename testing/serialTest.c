@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 #include <math.h>
 #include <float.h>
 #include <time.h>
@@ -202,9 +203,8 @@ int test_serial_fdxc_random(const int precision)
     int nptsPad = npts;
     int lxc = 2*npts - 1;
     int nsignals = NSIGNALS; // make it work but don't brick my computer in debug mode
-    double *xcs;
     const float *xc;
-    float *xcsAll;
+    float *phaseXcsAll, *xcsAll;
     double diffTime, diffTimeRef, res;
     double *xrand;
     int i, ierr, indx, ixc, nxcs;
@@ -246,44 +246,89 @@ ANNOTATE_SITE_BEGIN("fdxc: random serial");
     CHKERR(ierr, "xcloc_fdxc_computePhaseCorrelograms");
     // Get the result
     int nptsInXC = 2*nptsPad - 1;
+    phaseXcsAll = calloc((size_t) (nptsInXC*nxcs), sizeof(float));
+    xcloc_fdxc_getCorrelograms32f(nptsInXC, nxcs, phaseXcsAll, &ierr);
+    // Compute the cross-correlograms
     xcsAll = calloc((size_t) (nptsInXC*nxcs), sizeof(float));
-    xcloc_fdxc_getCorrelograms32f(nptsInXC, nxcs, xcsAll, &ierr);
+    // Compute the cross correlograms
+    xcloc_fdxc_computeCrossCorrelograms(&ierr);
+    CHKERR(ierr, "xcloc_fdxc_computeCrossCorrelograms");
+    xcloc_fdxc_getCorrelograms32f(nptsInXC, nxcs, xcsAll, &ierr); 
 #ifdef XCLOC_PROFILE
 ANNOTATE_SITE_END();
 #endif
     CHKERR(ierr, "xcloc_fdxc_getCorrelograms32f");
     diffTime = (double) (clock() - start)/CLOCKS_PER_SEC;
-    fprintf(stdout, "%s: Processing time %e (s)\n", __func__, diffTime);    
     // Do it the straight forward wa 
-    xcs = (double *) calloc((size_t) (nxcs*lxc)+32, sizeof(double));
-    ierr = xcfft_computeXCsWithISCL(nsignals, nxcs,
-                                    npts, lxc, xrand, xcs, &diffTimeRef);
+    start = clock();
+    double *phaseXcs = (double *) calloc((size_t) (nxcs*lxc)+32, sizeof(double));
+    double *xcs = (double *) calloc((size_t) (nxcs*lxc)+32, sizeof(double));
+    bool ldoPhase = true;
+    ierr = xcfft_computeXCsWithISCL(ldoPhase, nsignals, nxcs,
+                                    npts, lxc, xrand, phaseXcs, &diffTimeRef);
     if (ierr != EXIT_SUCCESS)
     {
         fprintf(stderr, "%s: Failed to compute reference signals\n", __func__);
         return EXIT_FAILURE;
     }
+    ldoPhase = false;
+    ierr = xcfft_computeXCsWithISCL(ldoPhase, nsignals, nxcs,
+                                    npts, lxc, xrand, xcs, &diffTimeRef);
+    if (ierr != EXIT_SUCCESS)
+    {   
+        fprintf(stderr, "%s: Failed to compute reference signals\n", __func__);
+        return EXIT_FAILURE;
+    }
+    diffTimeRef = (double) (clock() - start)/CLOCKS_PER_SEC;
+    // check phase xcs
     double resMax = 0;
     for (ixc=0; ixc<nxcs; ixc++)
     {
-        xc = &xcsAll[ixc*nptsInXC];
+        xc = &phaseXcsAll[ixc*nptsInXC];
         for (i=0; i<lxc; i++)
         {   
             indx = ixc*lxc + i; 
-            res = fabs((double) xc[i] - xcs[indx]);
+            res = fabs((double) xc[i] - phaseXcs[indx]);
             if (res > 10.0*FLT_EPSILON)
             {   
                 fprintf(stderr, "Failed on phase test: %d %d %f %e %e\n",
-                        ixc, i, xc[i], xcs[indx], res);
+                        ixc, i, xc[i], phaseXcs[indx], res);
                 return EXIT_FAILURE;
             }
             resMax = fmax(resMax, res);
         }
     }
-    fprintf(stdout, "%s: L1 error=%e\n", __func__, resMax);
+    fprintf(stdout, "%s: phaseXC L1 error=%e\n", __func__, resMax);
+    // check xc's
+    resMax = 0;
+    for (ixc=0; ixc<nxcs; ixc++)
+    {
+        xc = &xcsAll[ixc*nptsInXC];
+        for (i=0; i<lxc; i++)
+        {
+            indx = ixc*lxc + i;  
+            res = fabs((double) xc[i] - xcs[indx]);
+            if (res > 100.0*FLT_EPSILON)
+            {
+                fprintf(stderr, "Failed on xcs test: %d %d %f %e %e\n",
+                        ixc, i, xc[i], xcs[indx], res);
+                return EXIT_FAILURE;
+            }
+            resMax = fmax(resMax, res);
+        }
+    }   
+    fprintf(stdout, "%s: XC L1 error=%e\n", __func__, resMax);
+    fprintf(stdout, "%s: Processing time %e (s)\n", __func__, diffTime);
+    fprintf(stdout, "%s: Reference processing time %e (s)\n", __func__, diffTimeRef);
+    fprintf(stdout, "%s: Performance improvement %lf pct\n",
+            __func__, (diffTimeRef - diffTime)/diffTimeRef*100.0);
     // Finalize
     xcloc_fdxc_finalize();
     free(xrand);
+    free(phaseXcsAll);
+    free(xcsAll);
+    free(xcs);
+    free(phaseXcs);
     return EXIT_SUCCESS;
 }
 //============================================================================//
@@ -331,6 +376,7 @@ double *xcfft_createRandomSignals(int *seed, const int nsignals, const int npts,
 /*!
  * @brief Computes the phase correlations slowly but correctly.
  *
+ * @param[in] ldoPhase     If true then compute phase correlograms.
  * @param[in] nsignals     Number of signals to transform.
  * @param[in] ntfSignals   Number of cross-correlations.
  * @param[in] npts         Number of points in signals.
@@ -346,7 +392,8 @@ double *xcfft_createRandomSignals(int *seed, const int nsignals, const int npts,
  * @copyright Ben Baker distributed under the MIT license.
  *
  */
-int xcfft_computeXCsWithISCL(const int nsignals, const int ntfSignals,
+int xcfft_computeXCsWithISCL(const bool ldoPhase,
+                             const int nsignals, const int ntfSignals,
                              const int npts, const int lxc,
                              const double x[],
                              double xcs[],
@@ -383,11 +430,21 @@ int xcfft_computeXCsWithISCL(const int nsignals, const int ntfSignals,
                         kndx, ntfSignals-1);
                 return EXIT_FAILURE;
             }
-            for (k=0; k<ntf; k++)
+            if (ldoPhase)
             {
-                xnum = tforms[i*ntf+k]*conj(tforms[j*ntf+k]);
-                xden = fmax(DBL_EPSILON, cabs(xnum));
-                xcfd[k] = xnum/xden;
+                for (k=0; k<ntf; k++)
+                {
+                    xnum = tforms[i*ntf+k]*conj(tforms[j*ntf+k]);
+                    xden = fmax(DBL_EPSILON, cabs(xnum));
+                    xcfd[k] = xnum/xden;
+                }
+            }
+            else
+            {
+                for (k=0; k<ntf; k++)
+                {
+                    xcfd[k] = tforms[i*ntf+k]*conj(tforms[j*ntf+k]);
+                }
             }
             // Inverse fourier transform
             fft_irfft64z_work(ntf, xcfd, lxc, work);

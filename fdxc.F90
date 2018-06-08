@@ -758,8 +758,8 @@ MODULE XCLOC_FDXC
          RETURN
       ENDIF
       ! Compute the phase correlograms 
-      CALL xcloc_fdxc_computeFDCorrelations(lphasecorr, ierr)
-      ! Inverse transform back to the time domain  
+      CALL xcloc_fdxc_computeFDCorrelations(lphaseCorr, ierr)
+      ! Inverse transform back to the time domain
       CALL xcloc_fdxc_inverseTransform(ierr)
       IF (ierr /= 0) THEN
          WRITE(*,910)
@@ -786,7 +786,7 @@ MODULE XCLOC_FDXC
          RETURN
       ENDIF
       ! Compute the phase correlograms 
-      CALL xcloc_fdxc_computeFDCorrelations(lphasecorr, ierr)
+      CALL xcloc_fdxc_computeFDCorrelations(lphaseCorr, ierr)
       ! Inverse transform back to the time domain  
       CALL xcloc_fdxc_inverseTransform(ierr)
       IF (ierr /= 0) THEN
@@ -802,6 +802,7 @@ MODULE XCLOC_FDXC
 !                                                                                        !
 !>    @brief Computes the (phase) correlations in the frequency domain.
 !>    @param[in] lphaseCorr  If true then compute the phase correlations.
+!>    @param[out] ierr       0 indicates success.
       SUBROUTINE xcloc_fdxc_computeFDCorrelations(lphaseCorr, ierr)
       IMPLICIT NONE
       INCLUDE 'mkl_vml.f90'

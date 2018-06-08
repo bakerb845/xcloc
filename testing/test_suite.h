@@ -1,5 +1,6 @@
 #ifndef TEST_SUITE
 #define TEST_SUITE 1
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C"
@@ -8,7 +9,8 @@ extern "C"
 
 
 int test_serial_fdxc(void);
-int xcfft_computeXCsWithISCL(const int nsignals, const int ntfSignals,
+int xcfft_computeXCsWithISCL(const bool ldoPhase,
+                             const int nsignals, const int ntfSignals,
                              const int npts, const int lxc,
                              const double x[],
                              double xcs[],
