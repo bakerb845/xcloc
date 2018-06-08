@@ -309,7 +309,7 @@ int xcloc_rmsFilter_apply(const int nsignals,
         #pragma omp parallel default(none) \
          private(indx, is, filterLen, pMaxAbs64, xcFiltered64) \
          private(xcSqr64, xwork64) \
-         shared(lds, lfilter, nbytes, npts, nsignals, winLen2, x, xfilt) \
+         shared(lfilter, nbytes, winLen2, x, xfilt) \
          firstprivate(pSpec64, pBuf)
         {
         xcSqr64 = (double *) aligned_alloc(XCLOC_MEM_ALIGNMENT, nbytes);

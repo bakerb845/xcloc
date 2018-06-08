@@ -803,7 +803,7 @@ int xcloc_migrate_updateXCDSMImage(const int it1, const int it2,
     #pragma omp parallel for simd default(none) \
             shared(lxc, migratePtr, ngrd, ttimesIntPtr1, ttimesIntPtr2) \
             firstprivate(lxc2, xc) \
-            private(igrd, indxXC) \
+            private(indxXC) \
             aligned(ttimesIntPtr1,ttimesIntPtr2,migratePtr: XCLOC_MEM_ALIGNMENT)
     for (igrd=0; igrd<ngrd; igrd++)
     {

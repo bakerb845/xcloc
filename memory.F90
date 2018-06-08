@@ -18,8 +18,8 @@ MODULE XCLOC_MEMORY
       INTEGER(C_INT), VALUE, INTENT(IN) :: n 
       INTEGER(C_INT) xmod 
       padLength = 0  
-      xmod = MOD(n*sizeof_dataType, INT(alignment))
-      IF (xmod /= 0) padLength = (INT(alignment) - xmod)/sizeof_dataType
+      xmod = MOD(n*INT(sizeof_dataType), INT(alignment))
+      IF (xmod /= 0) padLength = (INT(alignment) - xmod)/INT(sizeof_dataType)
       padLength = n + padLength
       RETURN
       END FUNCTION

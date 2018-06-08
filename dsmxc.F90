@@ -14,7 +14,7 @@ MODULE XCLOC_DSMXC
       REAL(C_FLOAT), PRIVATE, TARGET, ALLOCATABLE, SAVE :: xcs32f_(:)
       !> Holds the travel time tables.  This is an array of dimension [ldg_ x ntables_]
       !> stored in column major format.
-      REAL(C_INT), PRIVATE, TARGET, ALLOCATABLE, SAVE :: ttimes_(:)
+      INTEGER(C_INT), PRIVATE, TARGET, ALLOCATABLE, SAVE :: ttimes_(:)
       !> Holds the migration image.  This is an array of dimension [ngrd_].
       REAL(C_FLOAT), PRIVATE, TARGET, ALLOCATABLE, SAVE :: image32f_(:)
       !> Maps from the ixc'th correlation to the table pairs.  This in an array of
@@ -46,6 +46,8 @@ MODULE XCLOC_DSMXC
       PUBLIC :: xcloc_dsmxc_setBlockSize
       PUBLIC :: xcloc_dsmxc_setTable64fF
       PUBLIC :: xcloc_dsmxc_setTable32fF
+      PUBLIC :: xcloc_dsmxc_setCorrelograms32f
+      PUBLIC :: xcloc_dsmxc_setCorrelogram32fF
       CONTAINS
 !----------------------------------------------------------------------------------------!
 !                                   Begin the Code                                       !
@@ -60,6 +62,7 @@ MODULE XCLOC_DSMXC
 !>                          pairs.  It is a column major matrix with dimension 
 !>                          [2 x nxcPairs].
 !>    @param[out] ierr      0 indicates success.  
+!>
       SUBROUTINE xcloc_dsmxc_initialize(ntables, ngrd, nxcPairs, nptsInXCs, &
                                         dt, xcPairs, ierr)                  &
       BIND(C, NAME='xcloc_dsmxc_initialize')
@@ -115,6 +118,8 @@ MODULE XCLOC_DSMXC
 !                                                                                        !
 !========================================================================================!
 !                                                                                        !
+!>    @brief Releases the memory on the module.
+!>
       SUBROUTINE xcloc_dsmxc_finalize( ) &
       BIND(C, NAME='xcloc_dsmxc_finalize')
       IF (ALLOCATED(xcs32f_))   DEALLOCATE(xcs32f_)
@@ -134,10 +139,91 @@ MODULE XCLOC_DSMXC
 !                                                                                        !
 !========================================================================================!
 !                                                                                        !
+!>    @brief Sets the correlograms to migrate on the module.
+!>    @param[in] ldxc       Leading dimension of nxcs.  This must be greater than or equal
+!>                          to nptsInXCs.
+!>    @param[in] nptsInXCs  The number of points in each correlogram.  This must
+!>                          equal nptsInXCs_.
+!>    @param[in] nxcs       The number of correlograms.  This must equal nxcPairs_.
+!>    @param[in] xcs        The cross-correlograms to migrate.  This an array of dimension
+!>                          [ldxc x nxcPairs] in column major format with leading
+!>                          dimension ldxc.  The order of the correlograms is dictated
+!>                          by xcPairs_ - i.e., for the ixc'th correlation the correlogram
+!>                          is expected to represent the cross-correlation between the
+!>                          signal index pairs given by xcPairs_(2*(ixc-1)+1) and
+!>                          xcPairs_(2*ixc).
+!>    @param[out] ierr      0 indicates success.
+!>
+      SUBROUTINE xcloc_dsmxc_setCorrelograms32f(ldxc, nptsInXCs, nxcPairs, xcs, ierr) &
+      BIND(C, NAME='xcloc_dsmxc_setCorrelograms32f')
+      IMPLICIT NONE
+      INTEGER(C_INT), VALUE, INTENT(IN) :: ldxc, nptsInXCs, nxcPairs
+      REAL(C_FLOAT), INTENT(IN) :: xcs(ldxc*nxcPairs)
+      INTEGER(C_INT), INTENT(OUT) :: ierr
+      INTEGER i, indx
+      ierr = 0
+      IF (nxcPairs /= nxcPairs_) THEN
+         WRITE(*,900) nxcPairs, nxcPairs_
+         ierr = 1
+         RETURN
+      ENDIF
+      IF (nptsInXCs /= nptsInXCs_) THEN
+         WRITE(*,901) nptsInXCs, nptsInXCs_
+         ierr = 1
+         RETURN
+      ENDIF
+      DO i=1,nxcPairs_
+         indx = (i - 1)*ldxc + 1
+         CALL xcloc_dsmxc_setCorrelogram32fF(i, nptsInXCs, xcs(indx), ierr)
+         IF (ierr /= 0) THEN
+            WRITE(*,902) i
+            RETURN
+         ENDIF
+      ENDDO
+  900 FORMAT('xcloc_dsmxc_setCorrelograms32f: nxcPairs=', I4,'- expecting nxcPairs=',I4)
+  901 FORMAT('xcloc_dsmxc_setCorrelograms32f: nPtsInXCs=', I6,'- expecting nptsInXCS=',I6)
+  902 FORMAT('xcloc_dsmxc_setCorrelograms32f: Error setting xc number', I4)
+      RETURN
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Sets the xcIndex'th correlogram.
+!>    @param[in] xcIndex    Cross-correlation index.  This must be in the range
+!>                          [1,nxcPairs_].
+!>    @param[in] nptsInXCs  Number of points in cross-correlation.  This must equal
+!>                          nptsInXCs_.
+!>    @param[in] xc         Cross-correlogram to set.  This has dimension [nptsInXCs].
+!>    @param[out] ierr      0 indicates success.
+!>
+      SUBROUTINE xcloc_dsmxc_setCorrelogram32fF(xcIndex, nptsInXCs, xc, ierr) &
+      BIND(C, NAME='xcloc_dsmxc_setCorrelogram32fF')
+      INTEGER(C_INT), VALUE, INTENT(IN) :: xcIndex, nptsInXCs
+      REAL(C_FLOAT), INTENT(IN) :: xc(nptsInXCs)
+      INTEGER(C_INT), INTENT(OUT) :: ierr
+      INTEGER i1, i2
+      ierr = 0
+      IF (nptsInXCs /= nptsInXCs_ .OR. xcIndex < 1 .OR. xcIndex > nxcPairs_) THEN
+         IF (nptsInXCs /= nptsInXCs_) WRITE(*,900) nxcPairs, nxcPairs_
+         IF (xcIndex < 1 .OR. xcIndex > nxcPairs_) WRITE(*,901) nxcPairs_
+         ierr = 1
+         RETURN
+      ENDIF 
+      i1 = (xcIndex - 1)*dataOffset_ + 1
+      i2 = i1 + nptsInXCs_ - 1
+      xcs32f_(i1:i2) = xc(1:nptsInXCs_)
+  900 FORMAT('xcloc_dsmxc_setCorrelogram32fF: nPtsInXCs=', I6,'- expecting nptsInXCS=',I6)
+  901 FORMAT('xcloc_dsmxc_setCorrelogram32fF: xcIndex must be in range [1,',I4,']')
+      RETURN
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
 !>    @brief Sets the block size in the migration loop.
 !>    @param[in] blockSize  This many grid points will be updated during the migration.
 !>                          This must be a power of 2.
 !>    @param[out] ierr      0 indicates success.  
+!>
       SUBROUTINE xcloc_dsmxc_setBlockSize(blockSize, ierr) &
       BIND(C, NAME='xcloc_dsmxc_setBlockSize')
       IMPLICIT NONE
@@ -169,6 +255,7 @@ MODULE XCLOC_DSMXC
 !>    @param[in] table        The travel times from the source to all points in the
 !>                            grid in seconds.  This has dimension [ngrd].
 !>    @param[out] ierr        0 indicates success.
+!>
       SUBROUTINE xcloc_dsmxc_setTable64fF(tableNumber, ngrd, table, ierr) &
       BIND(C, NAME='xcloc_dsmxc_setTable64fF')
       IMPLICIT NONE
@@ -204,6 +291,7 @@ MODULE XCLOC_DSMXC
 !>    @param[in] table        The travel times from the source to all points in the
 !>                            grid in seconds.  This has dimension [ngrd].
 !>    @param[out] ierr        0 indicates success.
+!>
       SUBROUTINE xcloc_dsmxc_setTable32fF(tableNumber, ngrd, table, ierr) &
       BIND(C, NAME='xcloc_dsmxc_setTable32fF')
       IMPLICIT NONE
@@ -246,34 +334,40 @@ MODULE XCLOC_DSMXC
 !>
       SUBROUTINE xcloc_dsmxc_compute(ierr) &
       BIND(C, NAME='xcloc_dsmxc_compute')
+      IMPLICIT NONE
       INTEGER(C_INT), INTENT(OUT) :: ierr
-      INTEGER igrd, igrd1, igrd2, indxXC, it1, it2, ixc, jgrd1, jgrd2, &
+      INTEGER i, igrd, igrd1, igrd2, indxXC, it1, it2, ixc, ixc1, ixc2, jgrd1, jgrd2, &
               kgrd1, kgrd2, lxc2, ngrdLoc
-      REAL(C_INT), CONTIGUOUS, POINTER :: tt1(:), tt2(:)
+      INTEGER(C_INT), CONTIGUOUS, POINTER :: tt1(:), tt2(:)
       REAL(C_FLOAT), CONTIGUOUS, POINTER :: imagePtr32f(:)
+      REAL(C_FLOAT), CONTIGUOUS, POINTER :: xcPtr32f(:)
       ierr = 0
       lxc2 = nptsInXCs_/2
-      DO igrd=1,ngrd,blockSize_
-         ngrdLoc = MIN(ngrd - igrd + 1, blockSize_)
+      DO igrd=1,ngrd_,blockSize_
+         ngrdLoc = MIN(ngrd_ - igrd + 1, blockSize_)
          igrd1 = igrd
          igrd2 = igrd + ngrdLoc - 1
          imagePtr32f => image32f_(igrd1:igrd2)
          DO ixc=1,nxcPairs_
             it1 = xcPairs_(2*(ixc-1)+1)
-            it2 = xcPairs_(2*(ixc-1)+2) 
-            jgrd1 = (it1 - 1)*ldg + igrd1
-            jgrd2 = (it1 - 1)*ldg + igrd2
-            kgrd1 = (it2 - 1)*ldg + igrd1 
-            kgrd2 = (it2 - 1)*ldg + igrd2
+            it2 = xcPairs_(2*(ixc-1)+2)
+            jgrd1 = (it1 - 1)*ldg_ + igrd1
+            jgrd2 = (it1 - 1)*ldg_ + igrd2
+            kgrd1 = (it2 - 1)*ldg_ + igrd1 
+            kgrd2 = (it2 - 1)*ldg_ + igrd2
+            ixc1 = (ixc - 1)*dataOffset_ + 1
+            ixc2 = (ixc - 1)*dataOffset_ + nptsInXCs_
             tt1 => ttimes_(jgrd1:jgrd2)
             tt2 => ttimes_(kgrd1:kgrd2)
+            xcPtr32f => xcs32f_(ixc1:ixc2)
             !$OMP SIMD ALIGNED(imagePtr32f, tt1, tt2: 64)
             DO i=1,ngrdLoc
                indxXC = lxc2 + tt1(i) - tt2(igrd)
-               !imagePtr32f(i) = imagePtr32f(i) + xcPtr32f(indxXC)
+               imagePtr32f(i) = imagePtr32f(i) + xcPtr32f(indxXC)
             ENDDO
             NULLIFY(tt1)
             NULLIFY(tt2)
+            NULLIFY(xcPtr32f)
          ENDDO
          NULLIFY(imagePtr32f)
       ENDDO

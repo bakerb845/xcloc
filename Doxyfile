@@ -787,6 +787,8 @@ INPUT                  = ./xcloc.c \
                          ./dsmxc.F90 \
                          ./constants.F90 \
                          ./ipps.F90 \
+                         ./memory.F90 \
+                         ./spxc.F90 \
                          ./xcloc.F90 \
                          ./envelope.c \
                          ./migrate.c \
@@ -1677,7 +1679,7 @@ EXTRA_SEARCH_MAPPINGS  =
 # If the GENERATE_LATEX tag is set to YES, doxygen will generate LaTeX output.
 # The default value is: YES.
 
-GENERATE_LATEX         = YES
+GENERATE_LATEX         = NO
 
 # The LATEX_OUTPUT tag is used to specify where the LaTeX docs will be put. If a
 # relative path is entered the value of OUTPUT_DIRECTORY will be put in front of

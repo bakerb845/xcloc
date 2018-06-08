@@ -3,12 +3,21 @@
 #include <string.h>
 #include <math.h>
 #include <float.h>
+#include <time.h>
 #include "xcloc_finter.h"
 #include "xcloc_enum.h"
 #include "test_suite.h"
+#include "iscl/fft/fft.h"
+#include "iscl/iscl/iscl.h"
+#ifdef XCLOC_PROFILE
+#include "advisor-annotate.h"
+#endif
+
 
 void getReferenceSoln(int *npts, double *xc, double *phaseXC);
 int test_fdxc(void);
+int test_serial_fdxc_hardwired(void);
+int test_serial_fdxc_random(const int precision);
 #ifndef CHKERR
 #define CHKERR(ierr, msg) \
 { \
@@ -20,13 +29,46 @@ int test_fdxc(void);
 };
 #endif
 
+#define NPTS 1201   /*!< 0.2 s window w/ rate of 6000 Hz */
+#define NSIGNALS 45 /*!< make my computer sweat but don't tank the debugger */
+
+/*!
+ * @brief Serial tests for the frequency domain cross correlation.
+ */
 int test_serial_fdxc(void)
+{
+    int ierr;
+    fprintf(stdout, "%s: Performing hardwired tests...\n", __func__);
+    ierr = test_serial_fdxc_hardwired();
+    if (ierr != 0)
+    {
+        fprintf(stderr, "%s: Failed hardwired tests", __func__);
+        return EXIT_FAILURE;
+    }
+    fprintf(stdout, "%s: Performing float random tests...\n", __func__);
+    ierr = test_serial_fdxc_random((int) XCLOC_SINGLE_PRECISION);
+    if (ierr != 0)
+    {
+        fprintf(stderr, "%s: Failed float random tests", __func__);
+        return EXIT_FAILURE;
+    }
+    fprintf(stdout, "%s: Performing double random tests...\n", __func__);
+    ierr = test_serial_fdxc_random((int) XCLOC_DOUBLE_PRECISION);
+    if (ierr != 0)
+    {   
+        fprintf(stderr, "%s: Failed float random tests", __func__);
+        return EXIT_FAILURE;
+    }
+    return EXIT_SUCCESS;
+}
+
+int test_serial_fdxc_hardwired(void)
 {
     const int npts = 6;
     const int nptsPad = 10;
     const int nsignals = 5;
     const int verbose = 0;
-    const int precision = 0;
+    const int precision = (int) XCLOC_SINGLE_PRECISION;
     const int xcPairRef1[20] = {1, 2, 1, 3, 1, 4, 1, 5,
                                 2, 3, 2, 4, 2, 5,
                                 3, 4, 3, 5,
@@ -152,6 +194,212 @@ int test_serial_fdxc(void)
     // Finalize
     xcloc_fdxc_finalize(); 
     return EXIT_SUCCESS;
+}
+//============================================================================//
+int test_serial_fdxc_random(const int precision)
+{
+    int npts = NPTS; // 0.2 s window w/ rate of 6000 Hz
+    int nptsPad = npts;
+    int lxc = 2*npts - 1;
+    int nsignals = NSIGNALS; // make it work but don't brick my computer in debug mode
+    double *xcs;
+    const float *xc;
+    float *xcsAll;
+    double diffTime, diffTimeRef, res;
+    double *xrand;
+    int i, ierr, indx, ixc, nxcs;
+    clock_t start;
+    int accuracy = XCLOC_HIGH_ACCURACY;
+    const int verbose = 0;
+    //const int precision = (int) XCLOC_DOUBLE_PRECISION; //(int) XCLOC_SINGLE_PRECISION; //0;
+    // Compute some random signals
+    fprintf(stdout, "%s: Generating random numbers...\n", __func__);
+    xrand = xcfft_createRandomSignals(NULL, nsignals, npts, &ierr);
+    // Initialize
+    xcloc_fdxc_initialize(npts, nsignals, nptsPad, verbose,
+                          precision, accuracy, &ierr); 
+    CHKERR(ierr, "initialize");
+    // Compute the cross-correlation table
+    int nwork =-1; // Workspace query
+    bool ldoAutoCorrs = false;
+    int *xcPairs = NULL;
+    xcloc_fdxc_computeDefaultXCTableF(ldoAutoCorrs, nwork, &nxcs, xcPairs, &ierr);
+    CHKERR(ierr, "computeDefaultXCTable workspace query");
+    nwork = 2*nxcs;
+    xcPairs = calloc((size_t) nwork, sizeof(int));
+    xcloc_fdxc_computeDefaultXCTableF(false, nwork, &nxcs, xcPairs, &ierr);
+    CHKERR(ierr, "computeDefaultXCTable");
+    // Set the table
+    xcloc_fdxc_setXCTableF(nxcs, xcPairs, &ierr);
+    CHKERR(ierr, "xcloc_fdxc_setXCTableF");
+    free(xcPairs); xcPairs = NULL;
+    // Set the signals
+    start = clock();
+#ifdef XCLOC_PROFILE
+ANNOTATE_SITE_BEGIN("fdxc: random serial");
+#endif
+    int ldx = nptsPad;
+    xcloc_fdxc_setSignals64f(ldx, npts, nsignals, xrand, &ierr);
+    CHKERR(ierr, "xcloc_fdxc_setSignals32f");
+    // Compute the phase correlograms
+    xcloc_fdxc_computePhaseCorrelograms(&ierr);
+    CHKERR(ierr, "xcloc_fdxc_computePhaseCorrelograms");
+    // Get the result
+    int nptsInXC = 2*nptsPad - 1;
+    xcsAll = calloc((size_t) (nptsInXC*nxcs), sizeof(float));
+    xcloc_fdxc_getCorrelograms32f(nptsInXC, nxcs, xcsAll, &ierr);
+#ifdef XCLOC_PROFILE
+ANNOTATE_SITE_END();
+#endif
+    CHKERR(ierr, "xcloc_fdxc_getCorrelograms32f");
+    diffTime = (double) (clock() - start)/CLOCKS_PER_SEC;
+    fprintf(stdout, "%s: Processing time %e (s)\n", __func__, diffTime);    
+    // Do it the straight forward wa 
+    xcs = (double *) calloc((size_t) (nxcs*lxc)+32, sizeof(double));
+    ierr = xcfft_computeXCsWithISCL(nsignals, nxcs,
+                                    npts, lxc, xrand, xcs, &diffTimeRef);
+    if (ierr != EXIT_SUCCESS)
+    {
+        fprintf(stderr, "%s: Failed to compute reference signals\n", __func__);
+        return EXIT_FAILURE;
+    }
+    double resMax = 0;
+    for (ixc=0; ixc<nxcs; ixc++)
+    {
+        xc = &xcsAll[ixc*nptsInXC];
+        for (i=0; i<lxc; i++)
+        {   
+            indx = ixc*lxc + i; 
+            res = fabs((double) xc[i] - xcs[indx]);
+            if (res > 10.0*FLT_EPSILON)
+            {   
+                fprintf(stderr, "Failed on phase test: %d %d %f %e %e\n",
+                        ixc, i, xc[i], xcs[indx], res);
+                return EXIT_FAILURE;
+            }
+            resMax = fmax(resMax, res);
+        }
+    }
+    fprintf(stdout, "%s: L1 error=%e\n", __func__, resMax);
+    // Finalize
+    xcloc_fdxc_finalize();
+    free(xrand);
+    return EXIT_SUCCESS;
+}
+//============================================================================//
+/*!
+ * @brief Creates nsignals random signals each of npts each.
+ *
+ * @param[in] seed      Optional random seed.  If NULL then SEED will be used.
+ * @param[in] nsignals  Number of signals.
+ * @param[in] npts      Number of points in each signal.
+ *
+ * @result An array of random signals whose dimension is [npts x nsignals]
+ *         with leading dimension npts.
+ *
+ * @copyright Ben Baker distributed under the MIT license.
+ *
+ */
+double *xcfft_createRandomSignals(int *seed, const int nsignals, const int npts,
+                                  int *ierr)
+{
+    double *xrand = NULL;
+    const int pad = 16; // Pad a little bit so cblas doesn't complain
+    int i, is; 
+    *ierr = 0;
+    if (nsignals < 1 || npts < 1)
+    {
+        fprintf(stderr, "%s: Invalid number of signals or points\n", __func__);
+        *ierr = 1;
+        return xrand;
+    }
+    if (seed != NULL){srand(*seed);}
+    // Set space
+    xrand = (double *) calloc((size_t) (nsignals*npts+pad), sizeof(double));
+    // Compute random numbers from [-1,1]
+    for (is=0; is<nsignals; is++)
+    {
+        // Generate a random signal 
+        for (i=0; i<npts; i++)
+        {
+            xrand[is*npts+i] = ((double) rand()/RAND_MAX - 0.5)*2.0;
+        }
+    }
+    return xrand;
+}
+//============================================================================//
+/*!
+ * @brief Computes the phase correlations slowly but correctly.
+ *
+ * @param[in] nsignals     Number of signals to transform.
+ * @param[in] ntfSignals   Number of cross-correlations.
+ * @param[in] npts         Number of points in signals.
+ * @param[in] lxc          Length of the cross-correlations.
+ * @param[in] x            Signals to transform.  This is an array of dimension
+ *                         [npts x nsignals] with leading dimension npts.
+ *
+ * @param[out] xcs         The cross-correlations.  This is an array of
+ *                         dimension [lxc x ntfSignals] with leading dimension
+ *                         lxc.
+ * @param[out] diffTime    Time to compute the reference solution (seconds).
+ *
+ * @copyright Ben Baker distributed under the MIT license.
+ *
+ */
+int xcfft_computeXCsWithISCL(const int nsignals, const int ntfSignals,
+                             const int npts, const int lxc,
+                             const double x[],
+                             double xcs[],
+                             double *diffTime)
+{
+    double complex *tforms, *xcfd, xnum;
+    double *work, xden;
+    int i, ierr, indx, is, j, jndx, k, kndx, ntf;
+    clock_t start;
+    *diffTime = 0.0;
+    ierr = EXIT_SUCCESS;
+    // Fourier transform the signals
+    ntf = lxc/2 + 1;
+    tforms = (double complex *)
+             calloc((size_t) (ntf*nsignals)+16, sizeof(double complex));
+    start = clock();
+    for (is=0; is<nsignals; is++)
+    {
+        indx = is*ntf;
+        jndx = is*npts;
+        fft_rfft64f_work(npts, &x[jndx], lxc, ntf, &tforms[indx]);
+    }
+    // Now let's do it the dumb way
+    xcfd = (double complex *) calloc((size_t) ntf+32, sizeof(double complex));
+    work = (double *) calloc((size_t) lxc+32, sizeof(double));
+    for (i=0; i<nsignals; i++)
+    {
+        for (j=i+1; j<nsignals; j++)
+        {
+            kndx = nsignals*i - ((i+1)*(i+2))/2 + j;
+            if (kndx < 0 || kndx >= ntfSignals)
+            {
+                fprintf(stderr, "%s: kndx=%d out of bounds [0,%d]\n", __func__,
+                        kndx, ntfSignals-1);
+                return EXIT_FAILURE;
+            }
+            for (k=0; k<ntf; k++)
+            {
+                xnum = tforms[i*ntf+k]*conj(tforms[j*ntf+k]);
+                xden = fmax(DBL_EPSILON, cabs(xnum));
+                xcfd[k] = xnum/xden;
+            }
+            // Inverse fourier transform
+            fft_irfft64z_work(ntf, xcfd, lxc, work);
+            // Need to shuffle the transform
+            fft_fftshift64f_work(lxc, work, &xcs[kndx*lxc]);
+        }
+    }
+    free(tforms);
+    free(xcfd);
+    free(work);
+    *diffTime = (double) (clock() - start)/CLOCKS_PER_SEC;
+    return ierr;
 }
 
 void getReferenceSoln(int *npts, double *xc, double *phaseXC)

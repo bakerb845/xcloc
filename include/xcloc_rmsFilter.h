@@ -15,7 +15,7 @@ struct xcfftRMSFilter_struct
     int bufferSize; /*!< Size of buffer. */
     int specSize;   /*!< Size of pSpec. */
     int npts;       /*!< Number of points to filter. */
-    enum xcfftPrecision_enum precision; /*!< Precision of filter. */
+    enum xclocPrecision_enum precision; /*!< Precision of filter. */
     bool lfilter;   /*!< If true then the filter will be applied. */
     char pad[3];
 };

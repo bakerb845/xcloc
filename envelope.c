@@ -343,7 +343,7 @@ int xcloc_envelope_apply(const int nsignals,
         hfiltI32 = (Ipp32f *) envelope->hfiltI;
         #pragma omp parallel default(none) \
          shared(accuracy, bufferSize, hfiltR32, hfiltI32, filterLen, ltype4, \
-                npts, specSize, tapsLen, x, xfilt, winLen2) \
+                specSize, tapsLen, x, xfilt, winLen2) \
          private(indx, is, pBuf, pMean32, pSpec32R, pSpec32I, ptr32R, ptr32I, \
                  xmean32, xwork32R, xwork32I)
         {
@@ -419,7 +419,7 @@ int xcloc_envelope_apply(const int nsignals,
         hfiltI64 = (Ipp64f *) envelope->hfiltI;
         #pragma omp parallel default(none) \
          shared(accuracy, bufferSize, hfiltR64, hfiltI64, filterLen, ltype4, \
-                npts, specSize, tapsLen, x, xfilt, winLen2) \
+                specSize, tapsLen, x, xfilt, winLen2) \
          private(indx, is, pBuf, pMean64, pSpec64R, pSpec64I, ptr64R, ptr64I, \
                  xmean64, xwork64R, xwork64I)
         {

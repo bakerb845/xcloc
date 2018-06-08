@@ -1,5 +1,6 @@
 #ifndef XCLOC_ENUM_H__
 #define XCLOC_ENUM_H__
+#include "xcloc_config.h"
 
 enum xclocPrecision_enum
 {

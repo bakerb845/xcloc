@@ -182,13 +182,12 @@ MODULE XCLOC_FDXC
 !>    @param[in] accuracy   XCLOC_LOW_ACCURACY will discard the last 2 bits.
 !>    @param[in] accuracy   XCLOC_EP_ACCURACY will use about 1/2 precision.
 !>    @param[out] ierr      0 indicates success.
-      SUBROUTINE xcloc_fdxc_setAccuracy(accuracy, ierr) &
-      BIND(C, NAME='xcloc_fdxc_setAccuracy')
+      SUBROUTINE xcloc_fdxc_setAccuracy(accuracy, ierr)
       USE ISO_C_BINDING
       IMPLICIT NONE
       INCLUDE 'mkl_vml.f90'
-      INTEGER(C_INT), VALUE, INTENT(IN) :: accuracy
-      INTEGER(KIND=4), INTENT(OUT) :: ierr
+      INTEGER, VALUE, INTENT(IN) :: accuracy
+      INTEGER, INTENT(OUT) :: ierr
       IF (accuracy == XCLOC_HIGH_ACCURACY) THEN
          accuracy_ = vmlsetmode(IOR(VML_HA, VML_ERRMODE_ERRNO)) !, VML_ERRMODE_STDERR))
       ELSEIF (accuracy == XCLOC_LOW_ACCURACY) THEN
@@ -337,7 +336,7 @@ MODULE XCLOC_FDXC
          IF (nwork < 0) RETURN ! space inquiry
          xcPairs(:) = 0
          IF (nwork < 2*nxcs) THEN
-            WRITE(905,*) 2*nxcs
+            WRITE(*,905) 2*nxcs
             ierr = 1
             RETURN
          ENDIF
@@ -354,7 +353,7 @@ MODULE XCLOC_FDXC
          IF (nwork < 0) RETURN ! space inquiry
          xcPairs(:) = 0
          IF (nwork < 2*nxcs) THEN
-            WRITE(905,*) 2*nxcs
+            WRITE(*,905) 2*nxcs
             ierr = 1
             RETURN
          ENDIF
@@ -1012,13 +1011,14 @@ MODULE XCLOC_FDXC
       IF (nsignals_ < 1 .OR. nptsInXCs_ < 1) RETURN ! Not enough info to initialize
 #ifdef _OPENMP
       nthreads = OMP_GET_NUM_THREADS()
-      IF (verbose_ > 0) THEN
-         WRITE(*,*) 'xcloc_fdxc_initializeFFTW: Initializing FFTs with nthreads=',nthreads
+      IF (verbose_ > XCLOC_PRINT_INFO) THEN
+         WRITE(*,855) nthreads
+  855    FORMAT('xcloc_fdxc_initializeFFTW: Initializing FFTs with nthreads=',I4)
       ENDIF 
       IF (precision_ == XCLOC_SINGLE_PRECISION) THEN
          fftwSuccess =  fftwf_init_threads()
          IF (fftwSuccess == 0) THEN
-            WRITE(*,*) 'xcloc_fdxc_initializeFFTW: Error initializing threads'
+            WRITE(*,900)
             ierr = 1
             RETURN
          ENDIF
@@ -1026,14 +1026,17 @@ MODULE XCLOC_FDXC
       ELSE
          fftwSuccess =  fftw_init_threads()
          IF (fftwSuccess == 0) THEN
-            WRITE(*,*) 'xcloc_fdxc_initializeFFTW: Error initializing threads'
+            WRITE(*,901)
             ierr = 1
             RETURN
          ENDIF
          CALL fftw_plan_with_nthreads(nthreads)
       ENDIF
+  900 FORMAT('xcloc_fdxc_initializeFFTW: Error initializing threads - single')
+  901 FORMAT('xcloc_fdxc_initializeFFTW: Error initializing threads - double')
 #else
-      IF (verbose_ > 0) WRITE(*,*) 'xcloc_fdxc_initializeFFTW: Initializing FFTs...'
+      IF (verbose_ > XCLOC_PRINT_INFO) WRITE(*,905)
+  905 FORMAT('xcloc_fdxc_initializeFFTW: Initializing FFTs...')
 #endif
       IF (ALLOCATED(xcFTs32f_))        DEALLOCATE(xcFTs32f_)
       IF (ALLOCATED(xcs32f_))          DEALLOCATE(xcs32f_)

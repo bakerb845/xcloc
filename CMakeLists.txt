@@ -30,6 +30,7 @@ INCLUDE_DIRECTORIES(
   ${SACIO_INCLUDE_DIR}
   ${ISCL_INCLUDE_DIR}
   ${H5_C_INCLUDE_DIR}
+  ${MPI_Fortran_INCLUDE_PATH}
   ${MPI_C_INCLUDE_PATH}
   ${XML2_INCLUDE_DIR}
   ${INIPARSER_INCLUDE_DIR}
@@ -38,7 +39,7 @@ IF (XCLOC_PROFILE)
   INCLUDE_DIRECTORIES(${ADVISOR_INCLUDE_DIR})
 ENDIF()
 
-SET(LIB_ALL ${SACIO_LIBRARY} ${ISCL_LIBRARY} ${MKL_LIBRARY} ${IPP_LIBRARY} ${XML2_LIBRARY} ${INIPARSER_LIBRARY} ${H5_LIBRARY} ${MPI_C_LIBRARIES} ${MPI_Fortran_LIBRARIES} -ldl)
+SET(LIB_ALL ${SACIO_LIBRARY} ${ISCL_LIBRARY} ${MKL_LIBRARY} ${IPP_LIBRARY} ${XML2_LIBRARY} ${INIPARSER_LIBRARY} ${H5_LIBRARY} ${MPI_C_LIBRARIES} ${MPI_Fortran_LIBRARIES} -ldl -lm)
 
 ADD_SUBDIRECTORY(include)
 
@@ -49,13 +50,14 @@ SET(SRC ${SRC} fdxc.F90 ipps.F90 constants.F90 memory.F90 xcloc.F90 dsmxc.F90)
 # Executables
 #ADD_EXECUTABLE(dales dales.c ${SRC})
 # Unit tests
-SET(UNIT_TESTS_SRC unit_tests/acousticGreens2D.c)
+#SET(UNIT_TESTS_SRC unit_tests/acousticGreens2D.c)
 ADD_LIBRARY(xcloc_shared SHARED ${SRC})
 #ADD_LIBRARY(xcloc_static STATIC ${SRCS})
 #ADD_EXECUTABLE(interloc interloc.c ${SRC})
 ADD_EXECUTABLE(xcf_tests
                testing/test_suite.c
-               testing/serialTest.c)
+               testing/serialTest.c
+               testing/acousticGreens2D.c)
 #ADD_EXECUTABLE(xcfft unit_tests/check_xcfft.c ${UNIT_TESTS_SRC} ${SRC})
 #ADD_EXECUTABLE(xc2d unit_tests/check_2d.c ${UNIT_TESTS_SRC} ${SRC})
 #ADD_EXECUTABLE(xcloc unit_tests/xcloc.c ${UNIT_TESTS_SRC} ${SRC})

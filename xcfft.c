@@ -1185,7 +1185,7 @@ int xcloc_xcfft_computeCorrelationsWithFFTData(
     if (precision == XCLOC_SINGLE_PRECISION)
     {
         #pragma omp parallel default(none) \
-         shared(lphaseOnly, tol32, fts32, ftsIn, xcPairs, xcfts32, xcftsOut) \
+         shared(fts32, ftsIn, xcPairs, xcfts32, xcftsOut) \
          private(i, is, iw, j, n, mag32, xc32, xcorr32)
         {
         n = (MKL_INT) ntfPts;
@@ -1233,7 +1233,7 @@ int xcloc_xcfft_computeCorrelationsWithFFTData(
     else
     {
         #pragma omp parallel default(none) \
-         shared(lphaseOnly, tol64, fts64, ftsIn, xcPairs, xcfts64, xcftsOut) \
+         shared(fts64, ftsIn, xcPairs, xcfts64, xcftsOut) \
          private(i, is, iw, j, n, mag64, xc64, xcorr64)
         {
         n = (MKL_INT) ntfPts;

@@ -24,10 +24,16 @@ void xcloc_fdxc_setXCTableF(const int nxcs, const int xcPairs[], int *ierr);
 void xcloc_fdxc_computeDefaultXCTableF(const bool ldoAutoCorrs,
                                        const int nwork,
                                        int *nxcs, int xcPairs[], int *ierr);
-/* Sets many float signals. */
+/* Sets many signals. */
+void xcloc_fdxc_setSignals64f(const int ldx, const int npts, const int nsignals,
+                              const double x[], int *ierr);
 void xcloc_fdxc_setSignals32f(const int ldx, const int npts, const int nsignals,
                               const float x[], int *ierr);
 /* Sets a float signal. */ 
+void xcloc_fdxc_setSignal64fF(const int signalNumber,
+                              const int npts,
+                              const double x[],
+                              int *ierr);
 void xcloc_fdxc_setSignal32fF(const int signalNumber,
                               const int npts,
                               const float x[],
