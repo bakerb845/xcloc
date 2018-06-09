@@ -8,11 +8,6 @@
 #include "xcloc_config.h"
 #include "acousticGreens2D.h"
 #include "iscl/fft/fft.h"
-#ifdef XCLOC_USE_INTEL
-#include <mkl_cblas.h>
-#else
-#include <cblas.h>
-#endif
 #include <ipps.h>
 
 #ifndef DCMPLX

@@ -9,6 +9,7 @@ extern "C"
 
 
 int test_serial_fdxc(void);
+int test_serial_dsmLocation(void);
 int xcfft_computeXCsWithISCL(const bool ldoPhase,
                              const int nsignals, const int ntfSignals,
                              const int npts, const int lxc,

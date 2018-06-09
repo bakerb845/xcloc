@@ -8,6 +8,39 @@ extern "C"
 {
 #endif
 
+/*----------------------------------------------------------------------------*/
+/*                Diffraction Stack Migration of Correlograms                 */
+/*----------------------------------------------------------------------------*/
+/* Initialize the DSM. */
+void xcloc_dsmxc_initialize(const int ntables, const int ngrd,
+                            const int nxcPairs, const int nptsInXCs,
+                            const double dt, const int xcPairs[],
+                            int *ierr);
+/* Computes the DSM image. */
+void xcloc_dsmxc_compute(int *ierr);
+/* Sets correlograms. */
+void xcloc_dsmxc_setCorrelograms64f(const int ldxc,
+                                    const int nptsInXCs,
+                                    const int nxcPairs,
+                                    const double xcs[], int *ierr);
+void xcloc_dsmxc_setCorrelograms32f(const int ldxc,
+                                    const int nptsInXCs,
+                                    const int nxcPairs,
+                                    const float xcs[], int *ierr);
+/* Sets a travel time table. */
+void xcloc_dsmxc_setTable64fF(const int tableNumber,
+                              const int ngrd,
+                              const double table[],
+                              int *ierr);
+void xcloc_dsmxc_setTable32fF(const int tableNumber,
+                              const int ngrd,
+                              const float table[],
+                              int *ierr);
+/* Release the memory on the DSM structure. */
+void xcloc_dsmxc_finalize(void);
+/*----------------------------------------------------------------------------*/
+/*                 Cross-Correlation in the Frequency Domain                  */
+/*----------------------------------------------------------------------------*/
 /* Initialize the frequency domain cross-correlation. */
 void xcloc_fdxc_initialize(const int npts,
                            const int nsignals,
@@ -38,7 +71,13 @@ void xcloc_fdxc_setSignal32fF(const int signalNumber,
                               const int npts,
                               const float x[],
                               int *ierr);
+/* Gets the number of points in the correlograms. */
+void xcloc_fdxc_getCorrelogramLength(int *nptsInXCs, int *ierr);
+/* Gets the number of time domain signals. */
+void xcloc_fdxc_getNumberOfSignals(int *nsignals, int *ierr);
 /* Gets all the cross-correlograms. */
+void xcloc_fdxc_getCorrelograms64f(const int ldxc, const int nxcs,
+                                   double xcs[], int *ierr);
 void xcloc_fdxc_getCorrelograms32f(const int ldxc, const int nxcs,
                                    float xcs[], int *ierr); 
 /* Gets a cross-correlogram. */

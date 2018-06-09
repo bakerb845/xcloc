@@ -57,6 +57,7 @@ ADD_LIBRARY(xcloc_shared SHARED ${SRC})
 ADD_EXECUTABLE(xcf_tests
                testing/test_suite.c
                testing/serialTest.c
+               testing/serialLocationTest.c
                testing/acousticGreens2D.c)
 #ADD_EXECUTABLE(xcfft unit_tests/check_xcfft.c ${UNIT_TESTS_SRC} ${SRC})
 #ADD_EXECUTABLE(xc2d unit_tests/check_2d.c ${UNIT_TESTS_SRC} ${SRC})

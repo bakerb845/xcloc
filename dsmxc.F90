@@ -20,6 +20,8 @@ MODULE XCLOC_DSMXC
       !> Maps from the ixc'th correlation to the table pairs.  This in an array of
       !> dimension [2 x nxcPairs_] stored in column major format.
       INTEGER, PRIVATE, ALLOCATABLE, SAVE :: xcPairs_(:)
+      !> Determines if all tables are set.
+      LOGICAL, PRIVATE, ALLOCATABLE, SAVE :: lhaveTable_(:)
       !> Sampling period (seconds) of signals.
       REAL(C_DOUBLE), PRIVATE, SAVE :: dt_ = 0.d0
       !> Leading dimension of the travel time table.
@@ -34,19 +36,26 @@ MODULE XCLOC_DSMXC
       INTEGER, PRIVATE, SAVE :: nxcPairs_ = 0
       !> Leading dimension of correlograms.
       INTEGER, PRIVATE, SAVE :: dataOffset_ = 0
+      !> Flag indicating that all tables are set.
+      LOGICAL, PRIVATE, SAVE :: lhaveAllTables_ = .FALSE.
       !> A tuning parameter that can improve performance by emphasizing cache coherency.
       INTEGER, PRIVATE, SAVE :: blockSize_ = XCLOC_DEFAULT_BLOCKSIZE 
       !> The data alignment.
       INTEGER(C_SIZE_T), PRIVATE, PARAMETER :: dataAlignment = 64
       !> The size of a float.
       INTEGER(C_SIZE_T), PRIVATE, PARAMETER :: sizeof_float = 4
+      !> The size of an integer.
+      INTEGER(C_SIZE_T), PRIVATE, PARAMETER :: sizeof_int = 4
 
       PUBLIC :: xcloc_dsmxc_initialize
+      PUBLIC :: xcloc_dsmxc_compute
       PUBLIC :: xcloc_dsmxc_finalize
       PUBLIC :: xcloc_dsmxc_setBlockSize
       PUBLIC :: xcloc_dsmxc_setTable64fF
       PUBLIC :: xcloc_dsmxc_setTable32fF
+      PUBLIC :: xcloc_dsmxc_setCorrelograms64f
       PUBLIC :: xcloc_dsmxc_setCorrelograms32f
+      PUBLIC :: xcloc_dsmxc_setCorrelogram64fF 
       PUBLIC :: xcloc_dsmxc_setCorrelogram32fF
       CONTAINS
 !----------------------------------------------------------------------------------------!
@@ -98,14 +107,20 @@ MODULE XCLOC_DSMXC
       ENDIF
       IF (ierr /= 0) RETURN
       ! Set the variables 
+      lhaveAllTables_ = .FALSE.
       ngrd_ = ngrd
-      nptsInXCs_ = nptsInXCs_
+      nptsInXCs_ = nptsInXCs
       ntables_ = ntables
       nxcPairs_ = nxcPairs
       dt_ = dt
       dataOffset_ = xcloc_memory_padLength(dataAlignment, sizeof_float, nptsInXCs_) 
+      ldg_ = xcloc_memory_padLength(dataAlignment, sizeof_int, ngrd_)
+      ALLOCATE(lhaveTable_(ntables_)); lhaveTable_(:) = .FALSE.
       ALLOCATE(xcs32f_(dataOffset_*nptsInXCs_)); xcs32f_(:) = 0.0
-      ALLOCATE(image32f_(ngrd_)); image32f_(:) = 0.0
+      ALLOCATE(image32f_(ldg_)); image32f_(:) = 0.0
+      ALLOCATE(ttimes_(ldg_*ntables_)); ttimes_(:) = 0
+      ALLOCATE(xcPairs_(2*nxcPairs_)); xcPairs_(:) = 0
+      xcPairs_(1:2*nxcPairs_) = xcPairs(1:2*nxcPairs_)
   900 FORMAT('xcloc_dsmxc_initialize: No grid points')
   901 FORMAT('xcloc_dsmxc_initialize: No correlation pairs')
   902 FORMAT('xcloc_dsmxc_initialize: Sampling period must be positive')
@@ -122,10 +137,12 @@ MODULE XCLOC_DSMXC
 !>
       SUBROUTINE xcloc_dsmxc_finalize( ) &
       BIND(C, NAME='xcloc_dsmxc_finalize')
-      IF (ALLOCATED(xcs32f_))   DEALLOCATE(xcs32f_)
-      IF (ALLOCATED(ttimes_))   DEALLOCATE(ttimes_)
-      IF (ALLOCATED(image32f_)) DEALLOCATE(image32f_)
-      IF (ALLOCATED(xcPairs_))  DEALLOCATE(xcPairs_)
+      IMPLICIT NONE
+      IF (ALLOCATED(lhaveTable_)) DEALLOCATE(lhaveTable_)
+      IF (ALLOCATED(xcs32f_))     DEALLOCATE(xcs32f_)
+      IF (ALLOCATED(ttimes_))     DEALLOCATE(ttimes_)
+      IF (ALLOCATED(image32f_))   DEALLOCATE(image32f_)
+      IF (ALLOCATED(xcPairs_))    DEALLOCATE(xcPairs_)
       dt_  = 0.d0
       ldg_ = 0 
       ngrd_ = 0 
@@ -133,12 +150,59 @@ MODULE XCLOC_DSMXC
       ntables_ = 0 
       nxcPairs_ = 0 
       dataOffset_ = 0 
+      lhaveAllTables_ = .FALSE.
       blockSize_ = XCLOC_DEFAULT_BLOCKSIZE
       RETURN
       END
 !                                                                                        !
 !========================================================================================!
 !                                                                                        !
+!>    @brief Sets the correlograms to migrate on the module.
+!>    @param[in] ldxc       Leading dimension of nxcs.  This must be greater than or equal
+!>                          to nptsInXCs.
+!>    @param[in] nptsInXCs  The number of points in each correlogram.  This must
+!>                          equal nptsInXCs_.
+!>    @param[in] nxcs       The number of correlograms.  This must equal nxcPairs_.
+!>    @param[in] xcs        The cross-correlograms to migrate.  This an array of dimension
+!>                          [ldxc x nxcPairs] in column major format with leading
+!>                          dimension ldxc.  The order of the correlograms is dictated
+!>                          by xcPairs_ - i.e., for the ixc'th correlation the correlogram
+!>                          is expected to represent the cross-correlation between the
+!>                          signal index pairs given by xcPairs_(2*(ixc-1)+1) and
+!>                          xcPairs_(2*ixc).
+!>    @param[out] ierr      0 indicates success.
+!>
+      SUBROUTINE xcloc_dsmxc_setCorrelograms64f(ldxc, nptsInXCs, nxcPairs, xcs, ierr) &
+      BIND(C, NAME='xcloc_dsmxc_setCorrelograms64f')
+      IMPLICIT NONE
+      INTEGER(C_INT), VALUE, INTENT(IN) :: ldxc, nptsInXCs, nxcPairs
+      REAL(C_DOUBLE), INTENT(IN) :: xcs(ldxc*nxcPairs)
+      INTEGER(C_INT), INTENT(OUT) :: ierr
+      INTEGER i, indx
+      ierr = 0
+      IF (nxcPairs /= nxcPairs_) THEN
+         WRITE(*,900) nxcPairs, nxcPairs_
+         ierr = 1
+         RETURN
+      ENDIF
+      IF (nptsInXCs /= nptsInXCs_) THEN
+         WRITE(*,901) nptsInXCs, nptsInXCs_
+         ierr = 1
+         RETURN
+      ENDIF
+      DO i=1,nxcPairs_
+         indx = (i - 1)*ldxc + 1 
+         CALL xcloc_dsmxc_setCorrelogram64fF(i, nptsInXCs, xcs(indx), ierr)
+         IF (ierr /= 0) THEN
+            WRITE(*,902) i
+            RETURN
+         ENDIF
+      ENDDO
+  900 FORMAT('xcloc_dsmxc_setCorrelograms64f: nxcPairs=', I4,'- expecting nxcPairs=',I4)
+  901 FORMAT('xcloc_dsmxc_setCorrelograms64f: nPtsInXCs=', I6,'- expecting nptsInXCS=',I6)
+  902 FORMAT('xcloc_dsmxc_setCorrelograms64f: Error setting xc number', I4) 
+      RETURN
+      END
 !>    @brief Sets the correlograms to migrate on the module.
 !>    @param[in] ldxc       Leading dimension of nxcs.  This must be greater than or equal
 !>                          to nptsInXCs.
@@ -183,6 +247,37 @@ MODULE XCLOC_DSMXC
   900 FORMAT('xcloc_dsmxc_setCorrelograms32f: nxcPairs=', I4,'- expecting nxcPairs=',I4)
   901 FORMAT('xcloc_dsmxc_setCorrelograms32f: nPtsInXCs=', I6,'- expecting nptsInXCS=',I6)
   902 FORMAT('xcloc_dsmxc_setCorrelograms32f: Error setting xc number', I4)
+      RETURN
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Sets the xcIndex'th correlogram.
+!>    @param[in] xcIndex    Cross-correlation index.  This must be in the range
+!>                          [1,nxcPairs_].
+!>    @param[in] nptsInXCs  Number of points in cross-correlation.  This must equal
+!>                          nptsInXCs_.
+!>    @param[in] xc         Cross-correlogram to set.  This has dimension [nptsInXCs].
+!>    @param[out] ierr      0 indicates success.
+!>
+      SUBROUTINE xcloc_dsmxc_setCorrelogram64fF(xcIndex, nptsInXCs, xc, ierr) &
+      BIND(C, NAME='xcloc_dsmxc_setCorrelogram64fF')
+      INTEGER(C_INT), VALUE, INTENT(IN) :: xcIndex, nptsInXCs
+      REAL(C_DOUBLE), INTENT(IN) :: xc(nptsInXCs)
+      INTEGER(C_INT), INTENT(OUT) :: ierr
+      INTEGER i1, i2
+      ierr = 0
+      IF (nptsInXCs /= nptsInXCs_ .OR. xcIndex < 1 .OR. xcIndex > nxcPairs_) THEN
+         IF (nptsInXCs /= nptsInXCs_) WRITE(*,900) nxcPairs, nxcPairs_
+         IF (xcIndex < 1 .OR. xcIndex > nxcPairs_) WRITE(*,901) nxcPairs_
+         ierr = 1
+         RETURN
+      ENDIF
+      i1 = (xcIndex - 1)*dataOffset_ + 1
+      i2 = i1 + nptsInXCs_ - 1 
+      xcs32f_(i1:i2) = SNGL(xc(1:nptsInXCs_))
+  900 FORMAT('xcloc_dsmxc_setCorrelogram64fF: nPtsInXCs=', I6,'- expecting nptsInXCS=',I6)
+  901 FORMAT('xcloc_dsmxc_setCorrelogram64fF: xcIndex must be in range [1,',I4,']')
       RETURN
       END
 !                                                                                        !
@@ -277,8 +372,17 @@ MODULE XCLOC_DSMXC
       DO i=1,ngrd_
          ttimes_(igrd+i) = INT(table(i)/dt_ + 0.5d0)
       ENDDO
+      lhaveTable_(tableNumber) = .TRUE.
+      ! Check if all tables are set
+      DO i=1,ntables_
+         IF (.NOT.lhaveTable_(i)) GOTO 500
+      ENDDO
+      lhaveAllTables_ = .TRUE.
+  500 CONTINUE
+      IF (lhaveAllTables_) WRITE(*,910)
   900 FORMAT('xcloc_dsmxc_setTable64fF: tableNumber=', I4, ' must be in range [1,',I4,']')
   905 FORMAT('xcloc_dsmxc_setTable64fF: ngrd=', I6, ' expecting ngrd_=', I6) 
+  910 FORMAT('xcloc_dsmxc_setTable64fF: All tables set')
       RETURN
       END
 !                                                                                        !
@@ -311,12 +415,20 @@ MODULE XCLOC_DSMXC
       ENDIF
       IF (ierr /= 0) RETURN
       igrd = (tableNumber - 1)*ldg_
-      dt4 = REAL(dt_)
+      dt4 = SNGL(dt_)
       DO i=1,ngrd_
          ttimes_(igrd+i) = INT(table(i)/dt4 + 0.5)
       ENDDO
+      ! Check if all tables are set
+      DO i=1,ntables_
+         IF (.NOT.lhaveTable_(i)) GOTO 500 
+      ENDDO
+      lhaveAllTables_ = .TRUE.
+  500 CONTINUE
+      IF (lhaveAllTables_) WRITE(*,910) 
   900 FORMAT('xcloc_dsmxc_setTable32fF: tableNumber=', I4, ' must be in range [1,',I4,']')
   905 FORMAT('xcloc_dsmxc_setTable32fF: ngrd=', I6, ' expecting ngrd_=', I6)
+  910 FORMAT('xcloc_dsmxc_setTable32fF: All tables set')
       RETURN
       END
 !                                                                                        !
@@ -341,13 +453,26 @@ MODULE XCLOC_DSMXC
       INTEGER(C_INT), CONTIGUOUS, POINTER :: tt1(:), tt2(:)
       REAL(C_FLOAT), CONTIGUOUS, POINTER :: imagePtr32f(:)
       REAL(C_FLOAT), CONTIGUOUS, POINTER :: xcPtr32f(:)
+      ! This would be problematic if all tables aren't set
       ierr = 0
-      lxc2 = nptsInXCs_/2
+      IF (.NOT.lhaveAllTables_) WRITE(*,905)
+  905 FORMAT('xcloc_dsmxc_compute: Only a subset of tables were set')
+      ! Compute
+      lxc2 = nptsInXCs_/2 
+      !$OMP PARALLEL DO DEFAULT(NONE) &
+      !$OMP SHARED(blockSize_, dataOffset_, image32f_, ldg_, ngrd_) &
+      !$OMP SHARED(nptsInXCs_, nxcPairs_, ttimes_, xcPairs_, xcs32f_) &
+      !$OMP PRIVATE(i, igrd, igrd1, ixc, ixc1, ixc2, igrd2, it1, it2, indxXC) &
+      !$OMP PRIVATE(jgrd1, jgrd2, kgrd1, kgrd2, imagePtr32f, ngrdLoc)   &
+      !$OMP PRIVATE(tt1, tt2, xcPtr32f) &
+      !$OMP FIRSTPRIVATE(lxc2)
       DO igrd=1,ngrd_,blockSize_
          ngrdLoc = MIN(ngrd_ - igrd + 1, blockSize_)
          igrd1 = igrd
          igrd2 = igrd + ngrdLoc - 1
          imagePtr32f => image32f_(igrd1:igrd2)
+         imagePtr32f(1:ngrdLoc) = 0.0 ! 0 out block prior to stack
+         ! Loop on correlation pairs
          DO ixc=1,nxcPairs_
             it1 = xcPairs_(2*(ixc-1)+1)
             it2 = xcPairs_(2*(ixc-1)+2)
@@ -362,7 +487,7 @@ MODULE XCLOC_DSMXC
             xcPtr32f => xcs32f_(ixc1:ixc2)
             !$OMP SIMD ALIGNED(imagePtr32f, tt1, tt2: 64)
             DO i=1,ngrdLoc
-               indxXC = lxc2 + tt1(i) - tt2(igrd)
+               indxXC = lxc2 + tt1(i) - tt2(i)
                imagePtr32f(i) = imagePtr32f(i) + xcPtr32f(indxXC)
             ENDDO
             NULLIFY(tt1)

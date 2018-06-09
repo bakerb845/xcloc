@@ -21,6 +21,14 @@ int main()
         fprintf(stderr, "%s: Failed serial tests!\n", __func__);
         return EXIT_FAILURE;
     }
+    fprintf(stdout, "%s: Performing serial DSM tests...\n", __func__);
+    ierr = test_serial_dsmLocation();
+    if (ierr != EXIT_SUCCESS)
+    {
+        fprintf(stderr, "%s: Failed serial dsm test!\n", __func__);
+        return EXIT_FAILURE;
+    }
+
     iscl_finalize();
     return EXIT_SUCCESS;
 }

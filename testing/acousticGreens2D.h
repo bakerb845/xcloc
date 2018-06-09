@@ -1,5 +1,7 @@
 #ifndef XCLOC_ACOUSTIC_GREENS_H__
 #define XCLOC_ACOUSTIC_GREENS_H__
+#include <stdbool.h>
+#include <complex.h>
 
 #ifdef __cplusplus
 extern "C"
