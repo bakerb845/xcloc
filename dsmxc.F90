@@ -9,6 +9,7 @@ MODULE XCLOC_DSMXC
 #ifdef _OPENMP
       USE OMP_LIB
 #endif
+      IMPLICIT NONE
       !> Holds the cross-correlograms.  This is an array of dimension
       !> [dataOffset_ x nxcs_] stored in column major format. 
       REAL(C_FLOAT), PRIVATE, TARGET, ALLOCATABLE, SAVE :: xcs32f_(:)
@@ -53,6 +54,8 @@ MODULE XCLOC_DSMXC
       PUBLIC :: xcloc_dsmxc_setBlockSize
       PUBLIC :: xcloc_dsmxc_setTable64fF
       PUBLIC :: xcloc_dsmxc_setTable32fF
+      PUBLIC :: xcloc_dsmxc_getImage64f
+      PUBLIC :: xcloc_dsmxc_getImage32f
       PUBLIC :: xcloc_dsmxc_setCorrelograms64f
       PUBLIC :: xcloc_dsmxc_setCorrelograms32f
       PUBLIC :: xcloc_dsmxc_setCorrelogram64fF 
@@ -152,6 +155,51 @@ MODULE XCLOC_DSMXC
       dataOffset_ = 0 
       lhaveAllTables_ = .FALSE.
       blockSize_ = XCLOC_DEFAULT_BLOCKSIZE
+      RETURN
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    Gets the diffraction stack migration image of the correlograms from the module.
+!>    @param[in] nwork   Size of image.
+!>    @param[out] image  This contains the DSM image.  This is an array of dimension
+!>                       [nwork] but only the first ngrd_ points are accessed. 
+!>    @param[out] ierr   0 indicates success.
+!>
+      SUBROUTINE xcloc_dsmxc_getImage64f(nwork, image, ierr) &
+      BIND(C, NAME='xcloc_dsmxc_getImage64f')
+      INTEGER(C_INT), VALUE, INTENT(IN) :: nwork
+      REAL(C_DOUBLE), INTENT(OUT) :: image(nwork)
+      INTEGER(C_INT), INTENT(OUT) :: ierr
+      ierr = 0
+      IF (nwork < ngrd_) THEN
+         WRITE(*,900) nwork, ngrd_
+         ierr = 1
+         RETURN
+      ENDIF
+      image(1:ngrd_) = DBLE(image32f_(1:ngrd_))
+  900 FORMAT('xcloc_dsmxc_getImage64f: nwork=', I6, ' must be at least ngrd_=', I6)
+      RETURN
+      END
+!>    Gets the diffraction stack migration image of the correlograms from the module.
+!>    @param[in] nwork   Size of image.
+!>    @param[out] image  This contains the DSM image.  This is an array of dimension
+!>                       [nwork] but only the first ngrd_ points are accessed. 
+!>    @param[out] ierr   0 indicates success.
+!>
+      SUBROUTINE xcloc_dsmxc_getImage32f(nwork, image, ierr) &
+      BIND(C, NAME='xcloc_dsmxc_getImage32f')
+      INTEGER(C_INT), VALUE, INTENT(IN) :: nwork
+      REAL(C_FLOAT), INTENT(OUT) :: image(nwork)
+      INTEGER(C_INT), INTENT(OUT) :: ierr
+      ierr = 0
+      IF (nwork < ngrd_) THEN
+         WRITE(*,900) nwork, ngrd_
+         ierr = 1
+         RETURN
+      ENDIF
+      image(1:ngrd_) = image32f_(1:ngrd_)
+  900 FORMAT('xcloc_dsmxc_getImage32f: nwork=', I6, ' must be at least ngrd_=', I6)
       RETURN
       END
 !                                                                                        !
@@ -268,7 +316,7 @@ MODULE XCLOC_DSMXC
       INTEGER i1, i2
       ierr = 0
       IF (nptsInXCs /= nptsInXCs_ .OR. xcIndex < 1 .OR. xcIndex > nxcPairs_) THEN
-         IF (nptsInXCs /= nptsInXCs_) WRITE(*,900) nxcPairs, nxcPairs_
+         IF (nptsInXCs /= nptsInXCs_) WRITE(*,900) nptsInXCs, nptsInXCs_
          IF (xcIndex < 1 .OR. xcIndex > nxcPairs_) WRITE(*,901) nxcPairs_
          ierr = 1
          RETURN
@@ -276,7 +324,7 @@ MODULE XCLOC_DSMXC
       i1 = (xcIndex - 1)*dataOffset_ + 1
       i2 = i1 + nptsInXCs_ - 1 
       xcs32f_(i1:i2) = SNGL(xc(1:nptsInXCs_))
-  900 FORMAT('xcloc_dsmxc_setCorrelogram64fF: nPtsInXCs=', I6,'- expecting nptsInXCS=',I6)
+  900 FORMAT('xcloc_dsmxc_setCorrelogram64fF: nptsInXCs=', I6,'- expecting nptsInXCS=',I6)
   901 FORMAT('xcloc_dsmxc_setCorrelogram64fF: xcIndex must be in range [1,',I4,']')
       RETURN
       END
@@ -299,7 +347,7 @@ MODULE XCLOC_DSMXC
       INTEGER i1, i2
       ierr = 0
       IF (nptsInXCs /= nptsInXCs_ .OR. xcIndex < 1 .OR. xcIndex > nxcPairs_) THEN
-         IF (nptsInXCs /= nptsInXCs_) WRITE(*,900) nxcPairs, nxcPairs_
+         IF (nptsInXCs /= nptsInXCs_) WRITE(*,900) nptsInXCs, nptsInXCs_
          IF (xcIndex < 1 .OR. xcIndex > nxcPairs_) WRITE(*,901) nxcPairs_
          ierr = 1
          RETURN
@@ -307,7 +355,7 @@ MODULE XCLOC_DSMXC
       i1 = (xcIndex - 1)*dataOffset_ + 1
       i2 = i1 + nptsInXCs_ - 1
       xcs32f_(i1:i2) = xc(1:nptsInXCs_)
-  900 FORMAT('xcloc_dsmxc_setCorrelogram32fF: nPtsInXCs=', I6,'- expecting nptsInXCS=',I6)
+  900 FORMAT('xcloc_dsmxc_setCorrelogram32fF: nptsInXCs=', I6,'- expecting nptsInXCS=',I6)
   901 FORMAT('xcloc_dsmxc_setCorrelogram32fF: xcIndex must be in range [1,',I4,']')
       RETURN
       END

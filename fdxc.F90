@@ -618,7 +618,8 @@ MODULE XCLOC_FDXC
       IF (precision_ == XCLOC_DOUBLE_PRECISION) THEN
          xc(1:nptsInXCs_) = xcs64f_(i1:i1+nptsInXCs_-1)
       ELSE
-         ierr = ippsConvert_32f64f(xcs32f_(i1), xc, nptsInXCs_)
+         xc(1:nptsInXCs_) = DBLE(xcs32f_(i1:i1+nptsInXCs_-1))
+         !ierr = ippsConvert_32f64f(xcs32f_(i1), xc, nptsInXCs_)
       ENDIF
   900 FORMAT('xcloc_fdxc_getCorrelogram32fF: lworC=', I6, 'must be at least', I6) 
   905 FORMAT('xcloc_fdxc_getCorrelogram32fF: corrNumber',I6, 'must be in range [1',I6,']')
@@ -659,7 +660,8 @@ MODULE XCLOC_FDXC
       IF (precision_ == XCLOC_SINGLE_PRECISION) THEN
          xc(1:nptsInXCs_) = xcs32f_(i1:i1+nptsInXCs_-1)
       ELSE
-         ierr = ippsConvert_64f32f(xcs64f_(i1), xc, nptsInXCs_)
+         xc(1:nptsInXCs_) = SNGL(xcs64f_(i1:i1+nptsInXCs_-1))
+         !ierr = ippsConvert_64f32f(xcs64f_(i1), xc, nptsInXCs_)
       ENDIF
   900 FORMAT('xcloc_fdxc_getCorrelogram32fF: lworC=', I6, 'must be at least', I6)
   905 FORMAT('xcloc_fdxc_getCorrelogram32fF: corrNumber',I6, 'must be in range [1',I6,']')
@@ -697,7 +699,8 @@ MODULE XCLOC_FDXC
       IF (precision_ == XCLOC_DOUBLE_PRECISION) THEN
          inputSignals64f_(i1:i1+npts-1) = x(1:npts)
       ELSE
-         ierr = ippsConvert_64f32f(x, inputSignals32f_(i1), npts)
+         inputSignals32f_(i1:i1+npts-1) = SNGL(x(1:npts))
+         !ierr = ippsConvert_64f32f(x, inputSignals32f_(i1), npts)
       ENDIF
   900 FORMAT('xcloc_fdxc_setSignal64fF: Error expecting npts=', I5) 
   905 FORMAT('xcloc_fdxc_setSignal64fF: Error signalNumber must be in range [1,',I4,']')
@@ -735,7 +738,8 @@ MODULE XCLOC_FDXC
       IF (precision_ == XCLOC_SINGLE_PRECISION) THEN
          inputSignals32f_(i1:i1+npts-1) = x(1:npts)
       ELSE
-         ierr = ippsConvert_32f64f(x, inputSignals64f_(i1), npts)
+         inputSignals64f_(i1:i1+npts-1) = DBLE(x(1:npts))
+         !ierr = ippsConvert_32f64f(x, inputSignals64f_(i1), npts)
       ENDIF
   900 FORMAT('xcloc_fdxc_setSignal32fF: Error expecting npts=', I5)
   905 FORMAT('xcloc_fdxc_setSignal32fF: Error signalNumber must be in range [1,',I4,']')
@@ -813,8 +817,8 @@ MODULE XCLOC_FDXC
       COMPLEX(C_FLOAT_COMPLEX), CONTIGUOUS, POINTER :: xcPtr32c(:)
       REAL(C_DOUBLE), ALLOCATABLE :: mag64f_(:)
       REAL(C_FLOAT), ALLOCATABLE :: mag32f_(:)
-      REAL(C_FLOAT), PARAMETER :: tol32 = EPSILON(1.0)*10.0
-      REAL(C_DOUBLE), PARAMETER :: tol64 = EPSILON(1.d0)*10.d0 
+      REAL(C_FLOAT), PARAMETER ::  tol32 = TINY(1.0)*10000.0   !EPSILON(1.0)*10.0
+      REAL(C_DOUBLE), PARAMETER :: tol64 = TINY(1.d0)*10000.d0 !EPSILON(1.d0)*10.d0 
       ierr = 0
       IF (precision_ == XCLOC_SINGLE_PRECISION) THEN
          !$OMP PARALLEL DEFAULT(NONE) &

@@ -152,7 +152,23 @@ int test_serial_dsmLocation(void)
     xcloc_dsmxc_setCorrelograms64f(nptsInXCs, nptsInXCs, nxcs, xcs, &ierr);
     fprintf(stdout, "%s: Computing dsm...\n", __func__);
     xcloc_dsmxc_compute(&ierr);
-
+    CHKERR(ierr, "failed to compute dsm");
+    float *image = (float *) calloc((size_t) ngrd, sizeof(float));
+    xcloc_dsmxc_getImage32f(ngrd, image, &ierr);
+    CHKERR(ierr, "failed to get image");
+printf("src1: %f %f\n", xs[0], xs[1]);
+printf("src2: %f %f\n", xs[3], xs[4]);
+FILE *ftemp = fopen("dsm2d.txt", "w");
+for (int iy=0; iy<ny; iy++)
+{
+ for (int ix=0; ix<nx; ix++)
+ {
+  fprintf(ftemp, "%e %e %e\n", x0+ix*dx, y0+iy*dy, image[iy*nx+ix]);
+ }
+ fprintf(ftemp, "\n");
+}
+fclose(ftemp);
+    free(image);
     // Free memory
     xcloc_fdxc_finalize();
     xcloc_dsmxc_finalize();

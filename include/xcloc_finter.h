@@ -27,6 +27,13 @@ void xcloc_dsmxc_setCorrelograms32f(const int ldxc,
                                     const int nptsInXCs,
                                     const int nxcPairs,
                                     const float xcs[], int *ierr);
+/* Gets the migration image. */
+void xcloc_dsmxc_getImage64f(const int nwork,
+                             double image[],
+                             int *ierr);
+void xcloc_dsmxc_getImage32f(const int nwork, 
+                             float image[],
+                             int *ierr);
 /* Sets a travel time table. */
 void xcloc_dsmxc_setTable64fF(const int tableNumber,
                               const int ngrd,
