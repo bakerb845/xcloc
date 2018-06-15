@@ -95,10 +95,64 @@ int test_serial_fdxc_hardwired(void)
     bool ldoAutoCorrs;
     int accuracy = XCLOC_HIGH_ACCURACY;
     xcPairs = NULL;
+    // Compute a cross correlation table with autocorrelations
+    ldoAutoCorrs = true;
+    nwork =-1; // Workspace query
+    xcloc_utils_computeDefaultXCTable(ldoAutoCorrs, nsignals, nwork,
+                                      XCLOC_FORTRAN_NUMBERING, &nxcs, xcPairs, &ierr);
+    CHKERR(ierr, "computeDefaultXCTable workspace query");
+    nwork = 2*nxcs;
+    xcPairs = calloc((size_t) nwork, sizeof(int));
+    xcloc_utils_computeDefaultXCTable(ldoAutoCorrs, nsignals, nwork,
+                                      XCLOC_FORTRAN_NUMBERING, &nxcs, xcPairs, &ierr);
+    CHKERR(ierr, "computeDefaultXCTable");
+    if (nxcs != 15)
+    {
+        fprintf(stderr, "%s: all nxcs is wrong\n", __func__);
+        return EXIT_FAILURE;
+    }
+    for (i=0; i<2*nxcs; i++)
+    {
+        if (xcPairRef2[i] != xcPairs[i])
+        {
+            fprintf(stderr, "%s: error computing pairs diag\n", __func__);
+            return EXIT_FAILURE;
+        }
+    }
+    free(xcPairs); xcPairs = NULL;
+    // Compute the cross-correlation table
+    nwork =-1; // Workspace query
+    ldoAutoCorrs = false;
+    xcloc_utils_computeDefaultXCTable(ldoAutoCorrs, nsignals, nwork,
+                                      XCLOC_FORTRAN_NUMBERING, &nxcs, xcPairs, &ierr);
+    CHKERR(ierr, "computeDefaultXCTable workspace query");
+    nwork = 2*nxcs;
+    xcPairs = calloc((size_t) nwork, sizeof(int));
+    xcloc_utils_computeDefaultXCTable(ldoAutoCorrs, nsignals, nwork,
+                                      XCLOC_FORTRAN_NUMBERING, &nxcs, xcPairs, &ierr);
+    CHKERR(ierr, "computeDefaultXCTable");
+    if (nxcs != 10)
+    {
+        fprintf(stderr, "%s: nxcs is wrong\n", __func__);
+        return EXIT_FAILURE;
+    }
+    for (i=0; i<2*nxcs; i++)
+    {
+        if (xcPairRef1[i] != xcPairs[i])
+        {
+            fprintf(stderr, "%s: error computing pairs no diag\n", __func__);
+            return EXIT_FAILURE;
+        }
+    }
+
+
     // Initialize
-    xcloc_fdxc_initialize(npts, nsignals, nptsPad, verbose, precision, accuracy, &ierr); 
+    xcloc_fdxc_initialize(npts, nsignals, nptsPad, 
+                          nxcs, xcPairs,
+                          verbose, precision, accuracy, &ierr); 
     CHKERR(ierr, "initialize");
     // Compute a cross correlation table with autocorrelations
+/*
     nwork =-1; // Workspace query
     xcloc_fdxc_computeDefaultXCTableF(true, nwork, &nxcs, xcPairs, &ierr);
     CHKERR(ierr, "computeDefaultXCTable workspace query");
@@ -146,6 +200,7 @@ int test_serial_fdxc_hardwired(void)
     // Set the table
     xcloc_fdxc_setXCTableF(nxcs, xcPairs, &ierr);
     CHKERR(ierr, "xcloc_fdxc_setXCTableF");
+*/
     free(xcPairs); xcPairs = NULL;
     // Set the signals
     int ldx = nptsPad;
@@ -212,13 +267,27 @@ int test_serial_fdxc_random(const int precision)
     int accuracy = XCLOC_HIGH_ACCURACY;
     const int verbose = 0;
     //const int precision = (int) XCLOC_DOUBLE_PRECISION; //(int) XCLOC_SINGLE_PRECISION; //0;
+    // Compute the cross-correlation table
+    int nwork =-1; // Workspace query
+    bool ldoAutoCorrs = false;
+    int *xcPairs = NULL;
+    xcloc_utils_computeDefaultXCTable(ldoAutoCorrs, nsignals, nwork,
+                                      XCLOC_FORTRAN_NUMBERING, &nxcs, xcPairs, &ierr);
+    CHKERR(ierr, "computeDefaultXCTable workspace query");
+    nwork = 2*nxcs;
+    xcPairs = calloc((size_t) nwork, sizeof(int));
+    xcloc_utils_computeDefaultXCTable(ldoAutoCorrs, nsignals, nwork,
+                                      XCLOC_FORTRAN_NUMBERING, &nxcs, xcPairs, &ierr);
+    CHKERR(ierr, "computeDefaultXCTable");
     // Compute some random signals
     fprintf(stdout, "%s: Generating random numbers...\n", __func__);
     xrand = xcfft_createRandomSignals(NULL, nsignals, npts, &ierr);
     // Initialize
-    xcloc_fdxc_initialize(npts, nsignals, nptsPad, verbose,
-                          precision, accuracy, &ierr); 
+    xcloc_fdxc_initialize(npts, nsignals, nptsPad,
+                          nxcs, xcPairs,
+                          verbose, precision, accuracy, &ierr); 
     CHKERR(ierr, "initialize");
+/*
     // Compute the cross-correlation table
     int nwork =-1; // Workspace query
     bool ldoAutoCorrs = false;
@@ -232,6 +301,7 @@ int test_serial_fdxc_random(const int precision)
     // Set the table
     xcloc_fdxc_setXCTableF(nxcs, xcPairs, &ierr);
     CHKERR(ierr, "xcloc_fdxc_setXCTableF");
+*/
     free(xcPairs); xcPairs = NULL;
     // Set the signals
     start = clock();

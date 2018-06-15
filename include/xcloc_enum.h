@@ -2,6 +2,12 @@
 #define XCLOC_ENUM_H__
 #include "xcloc_config.h"
 
+enum xclocNumbering_enum
+{
+    XCLOC_C_NUMBERING = 0,       /*!< C based indexing. */
+    XCLOC_FORTRAN_NUMBERING = 1  /*!< Fortran based indexing. */
+};
+
 enum xclocPrecision_enum
 {
     XCLOC_SINGLE_PRECISION = 0, /*!< Single precision. */
@@ -22,5 +28,7 @@ enum xclocAccuracy_enum
                                       precision in exchange for the
                                       highest performance. */
 };
+
+
 
 #endif

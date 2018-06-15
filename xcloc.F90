@@ -2,9 +2,9 @@
 !> @author Ben Baker 
 !> @copyright Ben Baker distributed under the MIT license.
 MODULE XCLOC
-      USE MPI
+      USE MPI_F08
       USE ISO_C_BINDING
-      INTEGER, PRIVATE, SAVE :: globalComm_ = MPI_COMM_WORLD
+      TYPE(MPI_Comm), PRIVATE, SAVE :: globalComm_ = MPI_COMM_WORLD
 
       LOGICAL, PRIVATE, SAVE :: mpi_isInit_ = 0
 integer nprocs_, myid_

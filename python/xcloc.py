@@ -34,26 +34,18 @@ class xcloc:
 
     (
        XCLOC_SINGLE_PRECISION, # Single precision
-       XCLOC_DOUBLE_PRECISION, # Double precision
+       XCLOC_DOUBLE_PRECISION  # Double precision
+    ) = map(int, range(2))
+
+    (
+       XCLOC_C_NUMBERING,       # C numbering
+       XCLOC_FORTRAN_NUMBERING  # Fortran numbering
     ) = map(int, range(2))
 
     def __init__(self,
                  xcloc_path=os.environ['LD_LIBRARY_PATH'].split(os.pathsep),
                  xcloc_library='libxcloc_shared.so'):
- 
-        self.fdxc = fdxc(xcloc_path, xcloc_library)
-    def __exit__(self):
-        self.fdxc.finalize()
-        return
-
-
-class fdxc:
-    """
-    This class computes cross-correlations in via the Fourier transform. 
-    """
-    def __init__(self,
-                 xcloc_path=os.environ['LD_LIBRARY_PATH'].split(os.pathsep),
-                 xcloc_library='libxcloc_shared.so'):
+        # Load the library
         lfound = False
         for path in xcloc_path:
             xcloc_path = os.path.join(path, xcloc_library)
@@ -61,19 +53,137 @@ class fdxc:
                 lfound = True
                 break
         if (lfound):
-            xcloc_lib = cdll.LoadLibrary(xcloc_path) 
+            xcloc_lib = cdll.LoadLibrary(xcloc_path)
         else:
-            print("Couldn't find libxcloc")
+            print("Couldn't find libxcloc") 
             return
+        ##################################################################################
+        #                                     XCLOC                                      #
+        ##################################################################################
         xcloc_lib.xcloc_initializeF.argtypes = None 
         xcloc_lib.xcloc_finalizeF.argtypes = None
 
-        xcloc_lib.xcloc_fdxc_initialize.argtypes = (c_int,
-                                                    c_int,
-                                                    c_int,
-                                                    c_int,
-                                                    c_int,
-                                                    c_int,
+        # Hook up the modules
+        self.utils = utils(xcloc_lib)
+        self.fdxc = fdxc(xcloc_lib, self.utils)
+        self.dsmxc = dsmxc(xcloc_lib)
+        self.lib = xcloc_lib
+
+    def __exit__(self):
+        self.fdxc.finalize()
+        return
+
+class dsmxc:
+    """
+    This class computes the diffraction stack migration image of the
+    correlograms.
+    """
+    def __init__(self, xcloc_lib):
+        xcloc_lib.xcloc_dsmxc_initialize.argtypes = (c_int, # ntables
+                                                     c_int, # ngrd
+                                                     c_int, # nxcPairs
+                                                     c_int, # nptsInXCs
+                                                     c_double, # dt
+                                                     POINTER(c_int), # xcPairs
+                                                     POINTER(c_int))
+        xcloc_lib.xcloc_dsmxc_finalize.argtypes = None
+        xcloc_lib.xcloc_dsmxc_getImage64f.argtypes = (c_int,
+                                                      POINTER(c_double), POINTER(c_int))
+        xcloc_lib.xcloc_dsmxc_getImage32f.argtypes = (c_int,
+                                                      POINTER(c_float), POINTER(c_int))
+        xcloc_lib.xcloc_dsmxc_setCorrelograms64f.argtpyes = (c_int,
+                                                             c_int,
+                                                             c_int,
+                                                             POINTER(c_double),
+                                                             POINTER(c_int))
+        xcloc_lib.xcloc_dsmxc_setCorrelograms32f.argtpyes = (c_int,
+                                                             c_int,
+                                                             c_int,
+                                                             POINTER(c_float),
+                                                             POINTER(c_int))
+        xcloc_lib.xcloc_dsmxc_setTable64fF.argtypes = (c_int, c_int,
+                                                       POINTER(c_double), POINTER(c_int))
+        xcloc_lib.xcloc_dsmxc_setTable32fF.argtypes = (c_int, c_int,
+                                                       POINTER(c_float), POINTER(c_int))
+        xcloc_lib.xcloc_dsmxc_compute.argtypes = [POINTER(c_int)]
+
+        self.lib = xcloc_lib
+        return
+
+class utils:
+    """
+    Generic utilities to help with using the library.
+    """
+    def __init__(self, xcloc_lib):
+        xcloc_lib.xcloc_utils_computeDefaultXCTable.argtypes = (c_bool, # ldoAutoCorrs
+                                                                c_int,  # nsignals
+                                                                c_int,  # nwork
+                                                                c_int,  # numbering 
+                                                                POINTER(c_int), # nxcs
+                                                                POINTER(c_int), # xcPairs
+                                                                POINTER(c_int))
+        self.lib = xcloc_lib
+
+    def computeDefaultXCTable(self, nsignals, ldoAutoCorrs = False):
+        """
+        Computes a default cross-correlation table pair.
+ 
+        Inputs
+        ------
+        nsignals : int
+            Number of signals.
+
+        ldoAutoCorrs : bool
+            If true then compute auto-correlations.
+            Otherwise, only compute cross correlations.
+
+        Returns
+        -------
+        xcPairs : matrix 
+            On successful exit this is a [nxcs x 2] table of cross correlation
+            pairs.  Each row is a correlation pair between signal (column 1) and
+            signal (column 2).  The signal indices are C numbered.  
+            Otherwise, this is None.
+        """
+        ierr = c_int(1)
+        nxcs = c_int(1)
+        # Space query
+        nwork =-1 
+        self.lib.xcloc_utils_computeDefaultXCTable(ldoAutoCorrs, nsignals, nwork,
+                                                   xcloc.XCLOC_FORTRAN_NUMBERING,
+                                                   byref(nxcs), None,
+                                                   byref(ierr)) 
+        if (ierr.value != 0): 
+            print("Error computing workspace size")
+            return None
+        nwork = 2*nxcs.value
+        xcPairs = ascontiguousarray(zeros(nwork, dtype=c_int))
+        xcPairsPtr = xcPairs.ctypes.data_as(POINTER(c_int))
+        self.lib.xcloc_utils_computeDefaultXCTable(ldoAutoCorrs, nsignals, nwork,
+                                                   xcloc.XCLOC_FORTRAN_NUMBERING,
+                                                   byref(nxcs), xcPairsPtr,
+                                                   byref(ierr))
+        if (ierr.value != 0): 
+            print("Error computing default table!")
+            return None
+        nxcs = nxcs.value
+        xcPairs = xcPairs.reshape([nxcs, 2], order='C') - 1 # C numbering
+        return xcPairs
+
+
+class fdxc:
+    """
+    This class computes cross-correlations in via the Fourier transform. 
+    """
+    def __init__(self, xcloc_lib, utils):
+        xcloc_lib.xcloc_fdxc_initialize.argtypes = (c_int, # npts
+                                                    c_int, # nsignals
+                                                    c_int, # nptsPad
+                                                    c_int, # nxcs
+                                                    POINTER(c_int), # xcPairs
+                                                    c_int, # verbose
+                                                    c_int, # precision
+                                                    c_int, # accuracy
                                                     POINTER(c_int))
         xcloc_lib.xcloc_fdxc_setSignals64f.argtypes = (c_int,
                                                        c_int,
@@ -85,14 +195,6 @@ class fdxc:
                                                        c_int,
                                                        POINTER(c_float),
                                                        POINTER(c_int))
-        xcloc_lib.xcloc_fdxc_setXCTableF.argtypes = (c_int, 
-                                                     POINTER(c_int),
-                                                     POINTER(c_int))
-        xcloc_lib.xcloc_fdxc_computeDefaultXCTableF.argtypes = (c_bool,
-                                                                c_int,
-                                                                POINTER(c_int),
-                                                                POINTER(c_int),
-                                                                POINTER(c_int)) 
         xcloc_lib.xcloc_fdxc_getNumberOfSignals.argtypes = (POINTER(c_int),
                                                             POINTER(c_int))
         xcloc_lib.xcloc_fdxc_getNumberOfCorrelograms.argtypes = (POINTER(c_int),
@@ -114,14 +216,16 @@ class fdxc:
                                                        POINTER(c_int))
         xcloc_lib.xcloc_fdxc_computePhaseCorrelograms.argtypes = [POINTER(c_int)]
         xcloc_lib.xcloc_fdxc_computeCrossCorrelograms.argtypes = [POINTER(c_int)]
-        xcloc_lib.xcloc_fdxc_finalize.argtypes = None 
+        xcloc_lib.xcloc_fdxc_finalize.argtypes = None
         self.lib = xcloc_lib
+        self.utils = utils
 
     def __exit__(self):
         self.finalize()
         return
 
     def initialize(self, npts, nsignals, nptsPad=None,
+                   xcPairs=None,
                    verbose=0,
                    precision=xcloc.XCLOC_SINGLE_PRECISION,
                    accuracy=xcloc.XCLOC_HIGH_ACCURACY):
@@ -155,7 +259,7 @@ class fdxc:
         ierr : int
             0 indicates success
         """
-        self.lib.xcloc_initializeF(2)
+        #self.lib.xcloc_initializeF(2)
         # Input checks 
         if (npts < 1):
             print("npts=%d must be positive"%npts)
@@ -168,58 +272,28 @@ class fdxc:
             print("precision=%d must be 0 or 1"%precision)
             return -1
         # If nptsPad is set then check that it makes sense; otherwise set it
-        if (nptsPad != None):
+        if (not nptsPad is None):
             if (nptsPad < npts):
                 print("nptsPad must be greater than npts", npts, nptsPad)
                 return -1
         else:
             nptsPad = npts
+        if (xcPairs is None):
+            xcPairs = self.utils.computeDefaultXCTable(nsignals)
+            xcPairs = xcPairs + 1
+        if (amin(xcPairs) == 0):
+            print("xcPairs must be Fortran indexed")
+            return -1
+        nxcs = xcPairs.shape[0]
+        xcPairs = xcPairs.flatten(order='C')
+        xcPairsPtr = xcPairs.ctypes.data_as(POINTER(c_int))
         # Fire up the library
         ierr = c_int(1)
-        self.lib.xcloc_fdxc_initialize(npts, nsignals, nptsPad, verbose,
+        self.lib.xcloc_fdxc_initialize(npts, nsignals, nptsPad,
+                                       nxcs, xcPairsPtr,
+                                       verbose,
                                        precision, accuracy, byref(ierr))
         return ierr 
-
-    def computeDefaultXCTable(self, ldoAutoCorrs = False):
-        """
-        Computes a default cross-correlation table pair.
- 
-        Inputs
-        ------
-        ldoAutoCorrs : bool
-            If true then compute auto-correlations.
-            Otherwise, only compute cross correlations.
-
-        Returns
-        -------
-        xcPairs : matrix 
-            On successful exit this is a [nxcs x 2] table of cross correlation
-            pairs.  Each row is a correlation pair between signal (column 1) and
-            signal (column 2).  The signal indices are C numbered.  
-            Otherwise, this is None.
-        """
-        ierr = c_int(1)
-        nxcs = c_int(1)
-        # Space query
-        nwork =-1 
-        self.lib.xcloc_fdxc_computeDefaultXCTableF(ldoAutoCorrs, nwork,
-                                                   byref(nxcs), None,
-                                                   byref(ierr)) 
-        if (ierr.value != 0):
-            print("Error computing workspace size")
-            return None
-        nwork = 2*nxcs.value
-        xcPairs = ascontiguousarray(zeros(nwork, dtype=c_int))
-        xcPairsPtr = xcPairs.ctypes.data_as(POINTER(c_int))
-        self.lib.xcloc_fdxc_computeDefaultXCTableF(ldoAutoCorrs, nwork,
-                                                   byref(nxcs), xcPairsPtr,
-                                                   byref(ierr))
-        if (ierr.value != 0):
-            print("Error computing default table!")
-            return None
-        nxcs = nxcs.value
-        xcPairs = xcPairs.reshape([nxcs, 2], order='C') - 1 # C numbering
-        return xcPairs
 
     def __getCorrelograms__(self):
         nxcs = c_int(1) 
@@ -300,46 +374,6 @@ class fdxc:
         xcs = self.__getCorrelograms__()
         return xcs
 
-
-    def setXCTable(self, xcPairs):
-        """
-        Sets the table of cross-correlation signal pairs.
-
-        Inputs
-        ------
-        xcPairs : matrix
-            This is a matrix of dimension [nxcs x 2] where nxcs is the number
-            of cross-correlations.  The columns define a correlation pair
-            between signal index 1 (column 1) and signal index 2 (column 2).
-            Note, that the signal indices are C numbered.
-
-        Returns
-        -------
-        ierr : int
-            0 indicates success.
-        """
-        nxcs = xcPairs.shape[0]
-        n2 = xcPairs.shape[1]
-        if (n2 != 2):
-            print("xcPairs must be [nxcs x 2]")
-        ierr = c_int(1)
-        nsignals = c_int(1)
-        self.lib.xcloc_fdxc_getNumberOfSignals(nsignals, ierr)
-        if (ierr.value != 0):
-            print("Error getting number of signals")
-        nsignals = nsignals.value
-        if (amax(xcPairs) >= nsignals or amin(xcPairs) < 0):
-            print("All signal pairs must be in range [0,%d]"%nsignals)
-            return -1
-        xcPairs = xcPairs + 1 # C to Fortran ordering
-        xcPairs = ascontiguousarray(xcPairs, c_int)
-        xcPairsPtr = xcPairs.ctypes.data_as(POINTER(c_int))
-        self.lib.xcloc_fdxc_setXCTableF(nxcs, xcPairsPtr, ierr) 
-        ierr = ierr.value
-        if (ierr != 0):
-            print("Error setting XC table")
-        return ierr
-
     def setSignals(self, signals):
         """
         Sets the matrix of signals to correlate.
@@ -383,7 +417,7 @@ class fdxc:
         Finalizes the frequency domain cross-correlation library.
         """
         self.lib.xcloc_fdxc_finalize()
-        self.lib.xcloc_finalizeF()
+        #self.lib.xcloc_finalizeF()
         return
 
 def unit_test(xcloc_path):
@@ -394,11 +428,6 @@ def unit_test(xcloc_path):
     ierr = xcloc.fdxc.initialize(npts, nsignals)
     if (ierr != 0):
         sys.exit("initialization failed")
-    # Create the correlation pairs - default is no auto-correlations
-    xcPairs = xcloc.fdxc.computeDefaultXCTable(ldoAutoCorrs = True)
-    ierr = xcloc.fdxc.setXCTable(xcPairs)
-    if (ierr != 0):
-        sys.exit("failed to set table") 
     # Set some signals to correlate
     signals = zeros([nsignals, npts])
     signals[0,:] = [ 1, 2, 3, 4, 5, -1,  0, 0,  0,  0]
@@ -423,10 +452,7 @@ if __name__ == "__main__":
     npts = 10     # Length of signal
     nsignals = 5  # Number of signals
     # Initialize - default is single precision + high accuracy
-    xcloc.fdxc.initialize(npts, nsignals)
-    # Create the correlation pairs - default is no auto-correlations
-    xcPairs = xcloc.fdxc.computeDefaultXCTable(ldoAutoCorrs = True)
-    xcloc.fdxc.setXCTable(xcPairs)
+    xcloc.fdxc.initialize(npts, nsignals, precision=xcloc.XCLOC_DOUBLE_PRECISION)
     # Set some signals to correlate
     signals = zeros([nsignals, npts])
     signals[0,:] = [ 1, 2, 3, 4, 5, -1,  0, 0,  0,  0]
@@ -440,4 +466,4 @@ if __name__ == "__main__":
     print(xcs) 
     # Clean up
     xcloc.fdxc.finalize()
-
+    

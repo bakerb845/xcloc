@@ -1,6 +1,7 @@
 #ifndef XCLOC_FINTER_H__
 #define XCLOC_FINTER_H__
 #include "xcloc_config.h"
+#include "xcloc_enum.h"
 #include <stdbool.h>
 
 #ifdef __cplusplus
@@ -8,6 +9,17 @@ extern "C"
 {
 #endif
 
+/*----------------------------------------------------------------------------*/
+/*                            Convenience Utilities                           */
+/*----------------------------------------------------------------------------*/
+/* Make a full table of correlation pairs. */
+void xcloc_utils_computeDefaultXCTable(const bool ldoAutoCorrs,
+                                       const int nsignals,
+                                       const int nwork,
+                                       const int numbering,
+                                       int *nxcs,
+                                       int xcPairs[],
+                                       int *ierr); 
 /*----------------------------------------------------------------------------*/
 /*                Diffraction Stack Migration of Correlograms                 */
 /*----------------------------------------------------------------------------*/
@@ -52,14 +64,14 @@ void xcloc_dsmxc_finalize(void);
 void xcloc_fdxc_initialize(const int npts,
                            const int nsignals,
                            const int nptsPad,
+                           const int nxcs,
+                           const int xcPairs[],
                            const int verbose,
                            const int precision,
                            const int accuracy,
                            int *ierr);
 /* Finalize the cross-correlation. */
 void xcloc_fdxc_finalize(void);
-/* Set the Fortran indexed XC table. */
-void xcloc_fdxc_setXCTableF(const int nxcs, const int xcPairs[], int *ierr);
 /* Computes a default cross-correlation XC table. */
 void xcloc_fdxc_computeDefaultXCTableF(const bool ldoAutoCorrs,
                                        const int nwork,

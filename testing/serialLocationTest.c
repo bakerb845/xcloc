@@ -107,22 +107,25 @@ int test_serial_dsmLocation(void)
     int verbose = 0;
     int prec = 0;
     int accuracy = 0;
-    xcloc_fdxc_initialize(nptsSig, nsignals, nptsSig, 
-                          verbose, prec, accuracy, &ierr);
-    CHKERR(ierr, "failed initializing fdxc");
     bool ldoAutoCorrs = false;
-    int nwork =-1;
+    int nwork =-1; 
     int nxcs;
     int *xcPairs = NULL;
-    xcloc_fdxc_computeDefaultXCTableF(ldoAutoCorrs, nwork, &nxcs,
-                                      xcPairs, &ierr);
+    xcloc_utils_computeDefaultXCTable(ldoAutoCorrs, nsignals, nwork,
+                                      XCLOC_FORTRAN_NUMBERING,
+                                      &nxcs, xcPairs, &ierr);
+    CHKERR(ierr, "computeDefaultXCTable workspace query");
     nwork = 2*nxcs;
-    xcPairs = (int *) calloc((size_t) nwork, sizeof(int));
-    xcloc_fdxc_computeDefaultXCTableF(ldoAutoCorrs, nwork, &nxcs,
-                                      xcPairs, &ierr);
-    CHKERR(ierr, "failed to make default XC table");
-    xcloc_fdxc_setXCTableF(nxcs, xcPairs, &ierr);
-    CHKERR(ierr, "failed to set XC table");
+    xcPairs = calloc((size_t) nwork, sizeof(int));
+    xcloc_utils_computeDefaultXCTable(ldoAutoCorrs, nsignals, nwork,
+                                      XCLOC_FORTRAN_NUMBERING,
+                                      &nxcs, xcPairs, &ierr);
+    CHKERR(ierr, "computeDefaultXCTable");
+    // Initialize the cross-correlation table
+    xcloc_fdxc_initialize(nptsSig, nsignals, nptsSig, 
+                          nxcs, xcPairs,
+                          verbose, prec, accuracy, &ierr);
+    CHKERR(ierr, "failed initializing fdxc");
     xcloc_fdxc_setSignals64f(nptsSig, nptsSig, nsignals, obs, &ierr);
     CHKERR(ierr, "failed to set signals");
     xcloc_fdxc_computePhaseCorrelograms(&ierr);
