@@ -784,12 +784,14 @@ WARN_LOGFILE           =
 INPUT                  = ./xcloc.c \
                          ./xcfft.c \
                          ./fdxc.F90 \
-                         ./fdxc_mpi.F90 \
+                         ./fdxcMPI.F90 \
                          ./dsmxc.F90 \
+                         ./dsmxcMPI.F90 \
                          ./constants.F90 \
                          ./ipps.F90 \
                          ./memory.F90 \
                          ./spxc.F90 \
+                         ./firFilter.c \
                          ./xcloc.F90 \
                          ./envelope.c \
                          ./migrate.c \

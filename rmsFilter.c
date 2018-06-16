@@ -291,16 +291,16 @@ int xcloc_rmsFilter_apply(const int nsignals,
                 // Undo the scaling
                 pMaxAbs32 = (float) (1.0/(double) pMaxAbs32); // Precision issue
                 ippsMulC_32f(xwork32, pMaxAbs32, &xfilt[indx], npts);
-           }
-           // Window is length 1 so square then square root means absolute value
-           else
-           {
-                vsAbs(npts, &x[indx], &xfilt[indx]);
-           }
-       } // Loop on signals
-       free(xcSqr32);
-       free(xcFiltered32);
-       } // End parallel for
+            }
+            // Window is length 1 so square then square root means absolute value
+            else
+            {
+                 vsAbs(npts, &x[indx], &xfilt[indx]);
+            }
+        } // Loop on signals
+        free(xcSqr32);
+        free(xcFiltered32);
+        } // End parallel for
     }
     else
     {
@@ -342,16 +342,16 @@ int xcloc_rmsFilter_apply(const int nsignals,
                 vdSqrt(npts, &xcFiltered64[winLen2], xwork64);
                 // Undo the scaling
                 ippsMulC_64f(xwork64, pMaxAbs64, &xfilt[indx], npts);
-           }
-           // Window is length 1 so square then square root means absolute value
-           else
-           {
+            }
+            // Window is length 1 so square then square root means absolute val
+            else
+            {
                 vsAbs(npts, &x[indx], &xfilt[indx]);
-           }
-       } // Loop on signals
-       free(xcSqr64);
-       free(xcFiltered64);
-       }
+            }
+        } // Loop on signals
+        free(xcSqr64);
+        free(xcFiltered64);
+        }
     }
     return 0;
 } 

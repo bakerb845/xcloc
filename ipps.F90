@@ -2,6 +2,8 @@
 !> @author Ben Baker
 !> @copyright Ben Baker distributed under the MIT license.
 MODULE XCLOC_IPPS
+  INTEGER, PARAMETER :: ipp32f = 13
+  INTEGER, PARAMETER :: ipp64f = 19
   INTERFACE
       !> @brief Converts a double array to a float array.
       !> @param[out] pSrc  Double precision source array.
@@ -26,6 +28,30 @@ MODULE XCLOC_IPPS
       INTEGER(C_INT), VALUE, INTENT(IN) :: len 
       REAL(C_FLOAT), INTENT(IN) :: pSrc(len)
       REAL(C_DOUBLE), INTENT(OUT) :: pDst(len)
+      END FUNCTION
+      !> @brief Gets the single-rate FIR filter state size.
+      !> @param[in] tapsLen   Number of taps.
+      !> @param[out] pSpecSize  Size of the internal constant specification structure.
+      !> @param[out] pBufSize   Size of the work buffer required for FIR filtering.
+      !> @result 0 indicates success.
+      INTEGER(C_INT) FUNCTION ippsFIRSRGetSize_finter64f(tapsLen, pSpecSize, pBufSize) &
+      BIND(C, NAME='ippsFIRSRGetSize_finter64f')
+      USE ISO_C_BINDING
+      IMPLICIT NONE
+      INTEGER(C_INT), VALUE, INTENT(IN) :: tapsLen
+      INTEGER(C_INT), INTENT(OUT) :: pSpecSize, pBufSize
+      END FUNCTION
+      !> @brief Gets the single-rate FIR filter state size.
+      !> @param[in] tapsLen   Number of taps.
+      !> @param[out] pSpecSize  Size of the internal constant specification structure.
+      !> @param[out] pBufSize   Size of the work buffer required for FIR filtering.
+      !> @result 0 indicates success.
+      INTEGER(C_INT) FUNCTION ippsFIRSRGetSize_finter32f(tapsLen, pSpecSize, pBufSize) &
+      BIND(C, NAME='ippsFIRSRGetSize_finter32f')
+      USE ISO_C_BINDING
+      IMPLICIT NONE
+      INTEGER(C_INT), VALUE, INTENT(IN) :: tapsLen
+      INTEGER(C_INT), INTENT(OUT) :: pSpecSize, pBufSize
       END FUNCTION
 
    END INTERFACE
