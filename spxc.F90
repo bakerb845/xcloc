@@ -332,8 +332,8 @@ MODULE XCLOC_SPXC
 !                                                                                        !
 !========================================================================================!
 !                                                                                        !
-      !> @brief Designs the hilbert transformer.
-      !> @param[out] ierr 0 indicates success.
+!>    @brief Designs the FIR Hilbert transformer.
+!>    @param[out] ierr 0 indicates success.
       SUBROUTINE xcloc_spxc_envelope_design(ierr)
       INTEGER, INTENT(OUT) :: ierr
       DOUBLE PRECISION, ALLOCATABLE :: kaiser(:), sinct(:), t(:)
@@ -353,7 +353,7 @@ MODULE XCLOC_SPXC
       ! Create the Kaiser window
       ALLOCATE(kaiser(nCoeffs_)); kaiser(:) = 1.d0
       xfact = 2.d0/DBLE(nCoeffs_ - 1)*beta
-      ierr = ippsWinKaiser_64f_I(kaiser, nCoeffs_, xfact)
+      ierr = ippsWinKaiser_64f_I(kaiser, nCoeffs_, xfact) ! only good to 7 digits?
       IF (ierr /= ippStsNoErr) THEN
          WRITE(*,905)
          ierr = 1
