@@ -781,8 +781,7 @@ WARN_LOGFILE           =
 # spaces. See also FILE_PATTERNS and EXTENSION_MAPPING
 # Note: If this tag is empty the current directory is searched.
 
-INPUT                  = ./xcloc.c \
-                         ./fdxc.F90 \
+INPUT                  = ./fdxc.F90 \
                          ./fdxcMPI.F90 \
                          ./dsmxc.F90 \
                          ./dsmxcMPI.F90 \
@@ -796,10 +795,7 @@ INPUT                  = ./xcloc.c \
                          ./xdmf.c \
                          ./include/xcloc.h \
                          ./include/xcloc_enum.h \
-                         ./include/xcloc_xcfft.h \
-                         ./include/xcloc_migrate.h \
-                         ./include/xcloc_xcfftMPI.h \
-                         ./include/xcloc_migrateMPI.h \
+                         ./include/xcloc_finter.h \
                          ./include/xcloc_hdf5.h \
                          ./include/xcloc_xdmf.h
 
