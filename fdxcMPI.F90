@@ -4,6 +4,7 @@
 MODULE XCLOC_FDXC_MPI
       USE ISO_C_BINDING
       USE MPI_F08
+      !USE MPI
       USE XCLOC_CONSTANTS
       USE XCLOC_MEMORY
       USE XCLOC_FDXC
@@ -11,6 +12,9 @@ MODULE XCLOC_FDXC_MPI
 #ifdef _OPENMP
       USE OMP_LIB
 #endif
+      !> Maps from
+      INTEGER, ALLOCATABLE, PRIVATE, SAVE :: myXCs_(:)
+      INTEGER, ALLOCATABLE, PRIVATE, SAVE :: myXCPtr_(:)
       !> Length of input signals.
       INTEGER, PRIVATE, SAVE :: npts_ = 0
       !> The length of the signals to transform.  This can mitigate the pathologic
@@ -19,6 +23,8 @@ MODULE XCLOC_FDXC_MPI
       INTEGER, PRIVATE, SAVE :: nptsPad_ = 0
       !> Length of the time domain cross-correloagrams.
       INTEGER, PRIVATE, SAVE :: nptsInXCs_ = 0
+      !> Total number of cross-correlations
+      INTEGER, PRIVATE, SAVE :: nTotalXCs_ = 0
       !> Controls verbosity.
       INTEGER, PRIVATE, SAVE :: verbose_ = XCLOC_PRINT_WARNINGS
       !> If true then this process will be computing cross-correlations. 
@@ -70,6 +76,7 @@ MODULE XCLOC_FDXC_MPI
             nTotalSignals_ = nsignals
             verbose_ = verbose
             nptsInXCs_ = 2*nptsPad_ - 1   ! Length of the cross-correlations
+            nTotalXCs_ = nxcs
          ENDIF
       ENDIF
       CALL MPI_BCAST(ierr, 1, MPI_INTEGER, master, comm, mpierr)
@@ -80,8 +87,11 @@ MODULE XCLOC_FDXC_MPI
       CALL MPI_BCAST(nTotalSignals_, 1, MPI_INTEGER, master, comm, mpierr)
       CALL MPI_BCAST(verbose_,       1, MPI_INTEGER, master, comm, mpierr)
       CALL MPI_BCAST(nptsInXCs_,     1, MPI_INTEGER, master, comm, mpierr)
+      CALL MPI_BCAST(nTotalXCs_,     1, MPI_INTEGER, master, comm, mpierr)
       ! Load balance
-
+      ALLOCATE(myXCs_(nTotalXCs_))
+      ALLOCATE(myXCPtr_(nprocs+1))
+      CALL xcloc_utils_partitionTasks(nTotalXCs_, nprocs, myXCs_, myXCPtr_, ierr)
       ! Initialize
 
       ! Format statements

@@ -306,7 +306,7 @@ int xcloc_firFilter_rmsFilter64f(const int lds,
         return -1; 
     }
     #pragma omp parallel default(none) \
-     shared(nsignals, pBufSize, pSpecSize, x, taps), \
+     shared(pBufSize, pSpecSize, x, taps), \
      private(is) \
      firstprivate(filterLen, tapsLen, winLen2)
     {
@@ -398,7 +398,7 @@ int xcloc_firFilter_rmsFilter32f(const int lds,
         return -1; 
     }
     #pragma omp parallel default(none) \
-     shared(nsignals, pBufSize, pSpecSize, x, taps), \
+     shared(pBufSize, pSpecSize, x, taps), \
      private(is) \
      firstprivate(filterLen, tapsLen, winLen2)
     {

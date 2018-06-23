@@ -303,7 +303,7 @@ int xcloc_xdmf_writeGrid(const char *xdmfFile,
         fprintf(stderr, "%s: Error creating xml writer", __func__);
         return -1;
     }
-    xmlTextWriterSetIndentString(writer, "  "); //"\t");
+    xmlTextWriterSetIndentString(writer, BAD_CAST "  "); //"\t");
     // Start the document with default xml version
     rc = xmlTextWriterStartDocument(writer, NULL, XML_ENCODING, NULL);
     if (rc < 0)
@@ -396,7 +396,7 @@ int xcloc_xdmf_writeGrid(const char *xdmfFile,
     strncpy(xmlmsg, (const char *)buf->content, msglen);
     // Write it 
     xmlFileHandle = fopen(xdmfFile, "w");
-    fprintf(xmlFileHandle, xmlmsg);
+    fprintf(xmlFileHandle, "%s", xmlmsg);
     fclose(xmlFileHandle);
     // Clean up
     xmlCleanupParser();

@@ -77,7 +77,7 @@ int test_serial_dsmLocation(void)
     int i, ierr;
     // Set the receiver location to the center of the model
     const int nsrc = 2; 
-    const double srcScale[nsrc] = {1, 1.1};
+    const double srcScale[2] = {1, 1.1};
     double xs[6] = {x0 + (double) (2*nx/7)*dx,
                     y0 + (double) (6*ny/7)*dy,
                     z0,// Source has to be at zero for the 2d example

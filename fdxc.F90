@@ -283,8 +283,7 @@ MODULE XCLOC_FDXC
 !>                        (i,j)'th signal pair comprising a correlation.
 !>    @param[out] ierr    0 indicates success 
 !>
-      SUBROUTINE xcloc_fdxc_setXCTableF(nxcs, xcPairs, ierr) &
-      BIND(C, NAME='xcloc_fdxc_setXCTableF')
+      SUBROUTINE xcloc_fdxc_setXCTableF(nxcs, xcPairs, ierr)
       IMPLICIT NONE
       INTEGER(C_INT), VALUE, INTENT(IN) :: nxcs
       INTEGER(C_INT), INTENT(IN) :: xcPairs(2*nxcs)
@@ -779,6 +778,8 @@ MODULE XCLOC_FDXC
          IF (lphaseCorr) THEN
             ALLOCATE(mag32f_(n))
             NULLIFY(xcPtr32c)
+         ELSE
+            ALLOCATE(mag32f_(1))
          ENDIF
          ! Loop on the number of cross-correlations
          !$OMP DO
@@ -806,7 +807,7 @@ MODULE XCLOC_FDXC
                NULLIFY(xcPtr32c)
             ENDIF
          ENDDO ! Loop on number of cross-correlations
-         IF (lphaseCorr) DEALLOCATE(mag32f_)
+         IF (ALLOCATED(mag32f_)) DEALLOCATE(mag32f_)
          !$OMP END PARALLEL
       ELSE
          !$OMP PARALLEL DEFAULT(NONE) &
@@ -815,8 +816,10 @@ MODULE XCLOC_FDXC
          !$OMP PRIVATE(i, indx, iw, ixc, j, jndx, kndx, mag64f_, n, xcPtr64z)
          n = nptsInFTs_
          IF (lphaseCorr) THEN
-            NULLIFY(xcPtr64z)
             ALLOCATE(mag64f_(n))
+            NULLIFY(xcPtr64z)
+         ELSE
+            ALLOCATE(mag64f_(1))
          ENDIF
          ! Loop on the number of cross-correlations
          !$OMP DO
@@ -843,7 +846,7 @@ MODULE XCLOC_FDXC
                NULLIFY(xcPtr64z)
             ENDIF
          ENDDO ! Loop on number of cross-correlations
-         IF (lphaseCorr) DEALLOCATE(mag64f_)
+         IF (ALLOCATED(mag64f_)) DEALLOCATE(mag64f_)
          !$OMP END PARALLEL
       ENDIF
       RETURN

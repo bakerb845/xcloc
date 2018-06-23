@@ -34,9 +34,9 @@ MODULE XCLOC_CONSTANTS
       !> Compute RMS of cross-correlograms.
       INTEGER(C_INT), PARAMETER :: XCLOC_SPXC_RMS_FILTER = 2
       !> Single complex 0.0
-      COMPLEX(C_FLOAT_COMPLEX), PARAMETER :: czero = CMPLX(0.0, 0.0)
+      COMPLEX(C_FLOAT_COMPLEX), PARAMETER :: czero = CMPLX(0.0, 0.0, KIND=4)
       !> Double complex 0.0
-      COMPLEX(C_DOUBLE_COMPLEX), PARAMETER :: zzero = DCMPLX(0.d0, 0.d0)
+      COMPLEX(C_DOUBLE_COMPLEX), PARAMETER :: zzero = CMPLX(0.d0, 0.d0, KIND=8)
       !> Default block size for migration loop.
       INTEGER(C_INT), PARAMETER :: XCLOC_DEFAULT_BLOCKSIZE = 1024
       !----------------------------------------------------------------------------------!

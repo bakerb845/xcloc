@@ -387,7 +387,7 @@ MODULE XCLOC_SPXC
          DO i=1,nCoeffs_
             hfiltR64f_(i) = 0.d0
             IF (i == (nCoeffs_+1)/2) hfiltR64f_(i) = 1.d0
-            IF (MOD(i, 2) == 1)      hfiltI64f_(i) = 0.d0
+            IF (MOD(i, 2) == 0)      hfiltI64f_(i) = 0.d0
          ENDDO
          ALLOCATE(hfiltR32f_(nCoeffs_)); hfiltR32f_(:) = SNGL(hfiltR64f_(:))
          ALLOCATE(hfiltI32f_(nCoeffs_)); hfiltI32f_(:) = SNGL(hfiltI64f_(:))
@@ -398,7 +398,7 @@ MODULE XCLOC_SPXC
          ALLOCATE(nzImIndices_(nnzImCoeffs_))
          nzReIndices_(1) = (nCoeffs_+1)/2
          DO i=1,nnzImCoeffs_
-            nzImIndices_(i) = 2*(i - 1) + 2
+            nzImIndices_(i) = 2*(i - 1) + 1
          ENDDO
          ALLOCATE(sparseHfiltR64f_(nnzReCoeffs_))
          ALLOCATE(sparseHfiltI64f_(nnzImCoeffs_))

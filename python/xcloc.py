@@ -507,7 +507,7 @@ class spxc:
         else:
             if (ftype != xcloc.XCLOC_SPXC_DONOT_FILTER):
                 print("Invalid filter type")
-                return -1 
+                return -1
         ierr = c_int(1)
         self.lib.xcloc_spxc_initialize(n, ftype, ierr)
         ierr = ierr.value
