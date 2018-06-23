@@ -2,7 +2,6 @@ CMAKE_MINIMUM_REQUIRED(VERSION 2.8 FATAL_ERROR)
 PROJECT(xcloc)
 ENABLE_LANGUAGE(C)
 ENABLE_LANGUAGE(Fortran)
-#ENABLE_LANGUAGE(CXX)
 ENABLE_TESTING()
 
 #SET(CMAKE_C_COMPILER ${C_COMPILER}) #"icc")
@@ -43,9 +42,10 @@ SET(LIB_ALL ${SACIO_LIBRARY} ${ISCL_LIBRARY} ${MKL_LIBRARY} ${IPP_LIBRARY} ${XML
 
 ADD_SUBDIRECTORY(include)
 
-SET(SRC xcloc.c xcfft.c migrate.c h5ioGrid.c h5ioUtils.c xdmf.c)
-SET(SRC ${SRC} xcfftMPI.c migrateMPI.c)
-SET(SRC ${SRC} firFilter.c fdxc.F90 ipps.F90 constants.F90 memory.F90 spxc.F90
+#SET(SRC xcloc.c xcfft.c migrate.c h5ioGrid.c h5ioUtils.c xdmf.c)
+#SET(SRC ${SRC} xcfftMPI.c migrateMPI.c)
+SET(IO_SRC h5ioGrid.c h5ioUtils.c xdmf.c)
+SET(SRC ${IO_SRC} firFilter.c fdxc.F90 ipps.F90 constants.F90 memory.F90 spxc.F90
     xcloc.F90 dsmxc.F90 utils.F90)
 SET(SRC_MPI ${SRC} fdxcMPI.F90 dsmxcMPI.F90)
 IF (XCLOC_USE_MPI)
