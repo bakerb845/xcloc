@@ -62,7 +62,6 @@ void xcloc_dsmxc_finalize(void);
 /*----------------------------------------------------------------------------*/
 /* Initialize the frequency domain cross-correlation. */
 void xcloc_fdxc_initialize(const int npts,
-                           const int nsignals,
                            const int nptsPad,
                            const int nxcs,
                            const int xcPairs[],
@@ -111,8 +110,7 @@ void xcloc_fdxc_computeCrossCorrelograms(int *ierr);
 /*                     Signals Processing of Correlograms                     */
 /*----------------------------------------------------------------------------*/
 /* Initializes the correlogram filtering. */
-void xcloc_spxc_initialize(const int n, const int ftype,
-                           const int accuracy, int *ierr);
+void xcloc_spxc_initialize(const int n, const int ftype, int *ierr);
 /* Filters signals out of place. */
 void xcloc_spxc_filterXCsOutOfPlace64f(const int ldxc,
                                        const int nptsInXCs,

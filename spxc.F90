@@ -32,8 +32,8 @@ MODULE XCLOC_SPXC
       INTEGER(C_INT), PRIVATE, ALLOCATABLE, SAVE :: nzReIndices_(:)
       !> Non-zero indices (C indexed) of imaginary FIR coefficients.
       INTEGER(C_INT), PRIVATE, ALLOCATABLE, SAVE :: nzImIndices_(:)
-      !> Accuracy.
-      INTEGER(C_INT), PRIVATE, SAVE :: accuracy_ = XCLOC_HIGH_ACCURACY
+      !!> Accuracy.
+      !INTEGER(C_INT), PRIVATE, SAVE :: accuracy_ = XCLOC_HIGH_ACCURACY
       !> Filtering type.
       INTEGER(C_INT), PRIVATE, SAVE :: ftype_ = XCLOC_SPXC_DONOT_FILTER
       !> Number of filter coefficients.
@@ -76,11 +76,10 @@ MODULE XCLOC_SPXC
 !>    @param[in] ftype     XCLOC_SPXC_DONOT_FILTER will not filter correlograms.
 !>    @param[in] ftype     XCLOC_SPXC_ENVELOPE_FILTER will apply envelope to correlograms.
 !>    @param[in] ftype     XCLOC_SPXC_RMS_FILTER will comptue RMS of correlograms.
-!>    @param[in] accuracy  Controls the accuracy during the envelope computation.
 !>    @param[out] ierr     0 indicates success.
-      SUBROUTINE xcloc_spxc_initialize(n, ftype, accuracy, ierr) &
+      SUBROUTINE xcloc_spxc_initialize(n, ftype, ierr) &
       BIND(C, NAME='xcloc_spxc_initialize')
-      INTEGER(C_INT), VALUE, INTENT(IN) :: n, ftype, accuracy
+      INTEGER(C_INT), VALUE, INTENT(IN) :: n, ftype
       INTEGER(C_INT), INTENT(OUT) :: ierr
       ierr = 0
       IF (ftype == XCLOC_SPXC_DONOT_FILTER) THEN
@@ -96,11 +95,6 @@ MODULE XCLOC_SPXC
          IF (n == 1) THEN
             ftype_ = XCLOC_SPXC_DONOT_FILTER
             WRITE(*,901) 
-            RETURN
-         ENDIF
-         IF (.NOT.xcloc_constants_isValidAccuracy(accuracy)) THEN
-            WRITE(*,903)
-            ierr = 1
             RETURN
          ENDIF
          ! Require FIR filters have an odd number of coefficients for easy group delay
@@ -133,7 +127,6 @@ MODULE XCLOC_SPXC
       ENDIF
   900 FORMAT('xcloc_spxc_initialize: Number of filter coefficients must be posisitve')
   901 FORMAT('xcloc_spxc_initialize: nTaps=1; skipping filtering')
-  903 FORMAT('xcloc_spxc_initialize: Invalid accuracy')
   904 FORMAT('xcloc_spxc_initialize: Adding one filter coefficient')
   905 FORMAT('xcloc_spxc_initialize: Invalid filter type', I4)
   906 FORMAT('xcloc_spxc_initialize: Error designing Hilbert transformer')
@@ -319,7 +312,6 @@ MODULE XCLOC_SPXC
       nImCoeffs_ = 0
       nCoeffs_ = 0
       nOrder_ = 0
-      accuracy_ = XCLOC_HIGH_ACCURACY
       ftype_ = XCLOC_SPXC_DONOT_FILTER
       RETURN
       END
