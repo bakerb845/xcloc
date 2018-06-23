@@ -4,3 +4,4 @@ xcloc is a [multilateration](https://en.wikipedia.org/wiki/Multilateration)-base
 
 1. An overview of this algorithm is described [here](https://github.com/bakerb845/xcloc/wiki/Building-the-Software).
 2. The build instructions are described [here](https://github.com/bakerb845/xcloc/wiki/Building-the-Software).
+3. The Python bindings are described [here](https://github.com/bakerb845/xcloc/wiki/Python-Bindings).
