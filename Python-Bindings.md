@@ -1,0 +1,3 @@
+# Python
+
+Python3 bindings are beginning to be made available.  This uses ctypes to call the underlying Fortran library.  Stay tuned for examples...
