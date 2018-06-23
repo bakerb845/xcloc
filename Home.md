@@ -33,7 +33,6 @@ I typically find it useful to generate a configuration script like the one below
 
     #!/bin/sh
     export CC=/opt/intel/bin/icc
-    export CXX=/opt/intel/bin/icpc
     export FC=/opt/intel/bin/ifort
     export F90=/opt/intel/bin/ifort
     export MKL_LIB_ROOT=/opt/intel/mkl/lib/intel64
@@ -48,10 +47,8 @@ I typically find it useful to generate a configuration script like the one below
     cmake ./ \
     -DCMAKE_INSTALL_PREFIX=./ \
     -DCMAKE_C_COMPILER=icc \
-    -DCMAKE_CXX_COMPILER=icpc \
     -DCMAKE_Fortran_COMPILER=ifort \
     -DCMAKE_C_FLAGS="-g -O2 -xCORE-AVX2 -std=c11 -qopenmp -Wall -Wcomment -Wunused -Wcheck -qopt-report=5" \
-    -DCMAKE_CXX_FLAGS="-g -O2 -qopenmp -std=c++11 -Wall -Wcomment -Wunused -Wcheck -qopt-report=5" \
     -DCMAKE_Fortran_FLAGS="-g -O2 -qopenmp -W 1 -warn unused -align array64byte -qopt-report=4 -xHOST -nofor-main" \
     -DXCLOC_USE_MPI=TRUE \
     -DXCLOC_USE_INTEL=TRUE \
