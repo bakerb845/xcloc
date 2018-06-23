@@ -4,6 +4,7 @@
 MODULE XCLOC_IPPS
   INTEGER, PARAMETER :: ipp32f = 13
   INTEGER, PARAMETER :: ipp64f = 19
+  INTEGER, PARAMETER :: ippStsNoErr = 0
   INTERFACE
       !> @brief Converts a double array to a float array.
       !> @param[out] pSrc  Double precision source array.
@@ -52,6 +53,36 @@ MODULE XCLOC_IPPS
       IMPLICIT NONE
       INTEGER(C_INT), VALUE, INTENT(IN) :: tapsLen
       INTEGER(C_INT), INTENT(OUT) :: pSpecSize, pBufSize
+      END FUNCTION
+      !> @brief Comptues a Kaiser window
+      !> @param[in,out] kaiser  On input contains the points at which to compute the
+      !>                        Kaiser window.
+      !> @param[in,out] kaiser  On exit contains this is the Kaiser window.
+      !> @param[in] n           Number of elements in n.
+      !> @param[in] alpha       Controls shape of Kaiser window. 
+      !> @result 0 indicates success.
+      INTEGER(C_INT) FUNCTION ippsWinKaiser_64f_I(pSrcDst, n, alpha) &
+      BIND(C, NAME='ippsWinKaiser_64f_I')
+      USE ISO_C_BINDING
+      IMPLICIT NONE
+      INTEGER(C_INT), VALUE, INTENT(IN) :: n 
+      REAL(C_DOUBLE), VALUE, INTENT(IN) :: alpha
+      REAL(C_DOUBLE), INTENT(INOUT) :: pSrcDst(n) 
+      END FUNCTION
+      !> @brief Comptues a Kaiser window
+      !> @param[in,out] kaiser  On input contains the points at which to compute the
+      !>                        Kaiser window.
+      !> @param[in,out] kaiser  On exit contains this is the Kaiser window.
+      !> @param[in] n           Number of elements in n.
+      !> @param[in] alpha       Controls shape of Kaiser window. 
+      !> @result 0 indicates success.
+      INTEGER(C_INT) FUNCTION ippsWinKaiser_32f_I(pSrcDst, n, alpha) &
+      BIND(C, NAME='ippsWinKaiser_32f_I')
+      USE ISO_C_BINDING
+      IMPLICIT NONE
+      INTEGER(C_INT), VALUE, INTENT(IN) :: n
+      REAL(C_FLOAT), VALUE, INTENT(IN) :: alpha
+      REAL(C_FLOAT), INTENT(INOUT) :: pSrcDst(n)
       END FUNCTION
 
    END INTERFACE

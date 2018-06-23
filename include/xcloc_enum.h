@@ -29,6 +29,13 @@ enum xclocAccuracy_enum
                                       highest performance. */
 };
 
+enum xclocXCFilterType_enum
+{
+    XCLOC_SPXC_DONOT_FILTER = 0,    /*!< Do not filter the correlograms. */
+    XCLOC_SPXC_ENVELOPE_FILTER = 1, /*!< Compute envelope of correlograms. */
+    XCLOC_SPXC_RMS_FILTER = 2 /*!< Compute RMS Filter of correlograms. */
+};
+
 
 
 #endif

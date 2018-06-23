@@ -107,6 +107,36 @@ void xcloc_fdxc_computePhaseCorrelograms(int *ierr);
 /* Computes the cross-correlograms. */
 void xcloc_fdxc_computeCrossCorrelograms(int *ierr);
 
+/*----------------------------------------------------------------------------*/
+/*                     Signals Processing of Correlograms                     */
+/*----------------------------------------------------------------------------*/
+/* Initializes the correlogram filtering. */
+void xcloc_spxc_initialize(const int n, const int ftype,
+                           const int accuracy, int *ierr);
+/* Filters signals out of place. */
+void xcloc_spxc_filterXCsOutOfPlace64f(const int ldxc,
+                                       const int nptsInXCs,
+                                       const int nxcs,
+                                       const double xcs[], double xcsFilt[],
+                                       int *ierr);
+void xcloc_spxc_filterXCsOutOfPlace32f(const int ldxc,
+                                       const int nptsInXCs,
+                                       const int nxcs,
+                                       const float xcs[], float xcsFilt[],
+                                       int *ierr);
+/* Filters signals in place. */
+void xcloc_spxc_filterXCsInPlace64f(const int ldxc,
+                                    const int nptsInXCs,
+                                    const int nxcs,
+                                    double xcs[],
+                                    int *ierr);
+void xcloc_spxc_filterXCsInPlace32f(const int ldxc,
+                                    const int nptsInXCs,
+                                    const int nxcs,
+                                    float xcs[],
+                                    int *ierr);
+/* Finalizes the correlogram filtering. */
+void xcloc_spxc_finalize(void);
 
 #ifdef __cplusplus
 }

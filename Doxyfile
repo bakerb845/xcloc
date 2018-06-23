@@ -782,7 +782,6 @@ WARN_LOGFILE           =
 # Note: If this tag is empty the current directory is searched.
 
 INPUT                  = ./xcloc.c \
-                         ./xcfft.c \
                          ./fdxc.F90 \
                          ./fdxcMPI.F90 \
                          ./dsmxc.F90 \
@@ -793,11 +792,6 @@ INPUT                  = ./xcloc.c \
                          ./spxc.F90 \
                          ./firFilter.c \
                          ./xcloc.F90 \
-                         ./envelope.c \
-                         ./migrate.c \
-                         ./migrateMPI.c \
-                         ./xcfftMPI.c \
-                         ./rmsFilter.c \
                          ./h5io.c \
                          ./xdmf.c \
                          ./include/xcloc.h \

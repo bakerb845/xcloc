@@ -105,8 +105,8 @@ int test_serial_dsmLocation(void)
     fprintf(stdout, "%s: Computing correlograms...\n", __func__); 
     int nsignals = nrec;
     int verbose = 0;
-    int prec = 0;
-    int accuracy = 0;
+    int prec = XCLOC_SINGLE_PRECISION; //0;
+    int accuracy = XCLOC_HIGH_ACCURACY; //0;
     bool ldoAutoCorrs = false;
     int nwork =-1; 
     int nxcs;
@@ -134,7 +134,28 @@ int test_serial_dsmLocation(void)
     xcloc_fdxc_getCorrelogramLength(&nptsInXCs, &ierr);
     CHKERR(ierr, "failed to get number of points in xcs");
     double *xcs = (double *) calloc((size_t) (nxcs*nptsInXCs), sizeof(double));
+float *xcs32 = (float *) calloc((size_t) (nxcs*nptsInXCs), sizeof(float));
     xcloc_fdxc_getCorrelograms64f(nptsInXCs, nxcs, xcs, &ierr);
+xcloc_fdxc_getCorrelograms32f(nptsInXCs, nxcs, xcs32, &ierr);
+    //------------------------Filter the Correlograms-------------------------//
+    int nTaps = 301;
+    int ftype = XCLOC_SPXC_ENVELOPE_FILTER;
+    xcloc_spxc_initialize(nTaps, ftype, accuracy, &ierr);
+double *xcsFilt = (double *) calloc((size_t) (nxcs*nptsInXCs), sizeof(double));
+    xcloc_spxc_filterXCsOutOfPlace64f(nptsInXCs, nptsInXCs, nxcs,
+                                      xcs, xcsFilt, &ierr);
+float *xcsFilt32 = (float *) calloc((size_t) (nxcs*nptsInXCs), sizeof(float));
+    xcloc_spxc_filterXCsOutOfPlace32f(nptsInXCs, nptsInXCs, nxcs,
+                                      xcs32, xcsFilt32, &ierr);
+FILE *fl = fopen("envelope.txt", "w");
+for (int i=0; i<nptsInXCs; i++)
+{
+ int j = i;
+ fprintf(fl, "%f %e %e %e\n", (i-nptsInXCs/2)*dt, xcs32[j], xcsFilt32[j], xcsFilt[j]);
+}
+fclose(fl);
+    xcloc_spxc_finalize();
+//  return 0;
     //---------------------------Compute the DSM------------------------------//
     fprintf(stdout, "%s: Initializing DSM...\n", __func__);
     int nxcPairs = nxcs;
@@ -152,7 +173,7 @@ int test_serial_dsmLocation(void)
     } 
     free(ttable);
     fprintf(stdout, "%s: Setting observations...\n", __func__);
-    xcloc_dsmxc_setCorrelograms64f(nptsInXCs, nptsInXCs, nxcs, xcs, &ierr);
+    xcloc_dsmxc_setCorrelograms64f(nptsInXCs, nptsInXCs, nxcs, xcsFilt, &ierr);
     fprintf(stdout, "%s: Computing dsm...\n", __func__);
     xcloc_dsmxc_compute(&ierr);
     CHKERR(ierr, "failed to compute dsm");
@@ -179,6 +200,8 @@ fclose(ftemp);
     free(xcs);
     free(obs);
     free(xr);
+    free(xcsFilt);
+    free(xcsFilt32);
     return EXIT_SUCCESS;
 }
 

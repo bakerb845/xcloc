@@ -1,4 +1,4 @@
-!> @brief Differential stack migration of cross-correlograms.
+!> @brief Diffraction stack migration of cross-correlograms.
 !> @author Ben Baker
 !> @copyright Ben Baker distributed the MIT license.
 MODULE XCLOC_DSMXC

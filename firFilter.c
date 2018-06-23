@@ -5,6 +5,7 @@
 #include <ipps.h>
 #include <mkl.h>
 
+/*
 int ippsFIRSRGetSize_finter64f(int tapsLen, int *pSpecSize, int *pBufSize)
 {
     IppStatus status;
@@ -28,12 +29,222 @@ int ippsFIRSRGetSize_finter32f(int tapsLen, int *pSpecSize, int *pBufSize)
     }
     return 0;  
 }
+*/
+
+int xcloc_firFilter_envelope64f(const int lds,
+                                const int npts,
+                                const int nsignals,
+                                const int nReCoeffs,
+                                const double reCoeffs[],
+                                const int nImCoeffs,
+                                const double imCoeffs[],
+                                double x[])
+{
+    if (nsignals == 0 || npts == 0){return 0;} // Nothing to do
+    if (x == NULL || reCoeffs == NULL || imCoeffs == NULL)
+    {
+        if (x == NULL){fprintf(stderr, "%s: x is NULL\n", __func__);}
+        if (reCoeffs == NULL)
+        {
+             fprintf(stderr, "%s: reCoeffs is NULL\n", __func__);
+        }
+        if (imCoeffs == NULL)
+        {
+             fprintf(stderr, "%s: imCoeffs is NULL\n", __func__);
+        }
+        return -1;
+    }
+    if (nReCoeffs < 0)
+    {
+        fprintf(stderr, "%s: This doesn't makse sense\n", __func__);
+        return -1;
+    }
+    if (lds < npts)
+    {
+        fprintf(stderr, "%s: lds = %d < npts = %d\n", __func__, lds, npts);
+        return -1;
+    }
+    int winLen, winLen2;
+    winLen = nImCoeffs;
+    winLen2 = winLen/2;
+    // Begin the parallel computation 
+    #pragma omp parallel default(none) \
+     shared(imCoeffs, x) \
+     firstprivate(winLen, winLen2)
+    {
+    int filterLen = npts + winLen2;
+    Ipp64f *xmean = NULL;
+    Ipp64f *yfiltIm = NULL;
+    Ipp8u *pBufIm = NULL;
+    IppsFIRSpec_64f *pSpecIm = NULL;
+    int bufSizeIm, is, specSizeIm;
+    // Initialize the FIR filter
+    ippsFIRSRGetSize(nImCoeffs, ipp64f, &specSizeIm, &bufSizeIm);
+    pSpecIm = (IppsFIRSpec_64f *) ippsMalloc_8u(specSizeIm);
+    pBufIm = ippsMalloc_8u(bufSizeIm);
+    ippsFIRSRInit_64f(imCoeffs, nImCoeffs, ippAlgAuto, pSpecIm);
+    // Set the workspace
+    xmean   = ippsMalloc_64f(filterLen);
+    yfiltIm = ippsMalloc_64f(filterLen);
+    ippsZero_64f(xmean,   filterLen);
+    ippsZero_64f(yfiltIm, filterLen);
+    // Loop on signals
+    #pragma omp for
+    for (is=0; is<nsignals; is++)
+    {
+        // Demean the signal
+        double pMean;
+        int indx = is*lds;
+        ippsMean_64f(&x[indx], npts, &pMean);
+        ippsSubC_64f(&x[indx], pMean, xmean, npts);
+        // The real part of the FIR filter is just a delay of winLen/2 samples
+        //ippsCopy_64f(xmean32, &yfiltRe[winLen2], npts);
+        // Imaginary filtering
+        ippsFIRSR_64f(xmean, yfiltIm, filterLen, pSpecIm, NULL, NULL, pBufIm);
+        Ipp64f* ptrRe = (Ipp64f *) &xmean[0]; 
+        Ipp64f* ptrIm = (Ipp64f *) &yfiltIm[winLen2];
+        // Compute the absolute value of the Hilbert transform.  Note, 
+        // winLen2 removes the phase shift
+        ippsMagnitude_64f(ptrRe, ptrIm, xmean, npts);
+        // Reincorporate the mean into the signal
+        ippsAddC_64f(xmean, pMean, &x[indx], npts); 
+    }
+    if (xmean != NULL){ippsFree(xmean);}
+    if (yfiltIm != NULL){ippsFree(yfiltIm);}
+    if (pSpecIm != NULL){ippsFree(pSpecIm);}
+    if (pBufIm  != NULL){ippsFree(pBufIm);}
+    } // End parallel
+    return 0;
+}
 
 /*!
+ */
+int xcloc_firFilter_envelope32f(const int lds,
+                                const int npts,
+                                const int nsignals,
+                                const int nnzReCoeffs,
+                                const int nzReCoeffs[],
+                                const float reCoeffs[],
+                                const int nnzImCoeffs,
+                                const int nzImCoeffs[],
+                                const float imCoeffs[],
+                                float x[])
+{
+    if (nsignals == 0 || npts == 0){return 0;} // Nothing to do
+    if (x == NULL || nzReCoeffs == NULL || nzImCoeffs == NULL ||
+        reCoeffs == NULL || imCoeffs == NULL)
+    {
+        if (x == NULL){fprintf(stderr, "%s: x is NULL\n", __func__);}
+        if (nzReCoeffs == NULL)
+        {
+             fprintf(stderr, "%s: nzReCoeffs is NULL\n", __func__);
+        }
+        if (nzImCoeffs == NULL)
+        {
+             fprintf(stderr, "%s: nzImCoeffs is NULL\n", __func__);
+        }
+        if (reCoeffs == NULL)
+        {
+             fprintf(stderr, "%s: reCoeffs is NULL\n", __func__);
+        }
+        if (imCoeffs == NULL)
+        {
+             fprintf(stderr, "%s: imCoeffs is NULL\n", __func__);
+        }
+        return -1;
+    }
+    if (lds < npts)
+    {
+        fprintf(stderr, "%s: lds = %d < npts = %d\n", __func__, lds, npts);
+        return -1; 
+    }
+    if (nnzReCoeffs != 1)
+    {
+        fprintf(stderr, "%s: More general case not yet considered\n", __func__);
+        return -1;
+    }
+    if (nnzImCoeffs < 1)
+    {
+        fprintf(stderr, "%s: No imaginary filter taps!\n", __func__);
+        return -1;
+    }
+    int winLen, winLen2;
+    ippsMax_32s(nzImCoeffs, nnzImCoeffs, &winLen);
+    winLen2 = winLen/2;
+    // Begin the parallel computation
+    #pragma omp parallel default(none) \
+     shared(imCoeffs, nzImCoeffs, stderr, x) \
+     firstprivate(winLen, winLen2)
+    {
+    IppStatus status;
+    int filterLen = npts + winLen2;
+    int bSizeIm, is;
+    int orderIm = nnzImCoeffs - 1; 
+    Ipp8u *pBufIm = NULL;
+    Ipp32f *xmean = NULL;
+    Ipp32f *yfiltIm = NULL;
+    IppsFIRSparseState_32f *ppStateIm = NULL;
+    status = ippsFIRSparseGetStateSize_32f(nnzImCoeffs, orderIm, &bSizeIm);
+    if (status != ippStsNoErr)
+    {   
+        fprintf(stderr, "%s: Error getting state size\n", __func__);
+        goto ERROR;
+    }
+    pBufIm = ippsMalloc_8u(2*bSizeIm); // Seems to underestimate!
+    //ppStateIm = (IppsFIRSparseState_32f *) ippsMalloc_8u(bSizeIm);
+    status = ippsFIRSparseInit_32f(&ppStateIm,
+                                   imCoeffs,
+                                   nzImCoeffs,
+                                   nnzImCoeffs,
+                                   NULL, pBufIm);
+    if (status != ippStsNoErr)
+    {
+        fprintf(stderr, "%s: Error initializing sparse filter\n", __func__);
+        goto ERROR;
+    }
+    xmean   = ippsMalloc_32f(filterLen);
+    yfiltIm = ippsMalloc_32f(filterLen); 
+    ippsZero_32f(xmean,   filterLen);
+    ippsZero_32f(yfiltIm, filterLen);
+    // Loop on signals
+    for (is=0; is<nsignals; is++)
+    {
+        // Demean the signal
+        float pMean;
+        int indx = is*lds;
+        ippsMean_32f(&x[indx], npts, &pMean, ippAlgHintFast);//Accurate);
+        ippsSubC_32f(&x[indx], pMean, xmean, npts);
+        // The real part of the FIR filter is just a delay of winLen/2 samples
+        //ippsCopy_32f(xmean32, &yfiltRe[winLen2], npts);
+        // Imaginary filtering
+        ippsFIRSparse_32f(xmean, yfiltIm, filterLen, ppStateIm);
+        Ipp32f* ptrRe = (Ipp32f *) &xmean[0];
+        Ipp32f* ptrIm = (Ipp32f *) &yfiltIm[winLen2];
+        // Compute the absolute value of the Hilbert transform.  Note, 
+        // winLen2 removes the phase shift
+        ippsMagnitude_32f(ptrRe, ptrIm, xmean, npts);
+        // Reincorporate the mean into the signal
+        ippsAddC_32f(xmean, pMean, &x[indx], npts); 
+    }
+ERROR:;
+    if (pBufIm != NULL)
+    {
+        ippsFree(pBufIm);
+        pBufIm = NULL;
+    }
+    if (xmean != NULL){ippsFree(xmean);}
+    if (yfiltIm != NULL){ippsFree(yfiltIm);}
+    //if (ppStateIm != NULL){ippsFree(ppStateIm);}
+    //omp_barrier();
+    }
+
+    return 0;
+}
+/*!
  * @brief Applies the RMS filter to the signals.
- * @param[in] nsignals   Number of signals to filter.
  * @param[in] lds        Leading dimension of signals.  This must be >= npts.
  * @param[in] npts       Number of points in each signal.
+ * @param[in] nsignals   Number of signals to filter.
  * @param[in] tapsLen    Number of filter coefficients.  This will be odd.
  * @param[in] taps       The FIR filter coefficients for computing the runinng
  *                       average.  This has dimension [tapsLen].
@@ -44,21 +255,19 @@ int ippsFIRSRGetSize_finter32f(int tapsLen, int *pSpecSize, int *pBufSize)
  * @result 0 indicates success.
  * @copyright Ben Baker distributed under the MIT license.
  */
-int xcloc_firFilter_rmsFilter64f(const int nsignals,
-                                 const int lds,
+int xcloc_firFilter_rmsFilter64f(const int lds,
                                  const int npts,
+                                 const int nsignals,
                                  const int tapsLen,
                                  const double taps[],
-                                 const double x[],
-                                 double xfilt[])
+                                 double x[])
 {
     int filterLen, is, pBufSize, pSpecSize, winLen2;
     IppStatus status;
     if (nsignals == 0 || npts == 0){return 0;} // Nothing to do
-    if (x == NULL || xfilt == NULL)
+    if (x == NULL)
     {
         if (x == NULL){fprintf(stderr, "%s: x is NULL\n", __func__);}
-        if (xfilt == NULL){fprintf(stderr, "%s: xfilt is NULL\n", __func__);}
         return -1;
     }
     if (lds < npts)
@@ -76,7 +285,7 @@ int xcloc_firFilter_rmsFilter64f(const int nsignals,
         return -1; 
     }
     #pragma omp parallel default(none) \
-     shared(nsignals, pBufSize, pSpecSize, x, xfilt, taps), \
+     shared(nsignals, pBufSize, pSpecSize, x, taps), \
      private(is) \
      firstprivate(filterLen, tapsLen, winLen2)
     {
@@ -110,7 +319,7 @@ int xcloc_firFilter_rmsFilter64f(const int nsignals,
         // the first winLen2 elements. 
         ippsSqrt_64f_I(&xwork[winLen2], npts);
         // Undo the scaling
-        ippsMulC_64f(xwork, pMaxAbs, &xfilt[indx], npts);
+        ippsMulC_64f(xwork, pMaxAbs, &x[indx], npts);
     }
     // Release memory    
     ippsFree(pBuf);
@@ -124,9 +333,9 @@ int xcloc_firFilter_rmsFilter64f(const int nsignals,
 }
 /*!
  * @brief Applies the RMS filter to the signals.
- * @param[in] nsignals   Number of signals to filter.
  * @param[in] lds        Leading dimension of signals.  This must be >= npts.
  * @param[in] npts       Number of points in each signal.
+ * @param[in] nsignals   Number of signals to filter.
  * @param[in] tapsLen    Number of filter coefficients.  This will be odd.
  * @param[in] taps       The FIR filter coefficients for computing the runinng
  *                       average.  This has dimension [tapsLen].
@@ -138,9 +347,9 @@ int xcloc_firFilter_rmsFilter64f(const int nsignals,
  * @ingroup xcloc_spxc
  * @copyright Ben Baker distributed under the MIT license.
  */
-int xcloc_firFilter_rmsFilter32f(const int nsignals,
-                                 const int lds,
+int xcloc_firFilter_rmsFilter32f(const int lds,
                                  const int npts,
+                                 const int nsignals,
                                  const int tapsLen,
                                  const float taps[],
                                  float x[])

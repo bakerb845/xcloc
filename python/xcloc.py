@@ -48,12 +48,12 @@ class xcloc:
         # Load the library
         lfound = False
         for path in xcloc_path:
-            xcloc_path = os.path.join(path, xcloc_library)
-            if (os.path.isfile(xcloc_path)):
+            xcloc_lib = os.path.join(path, xcloc_library)
+            if (os.path.isfile(xcloc_lib)):
                 lfound = True
                 break
         if (lfound):
-            xcloc_lib = cdll.LoadLibrary(xcloc_path)
+            xcloc_lib = cdll.LoadLibrary(xcloc_lib)
         else:
             print("Couldn't find libxcloc") 
             return
