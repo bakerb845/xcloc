@@ -35,37 +35,46 @@ I typically find it useful to generate a configuration script like the one below
     export CC=/opt/intel/bin/icc
     export CXX=/opt/intel/bin/icpc
     export FC=/opt/intel/bin/ifort
+    export F90=/opt/intel/bin/ifort
+    export MKL_LIB_ROOT=/opt/intel/mkl/lib/intel64
+    export IPP_LIB_ROOT=/opt/intel/ipp/lib/intel64
+    if [ -f Makefile]; then
+       make clean
+    fi
     if [ -f CMakeCache.txt ]; then
-      echo "Removing CMakeCache.txt"
-      rm CMakeCache.txt
+       echo "Removing CMakeCache.txt"
+       rm CMakeCache.txt
     fi
     cmake ./ \
     -DCMAKE_INSTALL_PREFIX=./ \
     -DCMAKE_C_COMPILER=icc \
     -DCMAKE_CXX_COMPILER=icpc \
     -DCMAKE_Fortran_COMPILER=ifort \
-    -DCMAKE_C_FLAGS="-g3 -O2 -xCORE-AVX2 -std=c11 -qopenmp -Wall -Wcomment -Wunused -Wcheck -qopt-report=5" \
-    -DCMAKE_CXX_FLAGS="-g3 -O2 -qopenmp -std=c++11 -Wall -Wcomment -Wunused -Wcheck -qopt-report=5" \
-    -DCMAKE_Fortran_FLAGS="-g3 -O -qopenmp -WB -W 1 -warn unused -align array64byte -qopt-report=4 -xHOST -nofor-main" \
+    -DCMAKE_C_FLAGS="-g -O2 -xCORE-AVX2 -std=c11 -qopenmp -Wall -Wcomment -Wunused -Wcheck -qopt-report=5" \
+    -DCMAKE_CXX_FLAGS="-g -O2 -qopenmp -std=c++11 -Wall -Wcomment -Wunused -Wcheck -qopt-report=5" \
+    -DCMAKE_Fortran_FLAGS="-g -O2 -qopenmp -W 1 -warn unused -align array64byte -qopt-report=4 -xHOST -nofor-main" \
     -DXCLOC_USE_MPI=TRUE \
     -DXCLOC_USE_INTEL=TRUE \
     -DXCLOC_PROFILE=TRUE \
     -DMKL_INCLUDE_DIR=/opt/intel/mkl/include \
-    -DMKL_LIBRARY="/opt/intel/mkl/lib/intel64_lin/libmkl_intel_lp64.so;/opt/intel/mkl/lib/intel64_lin/libmkl_sequential.so;/opt/intel/mkl/lib/intel64_lin/libmkl_core.so" \
+    -DMKL_LIBRARY="${MKL_LIB_ROOT}/libmkl_intel_lp64.so;${MKL_LIB_ROOT}/libmkl_sequential.so;${MKL_LIB_ROOT}/libmkl_core.so;${MKL_LIB_ROOT}/libmkl_vv
+ml_avx2.so;${MKL_LIB_ROOT}/libmkl_avx2.so" \
     -DIPP_INCLUDE_DIR=/opt/intel/ipp/include \
-    -DIPP_LIBRARY="/opt/intel/ipp/lib/intel64_lin/libipps.so;/opt/intel/ipp/lib/intel64_lin/libippvm.so;/opt/intel/ipp/lib/intel64_lin/libippcore.so" \
+    -DIPP_LIBRARY="${IPP_LIB_ROOT}/libipps.so;${IPP_LIB_ROOT}/libippvm.so;${IPP_LIB_ROOT}/libippcore.so" \
     -DMPI_C_INCLUDE_PATH=/opt/intel/impi/2018.0.128/include64 \
-    -DMPI_C_LIBRARIES=/opt/intel/impi/2018.0.128/lib64/libmpi.so \
+    -DMPI_C_LIBRARIES="/opt/intel/impi/2018.0.128/lib64/libmpi.so" \
+    -DMPI_Fortran_INCLUDE_PATH=/opt/intel/impi/2018.1.163/include64 \
+    -DMPI_Fortran_LIBRARIES="/opt/intel/impi/2018.0.128/lib64/libmpifort.so" \
     -DH5_C_INCLUDE_DIR=/home/bakerb25/C/hdf5-1.10.1_intel/include \
     -DH5_LIBRARY=/home/bakerb25/C/hdf5-1.10.1_intel/lib/libhdf5.so \
     -DSACIO_INCLUDE_DIR=/home/bakerb25/C/sacio/include \
     -DSACIO_LIBRARY=/home/bakerb25/C/sacio/lib/libsacio_shared.so \
-    -DISCL_LIBRARY=/home/bakerb25/C/libiscl/lib/libiscl_shared.so \
-    -DISCL_INCLUDE_DIR=/home/bakerb25/C/libiscl/include \
+    -DISCL_LIBRARY=/home/bakerb25/C/iscl/lib/libiscl_shared.so \
+    -DISCL_INCLUDE_DIR=/home/bakerb25/C/iscl/include \
     -DXML2_INCLUDE_DIR=/usr/include/libxml2 \
     -DXML2_LIBRARY=/usr/lib/x86_64-linux-gnu/libxml2.so \
     -DINIPARSER_INCLUDE_DIR=/home/bakerb25/C/iniparser/src \
-    -DINIPARSER_LIBRARY=/home/bakerb25/C/iniparser/libiniparser.a \
+    -DINIPARSER_LIBRARY=/home/bakerb25/C/iniparser/libiniparser.so.1 \
     -DADVISOR_INCLUDE_DIR=/opt/intel/advisor/include
 
 and run it in the root source directory.  After CMake has been successfully configured one then simply types
