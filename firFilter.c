@@ -3,34 +3,28 @@
 #include <string.h>
 #include <math.h>
 #include <ipps.h>
-#include <mkl.h>
 
-/*
-int ippsFIRSRGetSize_finter64f(int tapsLen, int *pSpecSize, int *pBufSize)
-{
-    IppStatus status;
-    status = ippsFIRSRGetSize(tapsLen, ipp64f, pSpecSize, pBufSize);
-    if (status != ippStsNoErr)
-    {
-        fprintf(stderr, "%s: Error getting state size\n", __func__);
-        return -1;
-    }
-    return 0;  
-}
-
-int ippsFIRSRGetSize_finter32f(int tapsLen, int *pSpecSize, int *pBufSize)
-{
-    IppStatus status;
-    status = ippsFIRSRGetSize(tapsLen, ipp32f, pSpecSize, pBufSize);
-    if (status != ippStsNoErr)
-    {
-        fprintf(stderr, "%s: Error getting state size\n", __func__);
-        return -1;
-    }
-    return 0;  
-}
-*/
-
+/*!
+ * @brief Computes the envelope of a set of signals.  It is assumed that the
+ *        Hilbert transformer is a Type III FIR filter.
+ * @param[in] lds        Leading dimension of signals.  This must be at least npts.
+ * @param[in] npts       Number of points in signals.
+ * @param[in] nsignals   Number of signals.
+ * @param[in] nReCoeffs  Number of real FIR coefficients.
+ * @param[in] reCoeffs   Real coefficients.  This is unity at nReCoeffs/2
+ *                       and 0 elsewhere.  This has dimension [nReCoeffs].
+ * @param[in] nImCoeffs  Number of imaginary FIR coefficients.
+ * @param[in] imCoeffs   Imaginary coefficients.  Every other point is 0.
+ *                       This has dimension [nImCoeffs].
+ * @param[in,out] x      On input this is an [lds x nsignals] array containing
+ *                       the signals to filter.
+ * @param[in,out] x      On exit the envelope of the signals have been computed.
+ * @result 0 indicates success.
+ * @author Ben Baker
+ * @copyright Ben Baker distributed under the MIT license.
+ * @bug Currently IPP doesn't have a double flavor for the FIR filter so 
+ *      the full Hilbert transformer must be specified.
+ */
 int xcloc_firFilter_envelope64f(const int lds,
                                 const int npts,
                                 const int nsignals,
@@ -118,6 +112,30 @@ int xcloc_firFilter_envelope64f(const int lds,
 }
 
 /*!
+ * @brief Computes the envelope of a set of signals.  It is assumed that the
+ *        Hilbert transformer is a Type III FIR filter.
+ * @param[in] lds          Leading dimension of signals.  This must be at least
+ *                         npts.
+ * @param[in] npts         Number of points in signals.
+ * @param[in] nsignals     Number of signals.
+ * @param[in] nnzReCoeffs  Number of non-zero real coefficients.  This
+ *                         should be 1.
+ * @param[in] nzReCoeffs   Indices of sparse filter that are non-zeros.  This
+ *                         is an array of dimension [nnzReCoeffs].
+ * @param[in] reCoeffs     Real coefficients of sparse FIR filter.  This
+ *                         is an array of dimension [nnzReCoeffs].
+ * @param[in] nnzImCoeffs  Number of non-zero imaginary coefficients.
+ * @param[in] nzImCoeffs   Indices of sparse filter that are non-zeros.  This
+ *                         is an array of dimension [nnzImCoeffs].
+ * @param[in] imCoeffs     Imaginary coefficients of sparse FIR filter.  This
+ *                         is an array of dimension [nnzImCoeffs].
+ * @param[in,out] x        On input this is an [lds x nsignals] array containing
+ *                         the signals to filter.
+ * @param[in,out] x        On exit the envelope of the signals have been
+ *                         computed.
+ * @result 0 indicates success.
+ * @author Ben Baker
+ * @copyright Ben Baker distributed under the MIT license.
  */
 int xcloc_firFilter_envelope32f(const int lds,
                                 const int npts,
