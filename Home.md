@@ -57,7 +57,7 @@ I typically find it useful to generate a configuration script like the one below
     -DXCLOC_USE_INTEL=TRUE \
     -DXCLOC_PROFILE=TRUE \
     -DMKL_INCLUDE_DIR=/opt/intel/mkl/include \
-    -DMKL_LIBRARY="${MKL_LIB_ROOT}/libmkl_intel_lp64.so;${MKL_LIB_ROOT}/libmkl_sequential.so;${MKL_LIB_ROOT}/libmkl_core.so;${MKL_LIB_ROOT}/libmkl_vvml_avx2.so;${MKL_LIB_ROOT}/libmkl_avx2.so" \
+    -DMKL_LIBRARY="${MKL_LIB_ROOT}/libmkl_intel_lp64.so;${MKL_LIB_ROOT}/libmkl_sequential.so;${MKL_LIB_ROOT}/libmkl_core.so;${MKL_LIB_ROOT}/libmkl_vml_avx2.so;${MKL_LIB_ROOT}/libmkl_avx2.so" \
     -DIPP_INCLUDE_DIR=/opt/intel/ipp/include \
     -DIPP_LIBRARY="${IPP_LIB_ROOT}/libipps.so;${IPP_LIB_ROOT}/libippvm.so;${IPP_LIB_ROOT}/libippcore.so" \
     -DMPI_C_INCLUDE_PATH=/opt/intel/impi/2018.0.128/include64 \
