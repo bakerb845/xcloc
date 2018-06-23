@@ -20,10 +20,10 @@ To build it is required that one have
 - [libxml2](http://xmlsoft.org/) 
 - [iniparser](https://github.com/ndevilla/iniparser)
 
-Optionally, for compiling the unit tests, one much also build
+Optionally, for compiling the unit tests, one must also build
 
-- [libiscl](https://github.com/bakerb845/libiscl)
-- [sacio](https://github.com/bakerb845/sacio)
+- [ISCL](https://gitlab.isti.com/bbaker/iscl)
+- [SacIO](https://gitlab.isti.com/bbaker/sacio)
 
 However, these will eventually become project submodules and wrangled into the CMake.
 
