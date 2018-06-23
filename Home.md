@@ -117,15 +117,21 @@ It can be expedient to configure CMake with a script.  Though I sometimes have t
     -DINIPARSER_LIBRARY=/home/bakerb25/C/iniparser/libiniparser.so.1 \
     -DADVISOR_INCLUDE_DIR=/opt/intel/advisor/include
 
-and run it in the root source directory.  After CMake has been successfully configured one then simply types
+## Building
+
+After CMake has been successfully configured one then simply types
 
     make
 
-in the root source directory and
+in the root source directory to build the software.  To install the software one then types
 
     make install
 
-to install the library and executables.  If [Doxygen](http://www.stack.nl/~dimitri/doxygen/) is available then the developer level documentation can be built by specifying
+in the root source directory.  
+
+## Building the Developer Level Documentation
+
+If [Doxygen](http://www.stack.nl/~dimitri/doxygen/) is available then the developer level documentation can be built by specifying
 
     doxygen Doxyfile
 
