@@ -42,6 +42,12 @@ class xcloc:
        XCLOC_FORTRAN_NUMBERING  # Fortran numbering
     ) = map(int, range(2))
 
+    (
+       XCLOC_SPXC_DONOT_FILTER,    # No filtering
+       XCLOC_SPXC_ENVELOPE_FILTER, # Envelope of correlograms
+       XCLOC_SPXC_RMS_FILTER       # RMS filter of correlograms
+    ) = map(int, range(3))
+
     def __init__(self,
                  xcloc_path=os.environ['LD_LIBRARY_PATH'].split(os.pathsep),
                  xcloc_library='libxcloc_shared.so'):
@@ -67,12 +73,15 @@ class xcloc:
         self.utils = utils(xcloc_lib)
         self.fdxc = fdxc(xcloc_lib, self.utils)
         self.dsmxc = dsmxc(xcloc_lib)
+        self.spxc = spxc(xcloc_lib)
         self.lib = xcloc_lib
 
     def __exit__(self):
         self.fdxc.finalize()
         return
-
+####################################################################################################
+#                                              DSM XC                                              #
+####################################################################################################
 class dsmxc:
     """
     This class computes the diffraction stack migration image of the
@@ -109,7 +118,9 @@ class dsmxc:
 
         self.lib = xcloc_lib
         return
-
+####################################################################################################
+#                                            Utilities                                             #
+####################################################################################################
 class utils:
     """
     Generic utilities to help with using the library.
@@ -170,14 +181,15 @@ class utils:
         xcPairs = xcPairs.reshape([nxcs, 2], order='C') - 1 # C numbering
         return xcPairs
 
-
+####################################################################################################
+#                                            FDXC                                                  #
+####################################################################################################
 class fdxc:
     """
     This class computes cross-correlations in via the Fourier transform. 
     """
     def __init__(self, xcloc_lib, utils):
         xcloc_lib.xcloc_fdxc_initialize.argtypes = (c_int, # npts
-                                                    c_int, # nsignals
                                                     c_int, # nptsPad
                                                     c_int, # nxcs
                                                     POINTER(c_int), # xcPairs
@@ -289,10 +301,13 @@ class fdxc:
         xcPairsPtr = xcPairs.ctypes.data_as(POINTER(c_int))
         # Fire up the library
         ierr = c_int(1)
-        self.lib.xcloc_fdxc_initialize(npts, nsignals, nptsPad,
+        self.lib.xcloc_fdxc_initialize(npts, nptsPad,
                                        nxcs, xcPairsPtr,
                                        verbose,
                                        precision, accuracy, byref(ierr))
+        ierr = ierr.value
+        if (ierr != 0):
+            print("Failed to initialize cross-correlator")
         return ierr 
 
     def __getCorrelograms__(self):
@@ -420,6 +435,96 @@ class fdxc:
         #self.lib.xcloc_finalizeF()
         return
 
+####################################################################################################
+#                                    Signals Processing for XCs                                    #
+####################################################################################################
+
+class spxc:
+    """
+    This class helps filter the cross-correlograms prior to migration.
+    To mitigate deconstructive interface in the sidelobes due to an
+    imperfect velocity model it is useful to either compute an envelope
+    or RMS Filter of the correlograms prior to migration.
+    """
+    def __init__(self, xcloc_lib):
+        xcloc_lib.xcloc_spxc_initialize.argtypes = (c_int, # number of filter coefficients
+                                                    c_int, # filter type
+                                                    POINTER(c_int))
+        xcloc_lib.xcloc_spxc_filterXCsOutOfPlace64f.argtypes = (c_int, #ldxc
+                                                                c_int, #nptsInXCs
+                                                                c_int, #nxcs
+                                                                POINTER(c_double), # xcs
+                                                                POINTER(c_double), # xcsFilt
+                                                                POINTER(c_int))
+        xcloc_lib.xcloc_spxc_filterXCsOutOfPlace32f.argtypes = (c_int, #ldxc
+                                                                c_int, #nptsInXCs
+                                                                c_int, #nxcs
+                                                                POINTER(c_float), # xcs
+                                                                POINTER(c_float), # xcsFilt
+                                                                POINTER(c_int))
+        xcloc_lib.xcloc_spxc_filterXCsInPlace64f.argtypes = (c_int, #ldxc
+                                                             c_int, #nptsInXCs
+                                                             c_int, #nxcs
+                                                             POINTER(c_double), # xcs
+                                                             POINTER(c_int))
+        xcloc_lib.xcloc_spxc_filterXCsInPlace32f.argtypes = (c_int, #ldxc
+                                                             c_int, #nptsInXCs
+                                                             c_int, #nxcs
+                                                             POINTER(c_float), # xcs
+                                                             POINTER(c_int))
+        xcloc_lib.xcloc_spxc_finalize.argtypes = None
+        self.lib = xcloc_lib
+        return
+
+    def __exit__(self):
+        self.finalize()
+        return
+
+    def initialize(self,
+                   n=301,
+                   ftype=xcloc.XCLOC_SPXC_ENVELOPE_FILTER):
+        """
+        Initializes the module module that will filter the correlograms.
+
+        Inputs
+        ------
+        n : int
+           Number of filtering coefficients.  This must be an odd number.
+        ftype : int
+           The filtering type.  This can be none, an envelope, or an RMS filter.
+           If it is none, then the value of n does not matter.
+
+        Returns
+        -------
+        ierr : int
+           0 indicates success.
+        """ 
+        if (ftype == xcloc.XCLOC_SPXC_ENVELOPE_FILTER or
+            ftype == xcloc.XCLOC_SPXC_RMS_FILTER):
+            if (n%2 != 1):
+                print("Adding a point to the filter length")
+                n = n + 1
+        else:
+            if (ftype != xcloc.XCLOC_SPXC_DONOT_FILTER):
+                print("Invalid filter type")
+                return -1 
+        ierr = c_int(1)
+        self.lib.xcloc_spxc_initialize(n, ftype, ierr)
+        ierr = ierr.value
+        if (ierr != 0):
+            print("Failed to initialize spxc")
+        return ierr
+
+    def finalize(self):
+        """
+        Finalizes the filtering library.
+        """
+        self.lib.xcloc_spxc_finalize()
+        return
+
+####################################################################################################
+#                                         Unit tests                                               #
+####################################################################################################
 def unit_test(xcloc_path):
     xcloc = xcloc(xcloc_path=[xcloc_path])
     npts = 10     # Length of signal

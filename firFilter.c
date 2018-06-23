@@ -21,6 +21,7 @@
  * @param[in,out] x      On exit the envelope of the signals have been computed.
  * @result 0 indicates success.
  * @author Ben Baker
+ * @ingroup xcloc_spxc
  * @copyright Ben Baker distributed under the MIT license.
  * @bug Currently IPP doesn't have a double flavor for the FIR filter so 
  *      the full Hilbert transformer must be specified.
@@ -95,13 +96,13 @@ int xcloc_firFilter_envelope64f(const int lds,
         //ippsCopy_64f(xmean32, &yfiltRe[winLen2], npts);
         // Imaginary filtering
         ippsFIRSR_64f(xmean, yfiltIm, filterLen, pSpecIm, NULL, NULL, pBufIm);
-        Ipp64f* ptrRe = (Ipp64f *) &xmean[0]; 
+        Ipp64f* ptrRe = (Ipp64f *) &xmean[0];
         Ipp64f* ptrIm = (Ipp64f *) &yfiltIm[winLen2];
         // Compute the absolute value of the Hilbert transform.  Note, 
-        // winLen2 removes the phase shift
+        // winLen2 accounts for the phase shift
         ippsMagnitude_64f(ptrRe, ptrIm, xmean, npts);
         // Reincorporate the mean into the signal
-        ippsAddC_64f(xmean, pMean, &x[indx], npts); 
+        ippsAddC_64f(xmean, pMean, &x[indx], npts);
     }
     if (xmean != NULL){ippsFree(xmean);}
     if (yfiltIm != NULL){ippsFree(yfiltIm);}
@@ -135,6 +136,7 @@ int xcloc_firFilter_envelope64f(const int lds,
  *                         computed.
  * @result 0 indicates success.
  * @author Ben Baker
+ * @ingroup xcloc_spxc
  * @copyright Ben Baker distributed under the MIT license.
  */
 int xcloc_firFilter_envelope32f(const int lds,
@@ -239,7 +241,7 @@ int xcloc_firFilter_envelope32f(const int lds,
         Ipp32f* ptrRe = (Ipp32f *) &xmean[0];
         Ipp32f* ptrIm = (Ipp32f *) &yfiltIm[winLen2];
         // Compute the absolute value of the Hilbert transform.  Note, 
-        // winLen2 removes the phase shift
+        // winLen2 accounts for the phase shift
         ippsMagnitude_32f(ptrRe, ptrIm, xmean, npts);
         // Reincorporate the mean into the signal
         ippsAddC_32f(xmean, pMean, &x[indx], npts); 
@@ -271,6 +273,7 @@ ERROR:;
  * @param[out] xfilt     The RMS filtered signals.  This is a column major
  *                       major matrix of dimension [lds x nsignals]. 
  * @result 0 indicates success.
+ * @ingroup xcloc_spxc
  * @copyright Ben Baker distributed under the MIT license.
  */
 int xcloc_firFilter_rmsFilter64f(const int lds,

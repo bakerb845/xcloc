@@ -214,10 +214,14 @@ BCAST_ERROR:;
     // Make the envelope structure
     if (xcloc->lenvelope)
     {
+printf("this is dead codE!\n");
+return -1;
+/*
         ierr = xcloc_envelope_initialize(xcloc->envFIRLen,
                                          xcloc->precision,
                                          xcloc->accuracy,
                                          &xcloc->envelope);
+*/
         if (ierr != 0)
         {
             fprintf(stderr, "%s: Error initializing envelope\n", __func__);
@@ -412,10 +416,12 @@ int xcloc_apply(struct xcloc_struct *xcloc)
         }
     }
     // Apply the envelope
+printf("broken!\n");
     if (xcloc->lenvelope)
     {
         if (xcloc->precision == XCLOC_SINGLE_PRECISION)
         {
+/*
             xcloc_envelope_applyMPI(xcloc->migrateMPI.intraComm,
                                     xcloc->root,
                                     xcloc->ntfSignalsLoc,
@@ -424,6 +430,7 @@ int xcloc_apply(struct xcloc_struct *xcloc)
                                     MPI_FLOAT,
                                     &xcloc->envelope,
                                     xcloc->y1, xcloc->y2);
+*/
 /*
  float pMax;
  ippsMin_32f(xcloc->y2, xcloc->leny, &pMax);
@@ -432,6 +439,7 @@ int xcloc_apply(struct xcloc_struct *xcloc)
         }
         else
         {
+/*
             xcloc_envelope_applyMPI(xcloc->migrateMPI.intraComm,
                                     xcloc->root,
                                     xcloc->ntfSignalsLoc,
@@ -440,6 +448,7 @@ int xcloc_apply(struct xcloc_struct *xcloc)
                                     MPI_DOUBLE,
                                     &xcloc->envelope,
                                     xcloc->y1, xcloc->y2);
+*/
         }
         // Set the crosss-correlograms on the migration structure 
         ierr = xcloc_migrateMPI_setCrossCorrelations(

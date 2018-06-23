@@ -147,7 +147,7 @@ int test_serial_fdxc_hardwired(void)
 
 
     // Initialize
-    xcloc_fdxc_initialize(npts, nsignals, nptsPad, 
+    xcloc_fdxc_initialize(npts, nptsPad, 
                           nxcs, xcPairs,
                           verbose, precision, accuracy, &ierr); 
     CHKERR(ierr, "initialize");
@@ -283,7 +283,7 @@ int test_serial_fdxc_random(const int precision)
     fprintf(stdout, "%s: Generating random numbers...\n", __func__);
     xrand = xcfft_createRandomSignals(NULL, nsignals, npts, &ierr);
     // Initialize
-    xcloc_fdxc_initialize(npts, nsignals, nptsPad,
+    xcloc_fdxc_initialize(npts, nptsPad,
                           nxcs, xcPairs,
                           verbose, precision, accuracy, &ierr); 
     CHKERR(ierr, "initialize");

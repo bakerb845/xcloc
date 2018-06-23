@@ -110,7 +110,6 @@ MODULE XCLOC_FDXC
 !>    @brief Initializes the frequency domain cross-correlation calculator.
 !>
 !>    @param[in] npts      Number of points in each input signal.
-!>    @param[in] nsignals  Number of signals which will be set on the module.
 !>    @param[in] nptsPad   A tuning parameter to mitigate DFT lengths that could 
 !>                         potentially be large semi-prime numbers. 
 !>    @param[in] nxcs      Number of cross-correlations.
@@ -123,22 +122,28 @@ MODULE XCLOC_FDXC
 !>
 !>    @param[out] ierr     0 indicates success.
 !>
-      SUBROUTINE xcloc_fdxc_initialize(npts, nsignals, nptsPad,       &
+      SUBROUTINE xcloc_fdxc_initialize(npts, nptsPad,                 &
                                        nxcs, xcPairs,                 &
                                        verbose, prec, accuracy, ierr) &
       BIND(C, NAME='xcloc_fdxc_initialize')
       IMPLICIT NONE
-      INTEGER(C_INT), VALUE, INTENT(IN) :: accuracy, npts, nptsPad, nsignals, &
-                                           nxcs, verbose, prec
+      INTEGER(C_INT), VALUE, INTENT(IN) :: accuracy, npts, nptsPad, nxcs, verbose, prec
       INTEGER(C_INT), INTENT(IN) :: xcPairs(2*nxcs)
       INTEGER(C_INT), INTENT(OUT) :: ierr
+      INTEGER nsignals
       ierr = 0
       CALL xcloc_fdxc_finalize()
+      nsignals = MAXVAL(xcPairs)
       IF (npts < 1 .OR. nsignals < 2 .OR. nptsPad < npts .OR. nxcs < 1) THEN
          IF (npts < 1) WRITE(*,905) npts
          IF (nsignals < 2) WRITE(*,906) nsignals
          IF (nptsPad < npts) WRITE(*,907) nptsPad, npts
          IF (nxcs < 1) WRITE(*,908) nxcs
+         ierr = 1
+         RETURN
+      ENDIF
+      IF (MINVAL(xcPairs) < 1) THEN
+         WRITE(*,909)
          ierr = 1
          RETURN
       ENDIF
@@ -155,7 +160,7 @@ MODULE XCLOC_FDXC
       ! Set the input variables
       npts_       = npts
       nptsPad_    = nptsPad
-      nsignals_   = nsignals
+      nsignals_   = MAXVAL(xcPairs(1:2*nxcs)) !nsignals
       verbose_    = verbose
       nptsInXCs_  = 2*nptsPad_ - 1   ! Length of the cross-correlations
       nptsInFTs_  = nptsInXCs_/2 + 1 ! Number of points in the fourier transforms
@@ -180,7 +185,7 @@ MODULE XCLOC_FDXC
       ! Set the cross-correlation table which will, in turn, initialize FFTw
       CALL xcloc_fdxc_setXCTableF(nxcs, xcPairs, ierr)
       IF (ierr /= 0) THEN
-         WRITE(*,909) 
+         WRITE(*,910) 
          CALL xcloc_fdxc_finalize()
       ENDIF
       ! Format statements
@@ -188,7 +193,8 @@ MODULE XCLOC_FDXC
   906 FORMAT("xcloc_fdxc_initialize: nsignals=", I8, "must be at least 2")
   907 FORMAT("xcloc_fdxc_initialize: nptsPad=", I8, "must be greater than npts=", I8)
   908 FORMAT("xcloc_fdxc_initialize: No correlation pairs=", I8)
-  909 FORMAT("xcloc_fdxc_initialize: Failed to set XC table")
+  909 FORMAT("xcloc_fdxc_initialize: Minimum value of xcPairs must be positive")
+  910 FORMAT("xcloc_fdxc_initialize: Failed to set XC table")
       RETURN
       END
 !                                                                                        !

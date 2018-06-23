@@ -122,7 +122,7 @@ int test_serial_dsmLocation(void)
                                       &nxcs, xcPairs, &ierr);
     CHKERR(ierr, "computeDefaultXCTable");
     // Initialize the cross-correlation table
-    xcloc_fdxc_initialize(nptsSig, nsignals, nptsSig, 
+    xcloc_fdxc_initialize(nptsSig, nptsSig, 
                           nxcs, xcPairs,
                           verbose, prec, accuracy, &ierr);
     CHKERR(ierr, "failed initializing fdxc");
@@ -140,7 +140,7 @@ xcloc_fdxc_getCorrelograms32f(nptsInXCs, nxcs, xcs32, &ierr);
     //------------------------Filter the Correlograms-------------------------//
     int nTaps = 301;
     int ftype = XCLOC_SPXC_ENVELOPE_FILTER;
-    xcloc_spxc_initialize(nTaps, ftype, accuracy, &ierr);
+    xcloc_spxc_initialize(nTaps, ftype, &ierr);
 double *xcsFilt = (double *) calloc((size_t) (nxcs*nptsInXCs), sizeof(double));
     xcloc_spxc_filterXCsOutOfPlace64f(nptsInXCs, nptsInXCs, nxcs,
                                       xcs, xcsFilt, &ierr);

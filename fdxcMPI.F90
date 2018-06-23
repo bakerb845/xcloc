@@ -30,19 +30,20 @@ MODULE XCLOC_FDXC_MPI
 !                                      Begin the Code                                    !
 !========================================================================================!
 !>    @brief Initializes the Foureir transform
-!>    @param[in] comm     MPI communicator.
-!>    @param[in] master   ID of master process.  This should probably be 0.
-!>    @param[in] npts    
+!>    @param[in] comm      MPI communicator.
+!>    @param[in] master    ID of master process.  This should probably be 0.
+!>    @param[in] npts      Number of points in each input signal.
+!>    @param[in] nptsPad   Number of  
       SUBROUTINE xcloc_fdxcMPI_initialize(comm, master,                   &
-                                          npts, nsignals, nptsPad,        &
+                                          npts, nptsPad,                  &
                                           nxcs, xcPairs,                  &
                                           verbose, prec, accuracy, ierr)  &
       BIND(C, NAME='xcloc_fdxcMPI_initialize')
       TYPE(MPI_Comm), VALUE, INTENT(IN) :: comm
-      INTEGER(C_INT), VALUE, INTENT(IN) :: master, npts, nsignals, nptsPad, nxcs, &
+      INTEGER(C_INT), VALUE, INTENT(IN) :: master, npts, nptsPad, nxcs, &
                                            verbose, prec, accuracy
-      INTEGER(C_INT), INTENT(IN) :: xcPairs(2*nxcs)
-      INTEGER ierr, mpierr, myid
+      INTEGER(C_INT), INTENT(IN) :: xcPairs(*)
+      INTEGER ierr, mpierr, myid, nsignals
       CALL MPI_COMM_RANK(comm, myid, mpierr)
       CALL MPI_COMM_SIZE(comm, nprocs, mpierr)
       ! Some basic checks by master process
@@ -51,10 +52,15 @@ MODULE XCLOC_FDXC_MPI
          ierr = 0
          IF (npts < 1 .OR. nsignals < 2 .OR. nptsPad < npts .OR. nxcs < 1) THEN
             IF (npts < 1) WRITE(*,905) npts 
-            IF (nsignals < 2) WRITE(*,906) nsignals
             IF (nptsPad < npts) WRITE(*,907) nptsPad, npts
             IF (nxcs < 1) WRITE(*,908) nxcs
             ierr = 1
+         ENDIF
+         nsignals = MAXVAL(xcPairs(1:2*nxcs)) 
+         IF (nsignals < 2) THEN
+            WRITE(*,906) nsignals
+            ierr = 1
+            RETURN
          ENDIF
          IF (.NOT. xcloc_constants_isValidPrecision(prec)) ierr = 1 
          IF (.NOT. xcloc_constants_isValidAccuracy(accuracy)) ierr = 1
