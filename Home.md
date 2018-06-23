@@ -4,7 +4,7 @@ xcloc is a [multilateration](https://en.wikipedia.org/wiki/Multilateration)-base
 
 # Building
 
-Before continuing, understand that this code is intended to run on Intel hardware.  I believe many portions of the algorithm could be ported to GPU's via OpenCL however this task would require a substantial amount of kernel code - hence the reason it doesn't exist.  Given this the Intel build instructions are discussed.
+Before continuing, understand that this code is intended to run on Intel hardware.  It likely could see a performance boost with coprocessors.  However, the idea of porting to a GPU is daunting and I instead would prefer to run the code on a Xeon Phi first to confirm my suspicions before writing that mountain of kernel code.  Given this the Intel build instructions are discussed.
 
 ## Prerequisites
 
