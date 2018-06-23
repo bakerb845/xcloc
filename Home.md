@@ -75,8 +75,6 @@ It can be expedient to configure CMake with a script.  Though I sometimes have t
 
 ### Configuring With the Intel Compilers
 
-I typically find it useful to generate a configuration script like the one below
-
     #!/bin/sh
     export CC=/opt/intel/bin/icc
     export FC=/opt/intel/bin/ifort
