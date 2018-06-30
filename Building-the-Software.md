@@ -18,7 +18,6 @@ To build it is required that one have
 
 Optionally, for compiling the unit tests, one must also build
 
-- [ISCL](https://gitlab.isti.com/bbaker/iscl)
 - [SacIO](https://gitlab.isti.com/bbaker/sacio)
 
 However, these will eventually become project submodules and wrangled into the CMake.
