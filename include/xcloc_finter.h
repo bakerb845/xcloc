@@ -1,8 +1,8 @@
 #ifndef XCLOC_FINTER_H__
 #define XCLOC_FINTER_H__
+#include <stdbool.h>
 #include "xcloc_config.h"
 #include "xcloc_enum.h"
-#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C"
@@ -135,6 +135,35 @@ void xcloc_spxc_filterXCsInPlace32f(const int ldxc,
                                     int *ierr);
 /* Finalizes the correlogram filtering. */
 void xcloc_spxc_finalize(void);
+
+#ifdef XCLOC_USE_MPI
+#include <mpi.h>
+/*----------------------------------------------------------------------------*/
+/*                        Frequency Domain Cross-Correlation                  */
+/*----------------------------------------------------------------------------*/
+/* Initialize parallel frequency domain cross correlation. */
+void xcloc_fdxcMPI_initialize(const MPI_Comm comm,
+                              const int master, 
+                              const int npts,
+                              const int nptsPad,
+                              const int nxcs,
+                              const int xcPairs[],
+                              const int verbose,
+                              const int precision,
+                              const int accuracy,
+                              int *ierr);
+/* Set many signals. */
+void xcloc_fdxcMPI_setSignals64f(const int ldx,
+                                 const int npts,
+                                 const int nsignals,
+                                 const double x[], int *ierr);
+void xcloc_fdxcMPI_setSignals32f(const int ldx,
+                                 const int npts,
+                                 const int nsignals,
+                                 const float x[], int *ierr);
+
+
+#endif
 
 #ifdef __cplusplus
 }

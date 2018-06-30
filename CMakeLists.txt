@@ -40,7 +40,11 @@ IF (XCLOC_PROFILE)
   INCLUDE_DIRECTORIES(${ADVISOR_INCLUDE_DIR})
 ENDIF()
 
-SET(LIB_ALL ${SACIO_LIBRARY} ${ISCL_LIBRARY} ${MKL_LIBRARY} ${IPP_LIBRARY} ${XML2_LIBRARY} ${INIPARSER_LIBRARY} ${H5_LIBRARY} ${MPI_C_LIBRARIES} ${MPI_Fortran_LIBRARIES} -ldl -lm)
+SET(LIB_ALL ${SACIO_LIBRARY}
+    #${ISCL_LIBRARY}
+    ${MKL_LIBRARY} ${IPP_LIBRARY} ${XML2_LIBRARY}
+    ${INIPARSER_LIBRARY} ${H5_LIBRARY}
+    ${MPI_C_LIBRARIES} ${MPI_Fortran_LIBRARIES} -ldl -lm)
 
 
 #SET(SRC xcloc.c xcfft.c migrate.c h5ioGrid.c h5ioUtils.c xdmf.c)
@@ -64,7 +68,8 @@ ADD_EXECUTABLE(xcf_tests
                testing/test_suite.c
                testing/serialTest.c
                testing/serialLocationTest.c
-               testing/acousticGreens2D.c)
+               testing/acousticGreens2D.c
+               testing/iscl_hack.c)
 #ADD_EXECUTABLE(xcfft unit_tests/check_xcfft.c ${UNIT_TESTS_SRC} ${SRC})
 #ADD_EXECUTABLE(xc2d unit_tests/check_2d.c ${UNIT_TESTS_SRC} ${SRC})
 #ADD_EXECUTABLE(xcloc unit_tests/xcloc.c ${UNIT_TESTS_SRC} ${SRC})

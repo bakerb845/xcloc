@@ -3,7 +3,8 @@
 #include <string.h>
 #include <math.h>
 #include "test_suite.h"
-#include "iscl/iscl/iscl.h"
+#include "mkl.h"
+//#include "iscl/iscl/iscl.h"
 
 #define SEED 40935  /*!< random seed - but predictable results. */
 
@@ -11,7 +12,6 @@ int main()
 {
     int ierr;
     // Initialize ISCL to make reference solution
-    iscl_init();
     srand(SEED);
 
     fprintf(stdout, "%s: Performing serial tests...\n", __func__);
@@ -29,6 +29,6 @@ int main()
         return EXIT_FAILURE;
     }
 
-    iscl_finalize();
+    mkl_finalize();
     return EXIT_SUCCESS;
 }

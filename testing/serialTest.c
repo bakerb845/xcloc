@@ -8,8 +8,7 @@
 #include "xcloc_finter.h"
 #include "xcloc_enum.h"
 #include "test_suite.h"
-#include "iscl/fft/fft.h"
-#include "iscl/iscl/iscl.h"
+#include "iscl_hack.h"
 #ifdef XCLOC_PROFILE
 #include "advisor-annotate.h"
 #endif
@@ -484,7 +483,7 @@ int xcfft_computeXCsWithISCL(const bool ldoPhase,
     {
         indx = is*ntf;
         jndx = is*npts;
-        fft_rfft64f_work(npts, &x[jndx], lxc, ntf, &tforms[indx]);
+        fft_rfft64f_work_hack(npts, &x[jndx], lxc, ntf, &tforms[indx]);
     }
     // Now let's do it the dumb way
     xcfd = (double complex *) calloc((size_t) ntf+32, sizeof(double complex));
@@ -517,9 +516,9 @@ int xcfft_computeXCsWithISCL(const bool ldoPhase,
                 }
             }
             // Inverse fourier transform
-            fft_irfft64z_work(ntf, xcfd, lxc, work);
+            fft_irfft64z_work_hack(ntf, xcfd, lxc, work);
             // Need to shuffle the transform
-            fft_fftshift64f_work(lxc, work, &xcs[kndx*lxc]);
+            fft_fftshift64f_work_hack(lxc, work, &xcs[kndx*lxc]);
         }
     }
     free(tforms);

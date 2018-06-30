@@ -7,7 +7,7 @@
 #include <float.h>
 #include "xcloc_config.h"
 #include "acousticGreens2D.h"
-#include "iscl/fft/fft.h"
+#include "iscl_hack.h" //fft/fft.h"
 #include <ipps.h>
 
 #ifndef DCMPLX
@@ -143,7 +143,7 @@ int acousticGreens2D_computeGreensLineSource(
     }
     else
     {
-        ierr = fft_rfft64f_work(npts, stf, npts, nomega, stfF);
+        ierr = fft_rfft64f_work_hack(npts, stf, npts, nomega, stfF);
         if (ierr != EXIT_SUCCESS)
         {
             fprintf(stderr, "%s: Failed to fourier transform stf\n", __func__);
@@ -154,7 +154,7 @@ int acousticGreens2D_computeGreensLineSource(
     stfF[0] = DCMPLX(0.0, 0.0);
     stfF[nomega-1] = DCMPLX(0.0, 0.0);
     // Compute FFT frequencies at which to evaluate Greens function
-    ierr = fft_rfftfreqs64f_work(npts, dt, nomega, omega);
+    ierr = fft_rfftfreqs64f_work_hack(npts, dt, nomega, omega);
     if (ierr != EXIT_SUCCESS)
     {
         fprintf(stderr, "%s: Error computing rfft freqs\n", __func__);
@@ -177,7 +177,7 @@ int acousticGreens2D_computeGreensLineSource(
             return EXIT_FAILURE;
         }
         // Inverse transform Gw
-        ierr = fft_irfft64z_work(nomega, Gw, npts, &G[irec*npts]);
+        ierr = fft_irfft64z_work_hack(nomega, Gw, npts, &G[irec*npts]);
         if (ierr != 0)
         {
             fprintf(stderr, "%s: Error inverse transforming Gw\n", __func__);

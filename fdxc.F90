@@ -69,7 +69,7 @@ MODULE XCLOC_FDXC
       !> Plan for transforming from frequency domain to time domain correlograms.
       TYPE(C_PTR), PRIVATE, SAVE :: inversePlan_
       !> Accuracy of the MKL computations.
-      INTEGER(KIND=8), PRIVATE, SAVE :: accuracy_
+      INTEGER(KIND=8), PRIVATE, SAVE :: accuracyMKL_
       !> Flag indicating FFTw has been initialized.
       LOGICAL, PRIVATE, SAVE :: linitFFTw_ = .FALSE.
       INTEGER(C_SIZE_T), PRIVATE, PARAMETER :: alignment = 64
@@ -212,11 +212,11 @@ MODULE XCLOC_FDXC
       INTEGER, VALUE, INTENT(IN) :: accuracy
       INTEGER, INTENT(OUT) :: ierr
       IF (accuracy == XCLOC_HIGH_ACCURACY) THEN
-         accuracy_ = vmlsetmode(IOR(VML_HA, VML_ERRMODE_ERRNO)) !, VML_ERRMODE_STDERR))
+         accuracyMKL_ = vmlsetmode(IOR(VML_HA, VML_ERRMODE_ERRNO)) !, VML_ERRMODE_STDERR))
       ELSEIF (accuracy == XCLOC_LOW_ACCURACY) THEN
-         accuracy_ = vmlsetmode(IOR(VML_LA, VML_ERRMODE_ERRNO)) !VML_ERRMODE_STDERR))
+         accuracyMKL_ = vmlsetmode(IOR(VML_LA, VML_ERRMODE_ERRNO)) !VML_ERRMODE_STDERR))
       ELSEIF (accuracy == XCLOC_EP_ACCURACY) THEN
-         accuracy_ = vmlsetmode(IOR(VML_EP, VML_ERRMODE_ERRNO)) !VML_ERRMODE_STDERR))
+         accuracyMKL_ = vmlsetmode(IOR(VML_EP, VML_ERRMODE_ERRNO)) !VML_ERRMODE_STDERR))
       ELSE
          WRITE(*,905) accuracy
          ierr = 1
@@ -228,7 +228,7 @@ MODULE XCLOC_FDXC
       ELSE
          ierr = 0 
       ENDIF
-      accuracy_ = vmlgetmode() ! Get the accuracy however MKL defines it
+      accuracyMKL_ = vmlgetmode() ! Get the accuracy however MKL defines it
   900 FORMAT('xcloc_fdxc_setAccuracy: Error setting accuracy')
   905 FORMAT('xcloc_fdxc_setAccuracy: Invalid accuracy', I4)
       RETURN
@@ -770,7 +770,7 @@ MODULE XCLOC_FDXC
       ierr = 0
       IF (precision_ == XCLOC_SINGLE_PRECISION) THEN
          !$OMP PARALLEL DEFAULT(NONE) &
-         !$OMP SHARED(accuracy_, ftOffset_, inputFTs32f_, lphaseCorr, nxcs_) &
+         !$OMP SHARED(accuracyMKL_, ftOffset_, inputFTs32f_, lphaseCorr, nxcs_) &
          !$OMP SHARED(nptsInFTs_, xcFTs32f_, xcPairs_) &
          !$OMP PRIVATE(i, indx, iw, ixc, j, jndx, kndx, mag32f_, n) &
          !$OMP FIRSTPRIVATE(xcPtr32c)
@@ -791,10 +791,10 @@ MODULE XCLOC_FDXC
             kndx = (ixc - 1)*ftOffset_ + 1
             ! Compute u1*conj(u2)
             CALL vmcMulByConj(n, inputFTs32f_(indx), inputFTs32f_(jndx), &
-                              xcFTs32f_(kndx), accuracy_)
+                              xcFTs32f_(kndx), accuracyMKL_)
             ! Normalize by the magnitude at each frequency
             IF (lphaseCorr) THEN
-               CALL vmcAbs(n, xcFTs32f_(kndx), mag32f_, accuracy_)
+               CALL vmcAbs(n, xcFTs32f_(kndx), mag32f_, accuracyMKL_)
                ! Avoid division by zero
                mag32f_(1:n) = MAX(mag32f_(1:n), tol32)
                ! Safely normalize
@@ -811,7 +811,7 @@ MODULE XCLOC_FDXC
          !$OMP END PARALLEL
       ELSE
          !$OMP PARALLEL DEFAULT(NONE) &
-         !$OMP SHARED(accuracy_, ftOffset_, inputFTs64f_, lphaseCorr, nxcs_) &
+         !$OMP SHARED(accuracyMKL_, ftOffset_, inputFTs64f_, lphaseCorr, nxcs_) &
          !$OMP SHARED(nptsInFTs_, xcFTs64f_, xcPairs_) &
          !$OMP PRIVATE(i, indx, iw, ixc, j, jndx, kndx, mag64f_, n, xcPtr64z)
          n = nptsInFTs_
@@ -831,10 +831,10 @@ MODULE XCLOC_FDXC
             kndx = (ixc - 1)*ftOffset_ + 1 
             ! Compute u1*conj(u2)
             CALL vmzMulByConj(n, inputFTs64f_(indx), inputFTs64f_(jndx), &
-                              xcFTs64f_(kndx), accuracy_)
+                              xcFTs64f_(kndx), accuracyMKL_)
             ! Normalize by the magnitude at each frequency
             IF (lphaseCorr) THEN
-               CALL vmzAbs(n, xcFTs64f_(kndx), mag64f_, accuracy_)
+               CALL vmzAbs(n, xcFTs64f_(kndx), mag64f_, accuracyMKL_)
                ! Avoid division by zero
                mag64f_(1:n) = MAX(mag64f_(1:n), tol64)
                ! Safely normalize
