@@ -64,6 +64,8 @@ MODULE XCLOC_FDXC
       !> Holds the Fourier transformed cross-correlograms.  This is an array
       !> of dimension [ftOffset x nxcs_].
       COMPLEX(C_DOUBLE_COMPLEX), TARGET, PRIVATE, ALLOCATABLE, SAVE :: xcFTs64f_(:)
+      !> Keeps track if the is'th signal has been set.
+      INTEGER, PRIVATE, ALLOCATABLE, SAVE :: lhaveSignal_(:)
       !> Plan for transforming from time domain to frequency domain.
       TYPE(C_PTR), PRIVATE, SAVE :: forwardPlan_
       !> Plan for transforming from frequency domain to time domain correlograms.
@@ -94,6 +96,7 @@ MODULE XCLOC_FDXC
       PUBLIC :: xcloc_fdxc_getNumberOfCorrelograms
       PUBLIC :: xcloc_fdxc_getNumberOfSignals
       PUBLIC :: xcloc_fdxc_getPrecision
+      PUBLIC :: xcloc_fdxc_haveNoSignals
       PUBLIC :: xcloc_fdxc_computePhaseCorrelograms
       PUBLIC :: xcloc_fdxc_computeCrossCorrelograms
 
@@ -175,6 +178,7 @@ MODULE XCLOC_FDXC
       IF (ALLOCATED(inputSignals64f_)) DEALLOCATE(inputSignals64f_)
       IF (ALLOCATED(inputFTs32f_))     DEALLOCATE(inputFTs32f_)
       IF (ALLOCATED(inputFTs64f_))     DEALLOCATE(inputFTs64f_)
+      IF (ALLOCATED(lhaveSignal_))     DEALLOCATE(lhaveSignal_)
       IF (precision_ == XCLOC_SINGLE_PRECISION) THEN
          ALLOCATE(inputSignals32f_(dataOffset_*nsignals_)); inputSignals32f_(:) = 0.0
          ALLOCATE(inputFTs32f_(ftOffset_*nsignals_)); inputFTs32f_(:) = czero
@@ -182,6 +186,8 @@ MODULE XCLOC_FDXC
          ALLOCATE(inputSignals64f_(dataOffset_*nsignals_)); inputSignals64f_(:) = 0.d0
          ALLOCATE(inputFTs64f_(ftOffset_*nsignals_)); inputFTs64f_(:) = zzero
       ENDIF
+      ALLOCATE(lhaveSignal_(nsignals_))
+      CALL xcloc_fdxc_haveNoSignals()
       ! Set the cross-correlation table which will, in turn, initialize FFTw
       CALL xcloc_fdxc_setXCTableF(nxcs, xcPairs, ierr)
       IF (ierr /= 0) THEN
@@ -250,6 +256,7 @@ MODULE XCLOC_FDXC
       IF (ALLOCATED(inputFTs64f_))     DEALLOCATE(inputFTs64f_)
       IF (ALLOCATED(xcFTs32f_))        DEALLOCATE(xcFTs32f_)
       IF (ALLOCATED(xcFTs64f_))        DEALLOCATE(xcFTs64f_) 
+      IF (ALLOCATED(lhaveSignal_))     DEALLOCATE(lhaveSignal_)
       IF (linitFFTw_) THEN
          IF (precision_ == XCLOC_SINGLE_PRECISION) THEN
             CALL FFTWF_DESTROY_PLAN(forwardPlan_)
@@ -335,6 +342,7 @@ MODULE XCLOC_FDXC
       INTEGER(C_INT), INTENT(OUT) :: ierr 
       INTEGER i, ix
       ierr = 0
+      CALL xcloc_fdxc_haveNoSignals()
       IF (ldx < npts .OR. npts /= npts_ .OR. nsignals /= nsignals_) THEN 
          IF (ldx < npts) WRITE(*,900) ldx, npts 
          IF (npts /= npts_) WRITE(*,901) npts_
@@ -375,6 +383,7 @@ MODULE XCLOC_FDXC
       INTEGER(C_INT), INTENT(OUT) :: ierr
       INTEGER i, ix
       ierr = 0
+      CALL xcloc_fdxc_haveNoSignals()
       IF (ldx < npts .OR. npts /= npts_ .OR. nsignals /= nsignals_) THEN
          IF (ldx < npts) WRITE(*,900) ldx, npts
          IF (npts /= npts_) WRITE(*,901) npts_
@@ -463,6 +472,15 @@ MODULE XCLOC_FDXC
       IMPLICIT NONE
       INTEGER(C_INT), INTENT(OUT) :: prec
       prec = precision_
+      RETURN
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Indicates that no signals are set.
+      SUBROUTINE xcloc_fdxc_haveNoSignals( ) &
+      BIND(C, NAME='xcloc_fdxc_haveNoSignals')
+      IF (ALLOCATED(lhaveSignal_)) lhaveSignal_(:) = 0
       RETURN
       END
 !                                                                                        !
@@ -650,6 +668,7 @@ MODULE XCLOC_FDXC
          inputSignals32f_(i1:i1+npts-1) = SNGL(x(1:npts))
          !ierr = ippsConvert_64f32f(x, inputSignals32f_(i1), npts)
       ENDIF
+      lhaveSignal_(signalNumber) = 1
   900 FORMAT('xcloc_fdxc_setSignal64fF: Error expecting npts=', I5) 
   905 FORMAT('xcloc_fdxc_setSignal64fF: Error signalNumber must be in range [1,',I4,']')
       RETURN
@@ -689,6 +708,7 @@ MODULE XCLOC_FDXC
          inputSignals64f_(i1:i1+npts-1) = DBLE(x(1:npts))
          !ierr = ippsConvert_32f64f(x, inputSignals64f_(i1), npts)
       ENDIF
+      lhaveSignal_(signalNumber) = 1
   900 FORMAT('xcloc_fdxc_setSignal32fF: Error expecting npts=', I5)
   905 FORMAT('xcloc_fdxc_setSignal32fF: Error signalNumber must be in range [1,',I4,']')
       RETURN
@@ -768,6 +788,10 @@ MODULE XCLOC_FDXC
       REAL(C_FLOAT), PARAMETER ::  tol32 = TINY(1.0)*10000.0   !EPSILON(1.0)*10.0
       REAL(C_DOUBLE), PARAMETER :: tol64 = TINY(1.d0)*10000.d0 !EPSILON(1.d0)*10.d0 
       ierr = 0
+      IF (MINVAL(lhaveSignal_) < 1) THEN
+         WRITE(*, 900)
+  900    FORMAT('xcloc_fdxc_computeFDCorrelations: Warning some signals may not be set')
+      ENDIF
       IF (precision_ == XCLOC_SINGLE_PRECISION) THEN
          !$OMP PARALLEL DEFAULT(NONE) &
          !$OMP SHARED(accuracyMKL_, ftOffset_, inputFTs32f_, lphaseCorr, nxcs_) &

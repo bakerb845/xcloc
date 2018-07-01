@@ -84,6 +84,18 @@ MODULE XCLOC_IPPS
       REAL(C_FLOAT), VALUE, INTENT(IN) :: alpha
       REAL(C_FLOAT), INTENT(INOUT) :: pSrcDst(n)
       END FUNCTION
+      !> @brief Sorts an integer array into ascending order.
+      !> @param[in,out] pSrcDst   On input this is the array to sort.
+      !> @param[in,out] pSrcDst   On exit this is the sorted array.
+      !> @param[in] len           The length of the array.
+      !> @result 0 indicates success.
+      INTEGER(C_INT) FUNCTION ippsSortAscend_32s_I(pSrcDst, len) &
+      BIND(C, NAME='ippsSortAscend_32s_I')
+      USE ISO_C_BINDING
+      IMPLICIT NONE
+      INTEGER(C_INT), INTENT(INOUT) :: pSrcDst(len)
+      INTEGER(C_INT), VALUE, INTENT(IN) :: len 
+      END FUNCTION
 
    END INTERFACE
 END MODULE

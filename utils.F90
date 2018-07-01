@@ -4,10 +4,12 @@
 MODULE XCLOC_UTILS
       USE ISO_C_BINDING
       USE XCLOC_CONSTANTS
+      USE XCLOC_IPPS
       IMPLICIT NONE
 
       PUBLIC :: xcloc_utils_computeDefaultXCTable
       PUBLIC :: xcloc_utils_partitionTasks
+      PUBLIC :: xcloc_utils_unique32s
       CONTAINS
 !========================================================================================!
 !                                     Begin the Code                                     !
@@ -164,6 +166,62 @@ MODULE XCLOC_UTILS
       IF (ALLOCATED(taskCtr)) DEALLOCATE(taskCtr)
   900 FORMAT('xcloc_utils_partitionTasks: Failed to initialize element', I4) 
 ! 905 FORMAT('xcloc_utils_partitionTasks: Process', I4, ' has ', I6, ' operations')
+      RETURN
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Creates a list of the unique elements in a list.
+!>    @param[in] n            Number of points in the input list.
+!>    @param[in] list         List of numbers of which to find unique values.
+!>    @param[out] nUnique     Number of unique elements in list.
+!>    @param[out] listUnique  The unique elements of list in ascending order. 
+!>                            This should have dimension of at  
+!>    @param[out] ierr        0 indicates success.
+      SUBROUTINE xcloc_utils_unique32s(n, list, nUnique, listUnique, ierr)
+      INTEGER, VALUE, INTENT(IN ) :: n
+      INTEGER, INTENT(IN) :: list(n)
+      INTEGER, ALLOCATABLE, INTENT(INOUT) :: listUnique(:)
+      INTEGER, INTENT(OUT) :: ierr, nUnique
+      INTEGER, ALLOCATABLE :: work(:), workUnique(:)
+      INTEGER i, np1
+      ! Initialize and error check
+      nUnique = 0
+      IF (ALLOCATED(listUnique)) DEALLOCATE(listUnique)
+      IF (n < 1) THEN
+         WRITE(*,900) 
+         ierr = 1
+         RETURN
+      ENDIF
+      ! Copy input and sort
+      np1 = n + 1
+      ALLOCATE(work(np1))
+      work(1:n) = list(1:n)
+      work(np1) = MINVAL(list) - 1 ! Will avoid a match in sorted list
+      ierr = ippsSortAscend_32s_I(work, n) ! Only sort first n elements
+      IF (ierr /= 0) THEN
+         WRITE(*,901) 
+         ierr = 1
+         DEALLOCATE(work)
+         RETURN
+      ENDIF
+      ! Locate the unique elements
+      ALLOCATE(workUnique(n))
+      nUnique = 0
+      DO i=1,n
+         IF (work(i+1) /= work(i)) THEN
+            nUnique = nUnique + 1
+            workUnique(nUnique) = work(i)
+         ENDIF
+      ENDDO
+      ! Copy the unique elements
+      ALLOCATE(listUnique(nUnique))
+      listUnique(1:nUnique) = workUnique(1:nUnique) 
+      ! Clean up
+      DEALLOCATE(work)
+      DEALLOCATE(workUnique)
+  900 FORMAT('xcloc_utils_unique32s: No points in input list') 
+  901 FORMAT('xcloc_utils_unique32s: Failed to sort list')
       RETURN
       END
 END MODULE
