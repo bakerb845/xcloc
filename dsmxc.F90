@@ -2,6 +2,7 @@
 !> @author Ben Baker
 !> @copyright Ben Baker distributed the MIT license.
 MODULE XCLOC_DSMXC
+      USE ISO_FORTRAN_ENV
       USE ISO_C_BINDING
       USE XCLOC_CONSTANTS
       USE XCLOC_IPPS
@@ -87,25 +88,25 @@ MODULE XCLOC_DSMXC
       ierr = 0
       CALL xcloc_dsmxc_finalize()
       IF (ngrd < 1) THEN
-         WRITE(*,900)
+         WRITE(ERROR_UNIT,900)
          ierr = 1
       ENDIF
       IF (nxcPairs < 1) THEN
-         WRITE(*,901)
+         WRITE(ERROR_UNIT,901)
          ierr = 1
       ENDIF
       IF (dt <= 0.d0) THEN
-         WRITE(*,902)
+         WRITE(ERROR_UNIT,902)
          ierr = 1
       ENDIF
       IF (MINVAL(xcPairs) < 1 .OR. MAXVAL(xcPairs) > ntables) THEN
-         IF (MINVAL(xcPairs) < 1) WRITE(*,903) 
-         IF (MAXVAL(xcPairs) > ntables) WRITE(*,904) MAXVAL(xcPairs), ntables 
+         IF (MINVAL(xcPairs) < 1) WRITE(ERROR_UNIT,903) 
+         IF (MAXVAL(xcPairs) > ntables) WRITE(ERROR_UNIT,904) MAXVAL(xcPairs), ntables
          ierr = 1
       ENDIF
       IF (nptsInXCs < 1 .OR. MOD(nptsInXCs, 2) /= 1) THEN
-         IF (nptsInXCs < 1) WRITE(*,905)
-         IF (MOD(nptsInXCs, 2) /= 1) WRITE(*,906) nptsInXCs
+         IF (nptsInXCs < 1) WRITE(ERROR_UNIT,905)
+         IF (MOD(nptsInXCs, 2) /= 1) WRITE(ERROR_UNIT,906) nptsInXCs
          ierr = 1
       ENDIF
       IF (ierr /= 0) RETURN
@@ -173,7 +174,7 @@ MODULE XCLOC_DSMXC
       INTEGER(C_INT), INTENT(OUT) :: ierr
       ierr = 0
       IF (nwork < ngrd_) THEN
-         WRITE(*,900) nwork, ngrd_
+         WRITE(ERROR_UNIT,900) nwork, ngrd_
          ierr = 1
          RETURN
       ENDIF
@@ -194,7 +195,7 @@ MODULE XCLOC_DSMXC
       INTEGER(C_INT), INTENT(OUT) :: ierr
       ierr = 0
       IF (nwork < ngrd_) THEN
-         WRITE(*,900) nwork, ngrd_
+         WRITE(ERROR_UNIT,900) nwork, ngrd_
          ierr = 1
          RETURN
       ENDIF
@@ -229,12 +230,12 @@ MODULE XCLOC_DSMXC
       INTEGER i, indx
       ierr = 0
       IF (nxcPairs /= nxcPairs_) THEN
-         WRITE(*,900) nxcPairs, nxcPairs_
+         WRITE(ERROR_UNIT,900) nxcPairs, nxcPairs_
          ierr = 1
          RETURN
       ENDIF
       IF (nptsInXCs /= nptsInXCs_) THEN
-         WRITE(*,901) nptsInXCs, nptsInXCs_
+         WRITE(ERROR_UNIT,901) nptsInXCs, nptsInXCs_
          ierr = 1
          RETURN
       ENDIF
@@ -242,7 +243,7 @@ MODULE XCLOC_DSMXC
          indx = (i - 1)*ldxc + 1 
          CALL xcloc_dsmxc_setCorrelogram64fF(i, nptsInXCs, xcs(indx), ierr)
          IF (ierr /= 0) THEN
-            WRITE(*,902) i
+            WRITE(ERROR_UNIT,902) i
             RETURN
          ENDIF
       ENDDO
@@ -275,12 +276,12 @@ MODULE XCLOC_DSMXC
       INTEGER i, indx
       ierr = 0
       IF (nxcPairs /= nxcPairs_) THEN
-         WRITE(*,900) nxcPairs, nxcPairs_
+         WRITE(ERROR_UNIT,900) nxcPairs, nxcPairs_
          ierr = 1
          RETURN
       ENDIF
       IF (nptsInXCs /= nptsInXCs_) THEN
-         WRITE(*,901) nptsInXCs, nptsInXCs_
+         WRITE(ERROR_UNIT,901) nptsInXCs, nptsInXCs_
          ierr = 1
          RETURN
       ENDIF
@@ -288,7 +289,7 @@ MODULE XCLOC_DSMXC
          indx = (i - 1)*ldxc + 1
          CALL xcloc_dsmxc_setCorrelogram32fF(i, nptsInXCs, xcs(indx), ierr)
          IF (ierr /= 0) THEN
-            WRITE(*,902) i
+            WRITE(ERROR_UNIT,902) i
             RETURN
          ENDIF
       ENDDO
@@ -316,8 +317,8 @@ MODULE XCLOC_DSMXC
       INTEGER i1, i2
       ierr = 0
       IF (nptsInXCs /= nptsInXCs_ .OR. xcIndex < 1 .OR. xcIndex > nxcPairs_) THEN
-         IF (nptsInXCs /= nptsInXCs_) WRITE(*,900) nptsInXCs, nptsInXCs_
-         IF (xcIndex < 1 .OR. xcIndex > nxcPairs_) WRITE(*,901) nxcPairs_
+         IF (nptsInXCs /= nptsInXCs_) WRITE(ERROR_UNIT,900) nptsInXCs, nptsInXCs_
+         IF (xcIndex < 1 .OR. xcIndex > nxcPairs_) WRITE(ERROR_UNIT,901) nxcPairs_
          ierr = 1
          RETURN
       ENDIF
@@ -347,8 +348,8 @@ MODULE XCLOC_DSMXC
       INTEGER i1, i2
       ierr = 0
       IF (nptsInXCs /= nptsInXCs_ .OR. xcIndex < 1 .OR. xcIndex > nxcPairs_) THEN
-         IF (nptsInXCs /= nptsInXCs_) WRITE(*,900) nptsInXCs, nptsInXCs_
-         IF (xcIndex < 1 .OR. xcIndex > nxcPairs_) WRITE(*,901) nxcPairs_
+         IF (nptsInXCs /= nptsInXCs_) WRITE(ERROR_UNIT,900) nptsInXCs, nptsInXCs_
+         IF (xcIndex < 1 .OR. xcIndex > nxcPairs_) WRITE(ERROR_UNIT,901) nxcPairs_
          ierr = 1
          RETURN
       ENDIF 
@@ -381,7 +382,7 @@ MODULE XCLOC_DSMXC
          i2 = i2*2
       ENDDO
       ierr = 1
-      WRITE(*,900) blockSize
+      WRITE(ERROR_UNIT,900) blockSize
   900 FORMAT('xcloc_dsmxc_setBlockSize: blockSize=', I6, 'is not a power of 2')
       RETURN
   500 CONTINUE 
@@ -408,11 +409,11 @@ MODULE XCLOC_DSMXC
       INTEGER i, igrd
       ierr = 0 
       IF (tableNumber < 1 .OR. tableNumber > ntables_) THEN
-         WRITE(*,900) tableNumber, ntables_ 
+         WRITE(ERROR_UNIT,900) tableNumber, ntables_ 
          ierr = 1 
       ENDIF
       IF (ngrd /= ngrd_) THEN
-         WRITE(*,905) ngrd, ngrd_
+         WRITE(ERROR_UNIT,905) ngrd, ngrd_
          ierr = 1 
       ENDIF
       IF (ierr /= 0) RETURN
@@ -427,7 +428,7 @@ MODULE XCLOC_DSMXC
       ENDDO
       lhaveAllTables_ = .TRUE.
   500 CONTINUE
-      IF (lhaveAllTables_) WRITE(*,910)
+      IF (lhaveAllTables_) WRITE(OUTPUT_UNIT,910)
   900 FORMAT('xcloc_dsmxc_setTable64fF: tableNumber=', I4, ' must be in range [1,',I4,']')
   905 FORMAT('xcloc_dsmxc_setTable64fF: ngrd=', I6, ' expecting ngrd_=', I6) 
   910 FORMAT('xcloc_dsmxc_setTable64fF: All tables set')
@@ -454,11 +455,11 @@ MODULE XCLOC_DSMXC
       INTEGER i, igrd
       ierr = 0
       IF (tableNumber < 1 .OR. tableNumber > ntables_) THEN
-         WRITE(*,900) tableNumber, ntables_ 
+         WRITE(ERROR_UNIT,900) tableNumber, ntables_ 
          ierr = 1
       ENDIF
       IF (ngrd /= ngrd_) THEN
-         WRITE(*,905) ngrd, ngrd_
+         WRITE(ERROR_UNIT,905) ngrd, ngrd_
          ierr = 1
       ENDIF
       IF (ierr /= 0) RETURN
@@ -473,7 +474,7 @@ MODULE XCLOC_DSMXC
       ENDDO
       lhaveAllTables_ = .TRUE.
   500 CONTINUE
-      IF (lhaveAllTables_) WRITE(*,910) 
+      IF (lhaveAllTables_) WRITE(OUTPUT_UNIT,910) 
   900 FORMAT('xcloc_dsmxc_setTable32fF: tableNumber=', I4, ' must be in range [1,',I4,']')
   905 FORMAT('xcloc_dsmxc_setTable32fF: ngrd=', I6, ' expecting ngrd_=', I6)
   910 FORMAT('xcloc_dsmxc_setTable32fF: All tables set')
@@ -503,7 +504,7 @@ MODULE XCLOC_DSMXC
       REAL(C_FLOAT), CONTIGUOUS, POINTER :: xcPtr32f(:)
       ! This would be problematic if all tables aren't set
       ierr = 0
-      IF (.NOT.lhaveAllTables_) WRITE(*,905)
+      IF (.NOT.lhaveAllTables_) WRITE(OUTPUT_UNIT,905)
   905 FORMAT('xcloc_dsmxc_compute: Only a subset of tables were set')
       ! Compute
       lxc2 = nptsInXCs_/2 

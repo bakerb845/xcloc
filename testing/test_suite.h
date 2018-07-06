@@ -1,5 +1,6 @@
 #ifndef TEST_SUITE
 #define TEST_SUITE 1
+#include "xcloc_finter.h"
 #include <stdbool.h>
 
 #ifdef __cplusplus
@@ -18,6 +19,10 @@ int xcfft_computeXCsWithISCL(const bool ldoPhase,
                              double *diffTime);
 double *xcfft_createRandomSignals(int *seed, const int nsignals, const int npts,
                                   int *ierr);
+
+#ifdef XCLOC_USE_MPI
+int test_parallel_fdxc(const MPI_Comm comm, const int root);
+#endif
 
 #ifdef __cplusplus
 }

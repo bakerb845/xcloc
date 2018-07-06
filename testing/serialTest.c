@@ -305,7 +305,7 @@ int test_serial_fdxc_random(const int precision)
     // Set the signals
     start = clock();
 #ifdef XCLOC_PROFILE
-ANNOTATE_SITE_BEGIN("fdxc: random serial");
+//ANNOTATE_SITE_BEGIN("fdxc: random serial");
 #endif
     int ldx = nptsPad;
     xcloc_fdxc_setSignals64f(ldx, npts, nsignals, xrand, &ierr);
@@ -324,7 +324,7 @@ ANNOTATE_SITE_BEGIN("fdxc: random serial");
     CHKERR(ierr, "xcloc_fdxc_computeCrossCorrelograms");
     xcloc_fdxc_getCorrelograms32f(nptsInXC, nxcs, xcsAll, &ierr); 
 #ifdef XCLOC_PROFILE
-ANNOTATE_SITE_END();
+//ANNOTATE_SITE_END("fdxc: random serial");
 #endif
     CHKERR(ierr, "xcloc_fdxc_getCorrelograms32f");
     diffTime = (double) (clock() - start)/CLOCKS_PER_SEC;

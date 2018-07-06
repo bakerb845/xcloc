@@ -198,6 +198,7 @@ fclose(ftemp);
     xcloc_dsmxc_finalize();
     free(xcPairs);
     free(xcs);
+    if (xcs32 != NULL){free(xcs32);}
     free(obs);
     free(xr);
     free(xcsFilt);

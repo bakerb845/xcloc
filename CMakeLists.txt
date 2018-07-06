@@ -21,6 +21,13 @@ SET(CMAKE_BINARY_DIR  ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 SET(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/lib)
 SET(LIBRARY_OUTPUT_PATH ${CMAKE_CURRENT_SOURCE_DIR}/lib)
 
+INCLUDE(FindOpenMP QUIET)
+IF (OPENMP_FOUND)
+   MESSAGE("OpenMP Found")
+   SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+   SET(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} ${OpenMP_Fortran_FLAGS}")
+ENDIF()
+
 ADD_SUBDIRECTORY(include)
 INCLUDE_DIRECTORIES(
   include
@@ -40,18 +47,18 @@ IF (XCLOC_PROFILE)
   INCLUDE_DIRECTORIES(${ADVISOR_INCLUDE_DIR})
 ENDIF()
 
-SET(LIB_ALL ${SACIO_LIBRARY}
+SET(LIB_ALL #${SACIO_LIBRARY}
     #${ISCL_LIBRARY}
     ${MKL_LIBRARY} ${IPP_LIBRARY} ${XML2_LIBRARY}
     ${INIPARSER_LIBRARY} ${H5_LIBRARY}
-    ${MPI_C_LIBRARIES} ${MPI_Fortran_LIBRARIES} -ldl -lm)
+    ${MPI_C_LIBRARIES} ${MPI_Fortran_LIBRARIES} -lpthread -ldl -lm)
 
 
 #SET(SRC xcloc.c xcfft.c migrate.c h5ioGrid.c h5ioUtils.c xdmf.c)
 #SET(SRC ${SRC} xcfftMPI.c migrateMPI.c)
-SET(IO_SRC h5ioGrid.c h5ioUtils.c xdmf.c)
+#SET(IO_SRC h5ioGrid.c h5ioUtils.c xdmf.c)
 SET(SRC ${IO_SRC} firFilter.c fdxc.F90 ipps.F90 constants.F90 memory.F90 spxc.F90
-    dsmxc.F90 utils.F90 xcloc.F90)
+    dsmxc.F90 utils.F90 xcloc.F90 sort.c)
 SET(SRC_MPI ${SRC} fdxcMPI.F90 dsmxcMPI.F90)
 IF (XCLOC_USE_MPI)
    SET(SRC ${SRC} ${SRC_MPI})
@@ -64,12 +71,16 @@ ENDIF()
 ADD_LIBRARY(xcloc_shared SHARED ${SRC})
 #ADD_LIBRARY(xcloc_static STATIC ${SRCS})
 #ADD_EXECUTABLE(interloc interloc.c ${SRC})
-ADD_EXECUTABLE(xcf_tests
-               testing/test_suite.c
-               testing/serialTest.c
-               testing/serialLocationTest.c
-               testing/acousticGreens2D.c
-               testing/iscl_hack.c)
+SET(TEST_SRC
+    testing/test_suite.c
+    testing/serialTest.c
+    testing/serialLocationTest.c
+    testing/acousticGreens2D.c
+    testing/iscl_hack.c)
+IF (XCLOC_USE_MPI)
+   SET(TEST_SRC ${TEST_SRC} testing/parallelTest.c)
+ENDIF()
+ADD_EXECUTABLE(xcf_tests ${TEST_SRC})
 #ADD_EXECUTABLE(xcfft unit_tests/check_xcfft.c ${UNIT_TESTS_SRC} ${SRC})
 #ADD_EXECUTABLE(xc2d unit_tests/check_2d.c ${UNIT_TESTS_SRC} ${SRC})
 #ADD_EXECUTABLE(xcloc unit_tests/xcloc.c ${UNIT_TESTS_SRC} ${SRC})

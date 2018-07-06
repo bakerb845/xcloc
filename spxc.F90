@@ -2,6 +2,7 @@
 !> @author Ben Baker
 !> @copyright Ben Baker distributed under the MIT license.
 MODULE XCLOC_SPXC
+      USE ISO_FORTRAN_ENV
       USE ISO_C_BINDING
       USE XCLOC_CONSTANTS
       USE XCLOC_UTILS
@@ -87,20 +88,20 @@ MODULE XCLOC_SPXC
       ELSE
          ! Check inputs
          IF (n < 1) THEN
-            WRITE(*,900)
+            WRITE(ERROR_UNIT,900)
             ierr = 1
             RETURN
          ENDIF
          ! Nothing to do
          IF (n == 1) THEN
             ftype_ = XCLOC_SPXC_DONOT_FILTER
-            WRITE(*,901) 
+            WRITE(ERROR_UNIT,901) 
             RETURN
          ENDIF
          ! Require FIR filters have an odd number of coefficients for easy group delay
          nCoeffs_ = n
          IF (MOD(n, 2) == 0) THEN
-            WRITE(*,904)
+            WRITE(ERROR_UNIT,904)
             nCoeffs_ = n + 1
          ENDIF
          nOrder_ = nCoeffs_ - 1 
@@ -108,19 +109,19 @@ MODULE XCLOC_SPXC
          IF (ftype == XCLOC_SPXC_ENVELOPE_FILTER) THEN
             CALL xcloc_spxc_envelope_design(ierr)
             IF (ierr /= 0) THEN
-               WRITE(*,906)
+               WRITE(ERROR_UNIT,906)
                RETURN
             ENDIF
             ftype_ = XCLOC_SPXC_ENVELOPE_FILTER
          ELSEIF (ftype == XCLOC_SPXC_RMS_FILTER) THEN
             CALL xcloc_spxc_rmsFilter_design(ierr)
             IF (ierr /= 0) THEN
-               WRITE(*,907)
+               WRITE(ERROR_UNIT,907)
                RETURN
             ENDIF
             ftype_ = XCLOC_SPXC_RMS_FILTER
          ELSE
-            WRITE(*,905) ftype
+            WRITE(ERROR_UNIT,905) ftype
             ierr = 1
             RETURN
          ENDIF
@@ -156,7 +157,7 @@ MODULE XCLOC_SPXC
       xcsFilt(1:ldxc*nxcs) = xcs(1:ldxc*nxcs)
       CALL xcloc_spxc_filterXCsInPlace64f(ldxc, nptsInXCs, nxcs, xcsFilt, ierr)
       IF (ierr /= 0) THEN
-         WRITE(*,900)
+         WRITE(ERROR_UNIT,900)
          ierr = 1
       ENDIF
   900 FORMAT('xcloc_spxc_filterXCsOutOfPlace64f: In place filtering failed')
@@ -182,7 +183,7 @@ MODULE XCLOC_SPXC
       xcsFilt(1:ldxc*nxcs) = xcs(1:ldxc*nxcs)
       CALL xcloc_spxc_filterXCsInPlace32f(ldxc, nptsInXCs, nxcs, xcsFilt, ierr)
       IF (ierr /= 0) THEN
-         WRITE(*,900)
+         WRITE(ERROR_UNIT,900)
          ierr = 1 
       ENDIF
   900 FORMAT('xcloc_spxc_filterXCsOutOfPlace32f: In place filtering failed')
@@ -212,22 +213,22 @@ MODULE XCLOC_SPXC
       nsignals = nxcs
       npts = nptsInXCs
       IF (ldxc <  nptsInXCs .OR. nxcs < 1 .OR. nptsInXCs < 1) THEN
-         IF (ldxc < nptsInXCs) WRITE(*,900)
-         IF (nxcs < 1) WRITE(*,901)
-         IF (nptsInXCs < 1) WRITE(*,902)
+         IF (ldxc < nptsInXCs) WRITE(ERROR_UNIT,900)
+         IF (nxcs < 1) WRITE(ERROR_UNIT,901)
+         IF (nptsInXCs < 1) WRITE(ERROR_UNIT,902)
          ierr = 1 
          RETURN
       ENDIF
       IF (ftype_ == XCLOC_SPXC_ENVELOPE_FILTER) THEN
          CALL xcloc_spxc_envelope_apply64f(lds, npts, nsignals, xcs, ierr)
-         IF (ierr /= 0) WRITE(*,903)
+         IF (ierr /= 0) WRITE(ERROR_UNIT,903)
       ELSEIF (ftype_ == XCLOC_SPXC_RMS_FILTER) THEN
          CALL xcloc_spxc_rmsFilter_apply64f(lds, npts, nsignals, xcs, ierr)
-         IF (ierr /= 0) WRITE(*,904)
+         IF (ierr /= 0) WRITE(ERROR_UNIT,904)
       ELSE
          IF (ftype_ /= XCLOC_SPXC_DONOT_FILTER) THEN
-            ierr = 1 
-            WRITE(*,905)
+            WRITE(ERROR_UNIT,905)
+            ierr = 1
          ENDIF
          RETURN
       ENDIF
@@ -260,22 +261,22 @@ MODULE XCLOC_SPXC
       nsignals = nxcs
       npts = nptsInXCs
       IF (ldxc <  nptsInXCs .OR. nxcs < 1 .OR. nptsInXCs < 1) THEN
-         IF (ldxc < nptsInXCs) WRITE(*,900)
-         IF (nxcs < 1) WRITE(*,901)
-         IF (nptsInXCs < 1) WRITE(*,902)
+         IF (ldxc < nptsInXCs) WRITE(ERROR_UNIT,900)
+         IF (nxcs < 1) WRITE(ERROR_UNIT,901)
+         IF (nptsInXCs < 1) WRITE(ERROR_UNIT,902)
          ierr = 1 
          RETURN
       ENDIF
       IF (ftype_ == XCLOC_SPXC_ENVELOPE_FILTER) THEN
          CALL xcloc_spxc_envelope_apply32f(lds, npts, nsignals, xcs, ierr)
-         IF (ierr /= 0) WRITE(*,903)
+         IF (ierr /= 0) WRITE(ERROR_UNIT,903)
       ELSEIF (ftype_ == XCLOC_SPXC_RMS_FILTER) THEN
          CALL xcloc_spxc_rmsFilter_apply32f(lds, npts, nsignals, xcs, ierr)
-         IF (ierr /= 0) WRITE(*,904)
+         IF (ierr /= 0) WRITE(ERROR_UNIT,904)
       ELSE
          IF (ftype_ /= XCLOC_SPXC_DONOT_FILTER) THEN
-            ierr = 1 
-            WRITE(*,905)
+            WRITE(ERROR_UNIT,905)
+            ierr = 1
          ENDIF
          RETURN
       ENDIF
@@ -346,7 +347,7 @@ MODULE XCLOC_SPXC
       lisTypeIII_ = .TRUE.
       IF (MOD(nOrder_, 2) /= 0) THEN
          lisTypeIII_ = .FALSE.
-         WRITE(*,900) 
+         WRITE(ERROR_UNIT,900) 
          ierr = 1
          RETURN
       ENDIF 
@@ -355,7 +356,7 @@ MODULE XCLOC_SPXC
       xfact = 2.d0/DBLE(nCoeffs_ - 1)*beta
       ierr = ippsWinKaiser_64f_I(kaiser, nCoeffs_, xfact) ! only good to 7 digits?
       IF (ierr /= ippStsNoErr) THEN
-         WRITE(*,905)
+         WRITE(ERROR_UNIT,905)
          ierr = 1
          RETURN
       ENDIF
@@ -459,7 +460,7 @@ MODULE XCLOC_SPXC
                                          nImCoeffs_, hfiltI64f_, &
                                          x)
       IF (ierr /= 0) THEN
-         WRITE(*,900)
+         WRITE(ERROR_UNIT,900)
          ierr = 1
       ENDIF
   900 FORMAT('xcloc_spxc_envelope_apply64f: Failed to compute envelope')
@@ -500,7 +501,7 @@ MODULE XCLOC_SPXC
                                          nnzImCoeffs_, nzImIndices_, sparseHfiltI32f_, &
                                          x)
       IF (ierr /= 0) THEN
-         WRITE(*,900)
+         WRITE(ERROR_UNIT,900)
          ierr = 1 
       ENDIF
   900 FORMAT('xcloc_spxc_envelope_apply32f: Failed to compute envelope')
@@ -537,7 +538,7 @@ MODULE XCLOC_SPXC
       ierr = xcloc_firFilter_rmsFilter64f(lds, npts, nsignals, nCoeffs_, &
                                           rms64f_, x)
       IF (ierr /= 0) THEN
-         WRITE(*,900)
+         WRITE(ERROR_UNIT,900)
          ierr = 1
       ENDIF
   900 FORMAT('xcloc_spxc_rmsFilter_apply64f: Failed to apply RMS filter')
@@ -571,7 +572,7 @@ MODULE XCLOC_SPXC
       ierr = xcloc_firFilter_rmsFilter32f(lds, npts, nsignals, nCoeffs_, &
                                           rms32f_, x)
       IF (ierr /= 0) THEN
-         WRITE(*,900)
+         WRITE(ERROR_UNIT,900)
          ierr = 1
       ENDIF
   900 FORMAT('xcloc_spxc_rmsFilter_apply32f: Failed to apply RMS filter')

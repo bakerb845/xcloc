@@ -2,6 +2,7 @@
 !> @author Ben Baker
 !> @copyright Ben Baker distributed under the MIT license.
 MODULE XCLOC_FDXC
+      USE ISO_FORTRAN_ENV
       USE ISO_C_BINDING
       USE XCLOC_CONSTANTS
       USE XCLOC_IPPS
@@ -138,15 +139,15 @@ MODULE XCLOC_FDXC
       CALL xcloc_fdxc_finalize()
       nsignals = MAXVAL(xcPairs)
       IF (npts < 1 .OR. nsignals < 2 .OR. nptsPad < npts .OR. nxcs < 1) THEN
-         IF (npts < 1) WRITE(*,905) npts
-         IF (nsignals < 2) WRITE(*,906) nsignals
-         IF (nptsPad < npts) WRITE(*,907) nptsPad, npts
-         IF (nxcs < 1) WRITE(*,908) nxcs
+         IF (npts < 1) WRITE(ERROR_UNIT,905) npts
+         IF (nsignals < 2) WRITE(ERROR_UNIT,906) nsignals
+         IF (nptsPad < npts) WRITE(ERROR_UNIT,907) nptsPad, npts
+         IF (nxcs < 1) WRITE(ERROR_UNIT,908) nxcs
          ierr = 1
          RETURN
       ENDIF
       IF (MINVAL(xcPairs) < 1) THEN
-         WRITE(*,909)
+         WRITE(ERROR_UNIT,909)
          ierr = 1
          RETURN
       ENDIF
@@ -191,7 +192,7 @@ MODULE XCLOC_FDXC
       ! Set the cross-correlation table which will, in turn, initialize FFTw
       CALL xcloc_fdxc_setXCTableF(nxcs, xcPairs, ierr)
       IF (ierr /= 0) THEN
-         WRITE(*,910) 
+         WRITE(ERROR_UNIT,910) 
          CALL xcloc_fdxc_finalize()
       ENDIF
       ! Format statements
@@ -224,13 +225,13 @@ MODULE XCLOC_FDXC
       ELSEIF (accuracy == XCLOC_EP_ACCURACY) THEN
          accuracyMKL_ = vmlsetmode(IOR(VML_EP, VML_ERRMODE_ERRNO)) !VML_ERRMODE_STDERR))
       ELSE
-         WRITE(*,905) accuracy
+         WRITE(ERROR_UNIT,905) accuracy
          ierr = 1
          RETURN
       ENDIF
       ierr = vmlgeterrstatus() 
       IF (ierr /= VML_STATUS_OK) THEN
-         WRITE(*,900)
+         WRITE(ERROR_UNIT,900)
       ELSE
          ierr = 0 
       ENDIF
@@ -298,12 +299,12 @@ MODULE XCLOC_FDXC
       ierr = 1
       lhaveTable_ = .FALSE.
       IF (nxcs < 1) THEN
-         WRITE(*, 900) nxcs
+         WRITE(ERROR_UNIT, 900) nxcs
          RETURN
       ENDIF
       IF (MINVAL(xcPairs) < 1 .OR. MAXVAL(xcPairs) > nsignals_) THEN
-         IF (MINVAL(xcPairs) < 1) WRITE(*,901) MINVAL(xcPairs)
-         IF (MAXVAL(xcPairs) > nsignals_) WRITE(*,902) MAXVAL(xcPairs), nsignals_
+         IF (MINVAL(xcPairs) < 1) WRITE(ERROR_UNIT,901) MINVAL(xcPairs)
+         IF (MAXVAL(xcPairs) > nsignals_) WRITE(ERROR_UNIT,902) MAXVAL(xcPairs), nsignals_
          RETURN
       ENDIF
       ! Allocate space and copy table
@@ -315,7 +316,7 @@ MODULE XCLOC_FDXC
       lhaveTable_ = .TRUE.
       ! Allocate rest of space
       CALL xcloc_fdxc_initializeFFTW(ierr)
-      IF (ierr /= 0) WRITE(*,903)
+      IF (ierr /= 0) WRITE(ERROR_UNIT,903)
       ! Format statements
   900 FORMAT('xcloc_fdxc_setXCTableF: Error nxcs must be positive', I5)
   901 FORMAT('xcloc_fdxc_setXCTableF: minval(xcPairs)=', I6, ' must be positive')
@@ -344,9 +345,9 @@ MODULE XCLOC_FDXC
       ierr = 0
       CALL xcloc_fdxc_haveNoSignals()
       IF (ldx < npts .OR. npts /= npts_ .OR. nsignals /= nsignals_) THEN 
-         IF (ldx < npts) WRITE(*,900) ldx, npts 
-         IF (npts /= npts_) WRITE(*,901) npts_
-         IF (nsignals /= nsignals_) WRITE(*,902) nsignals_
+         IF (ldx < npts) WRITE(ERROR_UNIT,900) ldx, npts 
+         IF (npts /= npts_) WRITE(ERROR_UNIT,901) npts_
+         IF (nsignals /= nsignals_) WRITE(ERROR_UNIT,902) nsignals_
          ierr = 1
          RETURN
       ENDIF
@@ -354,7 +355,7 @@ MODULE XCLOC_FDXC
          ix = (i - 1)*ldx + 1
          CALL xcloc_fdxc_setSignal64fF(i, npts, x(ix), ierr)
          IF (ierr /= 0) THEN 
-            WRITE(*,910) i
+            WRITE(ERROR_UNIT,910) i
             RETURN
          ENDIF
       ENDDO
@@ -385,9 +386,9 @@ MODULE XCLOC_FDXC
       ierr = 0
       CALL xcloc_fdxc_haveNoSignals()
       IF (ldx < npts .OR. npts /= npts_ .OR. nsignals /= nsignals_) THEN
-         IF (ldx < npts) WRITE(*,900) ldx, npts
-         IF (npts /= npts_) WRITE(*,901) npts_
-         IF (nsignals /= nsignals_) WRITE(*,902) nsignals_
+         IF (ldx < npts) WRITE(ERROR_UNIT,900) ldx, npts
+         IF (npts /= npts_) WRITE(ERROR_UNIT,901) npts_
+         IF (nsignals /= nsignals_) WRITE(ERROR_UNIT,902) nsignals_
          ierr = 1
          RETURN
       ENDIF
@@ -395,7 +396,7 @@ MODULE XCLOC_FDXC
          ix = (i - 1)*ldx + 1
          CALL xcloc_fdxc_setSignal32fF(i, npts, x(ix), ierr)
          IF (ierr /= 0) THEN
-            WRITE(*,910) i
+            WRITE(ERROR_UNIT,910) i
             RETURN
          ENDIF
       ENDDO
@@ -418,8 +419,8 @@ MODULE XCLOC_FDXC
       ierr = 0
       nxcs = nxcs_
       IF (nxcs_ < 1) THEN
+         WRITE(ERROR_UNIT,900)
          ierr = 1
-         WRITE(*,900)
       ENDIF 
   900 FORMAT('xcloc_fdxc_getNumberOfCorrelograms: Correlation table never set!')
       RETURN
@@ -437,8 +438,8 @@ MODULE XCLOC_FDXC
       ierr = 0 
       nsignals = nsignals_
       IF (nsignals_ < 1) THEN
-         ierr = 1 
-         WRITE(*,900)
+         WRITE(ERROR_UNIT,900)
+         ierr = 1
       ENDIF
   900 FORMAT('xcloc_fdxc_getNumberOfSignals: No signals!')
       RETURN
@@ -456,8 +457,8 @@ MODULE XCLOC_FDXC
       ierr = 0
       nptsInXCs = nptsInXCs_
       IF (nptsInXCs_ < 1) THEN
+         WRITE(ERROR_UNIT,900) 
          ierr = 1
-         WRITE(*,900) 
       ENDIF 
   900 FORMAT('xcloc_fdxc_getCorrelogramLength: Correlogram length is 0')
       RETURN
@@ -571,12 +572,12 @@ MODULE XCLOC_FDXC
       INTEGER i1
       ierr = 0 
       IF (lwork < nptsInXCs_) THEN
-         WRITE(*,900) lwork, nptsInXCs_
+         WRITE(ERROR_UNIT,900) lwork, nptsInXCs_
          ierr = 1
          RETURN
       ENDIF
       IF (corrNumber < 1 .OR. corrNumber > nxcs_) THEN
-         WRITE(*,905) corrNumber, nxcs_,  nxcs_
+         WRITE(ERROR_UNIT,905) corrNumber, nxcs_,  nxcs_
          ierr = 1
          RETURN
       ENDIF
@@ -613,12 +614,12 @@ MODULE XCLOC_FDXC
       INTEGER i1
       ierr = 0
       IF (lwork < nptsInXCs_) THEN
-         WRITE(*,900) lwork, nptsInXCs_
+         WRITE(ERROR_UNIT,900) lwork, nptsInXCs_
          ierr = 1
          RETURN
       ENDIF
       IF (corrNumber < 1 .OR. corrNumber > nxcs_) THEN
-         WRITE(*,905) corrNumber, nxcs_,  nxcs_
+         WRITE(ERROR_UNIT,905) corrNumber, nxcs_,  nxcs_
          ierr = 1
          RETURN
       ENDIF
@@ -653,11 +654,11 @@ MODULE XCLOC_FDXC
       ierr = 1 
       IF (npts < 1) RETURN ! nothing to do
       IF (npts > npts_) THEN
-         WRITE(*,900) npts_
+         WRITE(ERROR_UNIT,900) npts_
          RETURN
       ENDIF
       IF (signalNumber < 1 .OR. signalNumber > nsignals_) THEN
-         WRITE(*,905) signalNumber
+         WRITE(ERROR_UNIT,905) signalNumber
          RETURN
       ENDIF
       ierr = 0 
@@ -693,11 +694,11 @@ MODULE XCLOC_FDXC
       ierr = 1
       IF (npts < 1) RETURN ! nothing to do
       IF (npts > npts_) THEN
-         WRITE(*,900) npts_
+         WRITE(ERROR_UNIT,900) npts_
          RETURN
       ENDIF
       IF (signalNumber < 1 .OR. signalNumber > nsignals_) THEN
-         WRITE(*,905) signalNumber
+         WRITE(ERROR_UNIT,905) signalNumber
          RETURN
       ENDIF
       ierr = 0 
@@ -726,7 +727,7 @@ MODULE XCLOC_FDXC
       ! Convert input signals to time domain
       CALL xcloc_fdxc_forwardTransform(ierr)
       IF (ierr /= 0) THEN
-         WRITE(*,900)  
+         WRITE(ERROR_UNIT,900)  
          RETURN
       ENDIF
       ! Compute the phase correlograms 
@@ -734,7 +735,7 @@ MODULE XCLOC_FDXC
       ! Inverse transform back to the time domain
       CALL xcloc_fdxc_inverseTransform(ierr)
       IF (ierr /= 0) THEN
-         WRITE(*,910)
+         WRITE(ERROR_UNIT,910)
          RETURN
       ENDIF
   900 FORMAT('xcloc_fdxc_computePhaseCorrelograms: Error computing forward transforms') 
@@ -754,7 +755,7 @@ MODULE XCLOC_FDXC
       ! Convert input signals to time domain
       CALL xcloc_fdxc_forwardTransform(ierr)
       IF (ierr /= 0) THEN
-         WRITE(*,900)  
+         WRITE(ERROR_UNIT,900)  
          RETURN
       ENDIF
       ! Compute the phase correlograms 
@@ -762,7 +763,7 @@ MODULE XCLOC_FDXC
       ! Inverse transform back to the time domain  
       CALL xcloc_fdxc_inverseTransform(ierr)
       IF (ierr /= 0) THEN
-         WRITE(*,910)
+         WRITE(ERROR_UNIT,910)
          RETURN
       ENDIF
   900 FORMAT('xcloc_fdxc_computeCrossCorrelograms: Error computing forward transforms')
@@ -789,7 +790,7 @@ MODULE XCLOC_FDXC
       REAL(C_DOUBLE), PARAMETER :: tol64 = TINY(1.d0)*10000.d0 !EPSILON(1.d0)*10.d0 
       ierr = 0
       IF (MINVAL(lhaveSignal_) < 1) THEN
-         WRITE(*, 900)
+         WRITE(OUTPUT_UNIT, 900)
   900    FORMAT('xcloc_fdxc_computeFDCorrelations: Warning some signals may not be set')
       ENDIF
       IF (precision_ == XCLOC_SINGLE_PRECISION) THEN
@@ -887,7 +888,7 @@ MODULE XCLOC_FDXC
       ierr = 0
       IF (nsignals_ == 0) RETURN ! nothing to do
       IF (.NOT.linitFFTw_) THEN
-         WRITE(*,900) 
+         WRITE(ERROR_UNIT,900) 
          ierr = 1
          RETURN
       ENDIF
@@ -916,7 +917,7 @@ MODULE XCLOC_FDXC
       ierr = 0 
       IF (nsignals_ == 0) RETURN ! nothing to do
       IF (.NOT.linitFFTw_) THEN
-         WRITE(*,900)
+         WRITE(ERROR_UNIT,900)
          ierr = 1
          RETURN
       ENDIF
@@ -993,13 +994,13 @@ MODULE XCLOC_FDXC
 #ifdef _OPENMP
       nthreads = OMP_GET_NUM_THREADS()
       IF (verbose_ > XCLOC_PRINT_INFO) THEN
-         WRITE(*,855) nthreads
+         WRITE(OUTPUT_UNIT,855) nthreads
   855    FORMAT('xcloc_fdxc_initializeFFTW: Initializing FFTs with nthreads=',I4)
       ENDIF 
       IF (precision_ == XCLOC_SINGLE_PRECISION) THEN
          fftwSuccess =  fftwf_init_threads()
          IF (fftwSuccess == 0) THEN
-            WRITE(*,900)
+            WRITE(ERROR_UNIT,900)
             ierr = 1
             RETURN
          ENDIF
@@ -1007,7 +1008,7 @@ MODULE XCLOC_FDXC
       ELSE
          fftwSuccess =  fftw_init_threads()
          IF (fftwSuccess == 0) THEN
-            WRITE(*,901)
+            WRITE(ERROR_UNIT,901)
             ierr = 1
             RETURN
          ENDIF
@@ -1016,7 +1017,7 @@ MODULE XCLOC_FDXC
   900 FORMAT('xcloc_fdxc_initializeFFTW: Error initializing threads - single')
   901 FORMAT('xcloc_fdxc_initializeFFTW: Error initializing threads - double')
 #else
-      IF (verbose_ > XCLOC_PRINT_INFO) WRITE(*,905)
+      IF (verbose_ > XCLOC_PRINT_INFO) WRITE(OUTPUT_UNIT,905)
   905 FORMAT('xcloc_fdxc_initializeFFTW: Initializing FFTs...')
 #endif
       IF (ALLOCATED(xcFTs32f_))        DEALLOCATE(xcFTs32f_)

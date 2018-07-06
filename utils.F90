@@ -2,6 +2,7 @@
 !> @author Ben Baker
 !> @copyright Ben Baker distributed under the MIT license.
 MODULE XCLOC_UTILS
+      USE ISO_FORTRAN_ENV
       USE ISO_C_BINDING
       USE XCLOC_CONSTANTS
       USE XCLOC_IPPS
@@ -10,6 +11,7 @@ MODULE XCLOC_UTILS
       PUBLIC :: xcloc_utils_computeDefaultXCTable
       PUBLIC :: xcloc_utils_partitionTasks
       PUBLIC :: xcloc_utils_unique32s
+      PUBLIC :: xcloc_utils_bsearch32i
       CONTAINS
 !========================================================================================!
 !                                     Begin the Code                                     !
@@ -48,12 +50,12 @@ MODULE XCLOC_UTILS
       ierr = 0
       nxcs = 0
       IF (nsignals < 1) THEN
-         WRITE(*,900)
+         WRITE(ERROR_UNIT,900)
          ierr = 1
          RETURN
       ENDIF
       IF (.NOT.ldoAutoCorrs .AND. nsignals < 2) THEN
-         WRITE(*,901)
+         WRITE(ERROR_UNIT,901)
          ierr = 1
          RETURN
       ENDIF
@@ -63,7 +65,7 @@ MODULE XCLOC_UTILS
          IF (nwork < 0) RETURN ! space inquiry
          xcPairs(:) = 0
          IF (nwork < 2*nxcs) THEN
-            WRITE(*,905) 2*nxcs
+            WRITE(ERROR_UNIT,905) 2*nxcs
             ierr = 1
             RETURN
          ENDIF
@@ -80,7 +82,7 @@ MODULE XCLOC_UTILS
          IF (nwork < 0) RETURN ! space inquiry
          xcPairs(:) = 0
          IF (nwork < 2*nxcs) THEN
-            WRITE(*,905) 2*nxcs
+            WRITE(ERROR_UNIT,905) 2*nxcs
             ierr = 1
             RETURN
          ENDIF
@@ -107,13 +109,14 @@ MODULE XCLOC_UTILS
 !>
 !>    @param[in] ntasks    Number of tasks to divide.
 !>    @param[in] nprocs    Number of processes to assign tasks to.
-!>    @param[out] myTasks  This is a map from the it'th task to the process ID.  
 !>    @param[out] taskPtr  Given the p'th process ID this will return the chunk of
 !>                         tasks in myTasks that the process is to complete - i.e.,
 !>                         myTasks(taskPtr(p+1):taskPtr:p+2)-1).
+!>    @param[out] myTasks  This is a map from the it'th task to the process ID.
 !>    @param[out] ierr     0 indicates success.
 !>
-      SUBROUTINE xcloc_utils_partitionTasks(ntasks, nprocs, myTasks, taskPtr, ierr) &
+      SUBROUTINE xcloc_utils_partitionTasks(ntasks, nprocs,          &
+                                            taskPtr, myTasks, ierr)  &
       BIND(C, NAME='xcloc_utils_partitionTasks')
       IMPLICIT NONE
       INTEGER(C_INT), VALUE, INTENT(IN) :: ntasks, nprocs
@@ -145,7 +148,7 @@ MODULE XCLOC_UTILS
       ! Verify
       DO i=1,ntasks
          IF (myTasks(i) < 0) THEN
-            WRITE(*,900) i
+            WRITE(ERROR_UNIT,900) i
             ierr = 1 
             RETURN
          ENDIF
@@ -155,17 +158,15 @@ MODULE XCLOC_UTILS
       taskPtr(1) = 1
       DO ip=1,nprocs
          isum = isum + taskCtr(ip)
-         taskPtr(ip+1) = isum
+         taskPtr(ip+1) = isum + 1
       ENDDO
-!     ! Let user review how the partition went
-!     IF (verbose > XCLOC_PRINT_WARNINGS) THEN
-!        DO ip=1,nprocs
-!           WRITE(*,905) ip-1, taskCtr(ip) 
-!        ENDDO
-!     ENDIF
       IF (ALLOCATED(taskCtr)) DEALLOCATE(taskCtr)
+      IF (isum /= ntasks) THEN
+         WRITE(ERROR_UNIT,905) isum, ntasks 
+         ierr = 1
+      ENDIF
   900 FORMAT('xcloc_utils_partitionTasks: Failed to initialize element', I4) 
-! 905 FORMAT('xcloc_utils_partitionTasks: Process', I4, ' has ', I6, ' operations')
+  905 FORMAT('xcloc_utils_partitionTasks: Counted', I4, ' ntasks; need ', I6, ' tasks')
       RETURN
       END
 !                                                                                        !
@@ -189,7 +190,7 @@ MODULE XCLOC_UTILS
       nUnique = 0
       IF (ALLOCATED(listUnique)) DEALLOCATE(listUnique)
       IF (n < 1) THEN
-         WRITE(*,900) 
+         WRITE(ERROR_UNIT,900) 
          ierr = 1
          RETURN
       ENDIF
@@ -200,7 +201,7 @@ MODULE XCLOC_UTILS
       work(np1) = MINVAL(list) - 1 ! Will avoid a match in sorted list
       ierr = ippsSortAscend_32s_I(work, n) ! Only sort first n elements
       IF (ierr /= 0) THEN
-         WRITE(*,901) 
+         WRITE(ERROR_UNIT,901) 
          ierr = 1
          DEALLOCATE(work)
          RETURN
@@ -222,6 +223,39 @@ MODULE XCLOC_UTILS
       DEALLOCATE(workUnique)
   900 FORMAT('xcloc_utils_unique32s: No points in input list') 
   901 FORMAT('xcloc_utils_unique32s: Failed to sort list')
+      RETURN
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Searches an array sorted in increasing order for a key.
+!>    @param[in] n       Number of elements in values.
+!>    @param[in] key     Item to search for in values.
+!>    @param[in] values  Array of items sorted in increasing order.
+!>    @param[out] indx   Index in array values that matches key.
+!>    @param[out] ierr   0 indicates success.
+      SUBROUTINE xcloc_utils_bsearch32i(n, key, values, indx, ierr)
+      INTEGER, VALUE, INTENT(IN) :: key, n
+      INTEGER, INTENT(IN) :: values(n)
+      INTEGER, INTENT(OUT) :: indx, ierr
+      INTERFACE
+         SUBROUTINE xcloc_sort_bsearch32i(key, values, n, indx, ierr) &
+         BIND(C, NAME='xcloc_sort_bsearch32i')
+         USE ISO_C_BINDING
+         INTEGER(C_INT), VALUE, INTENT(IN) :: key, n
+         INTEGER(C_INT), INTENT(IN) :: values(n)
+         INTEGER(C_INT), INTENT(OUT) :: indx, ierr
+         END SUBROUTINE
+      END INTERFACE
+      ierr = 0
+      CALL xcloc_sort_bsearch32i(key, values, n, indx, ierr)
+      IF (ierr /= 0) THEN
+         WRITE(ERROR_UNIT,900) key
+         ierr = 1
+      ELSE
+         indx = indx + 1 ! C to F indexing
+      ENDIF 
+  900 FORMAT('xcloc_utils_bsearch32i: Could not find key=', I6, ' in values')
       RETURN
       END
 END MODULE

@@ -2,6 +2,7 @@
 !> @author Ben Baker
 !> @copyright Ben Baker distributed under the MIT license.
 MODULE XCLOC_CONSTANTS
+      USE ISO_FORTRAN_ENV
       USE ISO_C_BINDING
       !> Single precision.
       INTEGER(C_INT), PARAMETER :: XCLOC_SINGLE_PRECISION = 0
@@ -57,7 +58,7 @@ MODULE XCLOC_CONSTANTS
       INTEGER(C_INT), VALUE, INTENT(IN) :: prec
       isValid = .TRUE.
       IF (prec /= XCLOC_SINGLE_PRECISION .AND. prec /= XCLOC_DOUBLE_PRECISION) THEN
-         WRITE(*,900) prec, XCLOC_SINGLE_PRECISION, XCLOC_DOUBLE_PRECISION
+         WRITE(ERROR_UNIT,900) prec, XCLOC_SINGLE_PRECISION, XCLOC_DOUBLE_PRECISION
          isValid = .FALSE.
       ENDIF
   900 FORMAT("xcloc_constants_isValidPrecision: prec=", I4, " must be single=", I2, &
@@ -75,7 +76,8 @@ MODULE XCLOC_CONSTANTS
       IF (acc /= XCLOC_HIGH_ACCURACY .AND. &
           acc /= XCLOC_LOW_ACCURACY  .AND. &
           acc /= XCLOC_EP_ACCURACY) THEN
-         WRITE(*,900) acc, XCLOC_HIGH_ACCURACY, XCLOC_LOW_ACCURACY, XCLOC_EP_ACCURACY
+         WRITE(ERROR_UNIT,900) acc, XCLOC_HIGH_ACCURACY, &
+                               XCLOC_LOW_ACCURACY, XCLOC_EP_ACCURACY
          isValid = .FALSE.
       ENDIF
   900 FORMAT("xcloc_constants_isValidAccuracy: accuracy=", I4, " must be highe=", I2, &
@@ -91,7 +93,7 @@ MODULE XCLOC_CONSTANTS
       INTEGER(C_INT), VALUE, INTENT(IN) :: num
       isValid = .TRUE.
       IF (num /= XCLOC_C_NUMBERING .AND. num /= XCLOC_FORTRAN_NUMBERING) THEN
-         WRITE(*,900) num, XCLOC_C_NUMBERING, XCLOC_FORTRAN_NUMBERING
+         WRITE(ERROR_UNIT,900) num, XCLOC_C_NUMBERING, XCLOC_FORTRAN_NUMBERING
          isValid = .FALSE.
       ENDIF
   900 FORMAT("xcloc_constants_isValidNumbering: num=", I4, " must be C=", I2, &

@@ -28,7 +28,7 @@ int fft_rfftfreqs64f_work_hack(const int n, const double dt,
 */
     if (dt <= 0.0)
     {
-        fprintf(stderr, "invalid sample spacing=%e!\n", __func__, dt);
+        fprintf(stderr, "%s: invalid sample spacing=%e!\n", __func__, dt);
         return -1;
 /*
         isclPrintError("Invalid sample spacing=%e!\n", dt);
@@ -186,14 +186,14 @@ int fft_rfft64f_work_hack(const int nx, const double *__restrict__ x, const int 
     fftw_complex *out;
     double *in;
     fftw_plan p;
-    int i, ntf;
+    int i;//, ntf;
     int ierr; //enum isclError_enum ierr;
     const double zero = 0.0;
     //------------------------------------------------------------------------//
     //  
     // Size checking
     ierr = 0; //ISCL_SUCCESS;
-    ntf = n/2 + 1;
+    //ntf = n/2 + 1;
     //isclReturnArrayTooSmallError("n", n, 1);
     //isclReturnArrayTooSmallError("nx", nx, 1);
     //isclReturnArrayTooSmallError("ny", ny, ntf);

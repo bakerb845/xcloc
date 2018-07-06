@@ -3,6 +3,7 @@
 !> @copyright Ben Baker distributed under the MIT license.
 MODULE XCLOC_FDXC_MPI
       USE ISO_C_BINDING
+      USE ISO_FORTRAN_ENV
       USE MPI_F08
       USE XCLOC_CONSTANTS
       USE XCLOC_MEMORY
@@ -18,32 +19,29 @@ MODULE XCLOC_FDXC_MPI
 #else
       TYPE(MPI_Comm), PRIVATE, SAVE :: comm_
 #endif
-      !> RMA window for setting signals.
-      TYPE(MPI_Win), PRIVATE, SAVE :: signalRMAWindow_
-      !> RMA window for gathering correlograms.
-      TYPE(MPI_Win), PRIVATE, SAVE :: xcRMAWindow_
-      !> Holds all the input signals.
-
-      !> Memory on the RMA signal window for holding the input signals.
-      DOUBLE PRECISION, ALLOCATABLE, PRIVATE, SAVE :: inputSignalsRMA64f_(:)
-      !> Memory on the RMA signal window for holding the input signals.
-      REAL, ALLOCATABLE, PRIVATE, SAVE :: inputSignalsRMA32f_(:)
-      !> Root (master) process ID.
+!     !> RMA window for setting signals.
+!     TYPE(MPI_Win), PRIVATE, SAVE :: signalRMAWindow_
+!     !> Memory on the RMA signal window for holding the input signals.
+!     DOUBLE PRECISION, POINTER, DIMENSION(:), PRIVATE, SAVE :: inputSignalsRMA64f_
+!     !> Memory on the RMA signal window for holding the input signals.
+!     REAL, POINTER, DIMENSION(:), PRIVATE, SAVE :: inputSignalsRMA32f_
+!     !> Pointer to the data on the window.
+!     TYPE(C_PTR), SAVE :: dataPtr_ = C_NULL_PTR
+      !> Root process ID.
       INTEGER, PRIVATE, SAVE :: root_ = 0
       !> Number of processes on the communicator.
       INTEGER, PRIVATE, SAVE :: nprocs_ = 0
       !> My rank on the process.
       INTEGER, PRIVATE, SAVE :: myid_ = MPI_UNDEFINED
-      !> represents the (i,j)'th signal (globally indexed).
+      !> A list of each processes list of unique signals global signal IDs.
+      INTEGER, PRIVATE, ALLOCATABLE, SAVE :: uniqueGlobalSignalIDs_(:)
+      !> This maps from the ip'th process to the start index of uniqueGlobalSignalIDs_.
+      !> This has dimension [nprocs_ + 1].
+      INTEGER, PRIVATE, ALLOCATABLE, SAVE :: uniqueGlobalSignalIDPtr_(:)
+      !> This
       !> This maps from the isLoc'th local signal number to the global signal number.
       !> This has dimension [nsignalsLocal_].
       INTEGER, ALLOCATABLE, PRIVATE, SAVE :: local2GlobalSignal_(:)
-      !> This is a [2 x nXCsLocal_] matrix where (2
-      INTEGER, ALLOCATABLE, PRIVATE, SAVE :: xcPairsLocal_localNumbering_(:)
-      INTEGER, ALLOCATABLE, PRIVATE, SAVE :: xcPairsLocalNumbering_(:)
-      !> Maps from
-      INTEGER, ALLOCATABLE, PRIVATE, SAVE :: myXCs_(:)
-      INTEGER, ALLOCATABLE, PRIVATE, SAVE :: myXCPtr_(:)
       !> Length of input signals.
       INTEGER, PRIVATE, SAVE :: npts_ = 0
       !> The leading dimension of the input signals RMA buffer.
@@ -72,131 +70,312 @@ MODULE XCLOC_FDXC_MPI
       LOGICAL, PRIVATE, SAVE :: ldoXC_ = .FALSE.
       !> If true then free the communicator.
       LOGICAL, PRIVATE, SAVE :: lfreeComm_ = .FALSE.
+      !> If true then free the input signal RMA window
+!     LOGICAL, PRIVATE, SAVE :: lfreeSignalRMA_ = .FALSE. 
+      !> If true then free the cross-correlation RMA window
+      INTEGER(KIND=8), PRIVATE, PARAMETER :: alignPage_ = 4096
+      !LOGICAL, PRIVATE, SAVE :: lfree
       PUBLIC :: xcloc_fdxcMPI_initialize
       CONTAINS
 !========================================================================================!
 !                                      Begin the Code                                    !
 !========================================================================================!
 !>    @brief Initializes the parallel frequency domain cross-correlation calculator.
-!>    @param[in] comm      MPI communicator.
-!>    @param[in] master    ID of master process.  This will likely be 0.
+!>    @param[in] fcomm     MPI communicator.
+!>    @param[in] root      ID of root process.  This will likely be 0 and must be 
+!>                         defined on all processes.
 !>    @param[in] npts      Number of points in each input signal.  This is defined on
-!>                         the master process.
+!>                         the root process.
 !>    @param[in] nptsPad   A tuning parameter to mitigate DFT lengths that could
 !>                         potentially be large semi-prime numbers.  This is defined
-!>                         on the master process.
+!>                         on the root process.
 !>    @param[in] nxcs      Number of cross-correlations.  This is defined on the
-!>                         master process.
+!>                         root process.
 !>    @param[in] xcPairs   This is a [2 x nxcs] matrix in column major format where
 !>                         the indices, (2*(ixc-1)+1, 2*(ixc-1)+2), map to the
 !>                         (i,j)'th signal pair comprising a correlation.
-!>                         This is defined on the master process.
+!>                         This is defined on the root process.
 !>    @param[in] verbose   Controls the verbosity of the module.  This is defined
-!>                         on the master process.
-!>    @param[in] prec      The precision of hte module.  This is defined on the
-!>                         master process.
+!>                         on the root process.
+!>    @param[in] prec      The precision of the module.  This is defined on the
+!>                         root process.
 !>    @param[in] accuracy  Controls the accuracy of the vector calculations in MKL.
-!>                         This is defined on the master process.
+!>                         This is defined on the root process.
 !>    @param[out] ierr     0 indicates sucess.
 !>
-      SUBROUTINE xcloc_fdxcMPI_initialize(comm, master,                   &
+      SUBROUTINE xcloc_fdxcMPI_initialize(comm, root,                     &
                                           npts, nptsPad,                  &
                                           nxcs, xcPairs,                  &
                                           verbose, prec, accuracy, ierr)  &
       BIND(C, NAME='xcloc_fdxcMPI_initialize')
       TYPE(MPI_Comm), VALUE, INTENT(IN) :: comm
-      INTEGER(C_INT), VALUE, INTENT(IN) :: master, npts, nptsPad, nxcs, &
+      !INTEGER(C_INT), VALUE, INTENT(IN) :: fcomm !TODO could be problematic w/ *finter.h
+      INTEGER(C_INT), VALUE, INTENT(IN) :: root, npts, nptsPad, nxcs, &
                                            verbose, prec, accuracy
       INTEGER(C_INT), INTENT(IN) :: xcPairs(*)
-      INTEGER ierr, indx, mpierr, myid, nsignals
-      INTEGER(KIND=8) nwork
+      INTEGER(C_INT), INTENT(OUT) :: ierr
+      !> Maps from 
+      INTEGER, ALLOCATABLE, DIMENSION(:) :: l2gSignal, myXCs,  myXCPtr, signalList, &
+                                            work, xcPairsWork, xcPairsLocal
+      INTEGER i, i1, i2, ierrLocal, indx, ip, mpierr, nsignals, nsloc, nwork
+      root_ = root
       ! Copy the communicator
-      CALL MPI_COMM_DUP_WITH_INFO(comm, MPI_INFO_NULL, comm_)
+      CALL MPI_COMM_DUP_WITH_INFO(comm, MPI_INFO_NULL, comm_, mpierr)
       lfreeComm_ = .TRUE.
       ! Get information 
       CALL MPI_COMM_RANK(comm_, myid_, mpierr)
       CALL MPI_COMM_SIZE(comm_, nprocs_, mpierr)
-      ! Some basic checks by master process
+      ! Some basic checks by root process
       ierr = 1
-      IF (myid == master) THEN
+      IF (myid_ == root) THEN
          ierr = 0
-         root_ = master
-         IF (npts < 1 .OR. nsignals < 2 .OR. nptsPad < npts .OR. nxcs < 1) THEN
-            IF (npts < 1) WRITE(*,905) npts 
-            IF (nptsPad < npts) WRITE(*,907) nptsPad, npts
-            IF (nxcs < 1) WRITE(*,908) nxcs
+         root_ = root
+         IF (npts < 1 .OR. nptsPad < npts .OR. nxcs < 1) THEN
+            IF (npts < 1) WRITE(ERROR_UNIT,905) npts 
+            IF (nptsPad < npts) WRITE(ERROR_UNIT,907) nptsPad, npts
+            IF (nxcs < 1) WRITE(ERROR_UNIT,908) nxcs
             ierr = 1
          ENDIF
          nsignals = MAXVAL(xcPairs(1:2*nxcs))
          IF (nsignals < 2) THEN
-            WRITE(*,906) nsignals
+            WRITE(ERROR_UNIT,906) nsignals
+            ierr = 1
+         ENDIF
+         nsignals = MAXVAL(xcPairs(1:2*nxcs))
+         IF (nsignals < 2) THEN
+            WRITE(ERROR_UNIT,906) nsignals
             ierr = 1
          ENDIF
          IF (.NOT. xcloc_constants_isValidPrecision(prec)) ierr = 1 
          IF (.NOT. xcloc_constants_isValidAccuracy(accuracy)) ierr = 1
-         IF (ierr == 0) THEN
-            npts_     = npts
-            nptsPad_  = nptsPad
-            nSignalsTotal_ = nsignals
-            verbose_ = verbose
-            nptsInXCs_ = 2*nptsPad_ - 1   ! Length of the cross-correlations
-            nXCsTotal_ = nxcs
-            accuracy_ = accuracy
-            precision_ = prec
-            ! build up the workspaces
-            !lds_ = xcloc_memory_padLength(4096, SIZEOF(1.d0), nptsPad_) 
-            !nwork = lds_*
+         IF (ierr /= 0) GOTO 500
+         npts_     = npts
+         nptsPad_  = nptsPad
+         nSignalsTotal_ = nsignals
+         verbose_ = verbose
+         nptsInXCs_ = 2*nptsPad_ - 1   ! Length of the cross-correlations
+         nXCsTotal_ = nxcs
+         accuracy_ = accuracy
+         precision_ = prec
+         ! build up the workspaces
+         IF (precision_ == XCLOC_SINGLE_PRECISION) THEN
+            lds_ = xcloc_memory_padLength(alignPage_, SIZEOF(1.0),  nptsPad_)
+         ELSE
+            lds_ = xcloc_memory_padLength(alignPage_, SIZEOF(1.d0), nptsPad_)
          ENDIF
+         !nwork = lds_*
+         ! Need to partition the work
+         ALLOCATE(myXCs(nXCsTotal_))
+         ALLOCATE(myXCPtr(nprocs_+1))
+         CALL xcloc_utils_partitionTasks(nXCsTotal_, nprocs_, myXCPtr, myXCs, ierr)
+         IF (verbose_ > XCLOC_PRINT_WARNINGS) THEN
+            DO ip=1,nprocs_
+               WRITE(OUTPUT_UNIT,910) ip-1, myXCPtr(ip+1) - myXCPtr(ip)
+            ENDDO
+         ENDIF
+         ! Now that the work is partitioned figure out which processes get which signals.
+         ALLOCATE(signalList(2*nXCsTotal_)); signalList(:) = 0
+         ALLOCATE(uniqueGlobalSignalIDPtr_(nprocs_+1)); uniqueGlobalSignalIDPtr_(:) = 0
+         ALLOCATE(work(nprocs_*nSignalsTotal_)); work(:) =-1 
+         uniqueGlobalSignalIDPtr_(1) = 1
+         DO ip=1,nprocs_
+            i1 = myXCPtr(ip)
+            i2 = myXCPtr(ip+1) - 1
+            i1 = 2*(i1 - 1) + 1
+            i2 = 2*i2
+            nwork = i2 - i1 + 1
+            nsloc = 0
+            IF (nwork > 0) THEN
+               signalList(1:nwork) = xcPairs(i1:i2)
+               CALL xcloc_utils_unique32s(nwork, signalList, nsloc, &
+                                          l2gSignal, ierr)
+               indx = uniqueGlobalSignalIDPtr_(ip)
+               work(indx:indx+nsloc-1) = l2gSignal(1:nsloc)
+               IF (ALLOCATED(l2gSignal)) DEALLOCATE(l2gSignal)
+            ENDIF
+            uniqueGlobalSignalIDPtr_(ip+1) = uniqueGlobalSignalIDPtr_(ip) + nsloc
+         ENDDO
+         nwork = uniqueGlobalSignalIDPtr_(nprocs_+1) - 1
+         ALLOCATE(uniqueGlobalSignalIDs_(nwork))
+         uniqueGlobalSignalIDs_(:) =-1
+         uniqueGlobalSignalIDs_(1:nwork) = work(1:nwork)
+         IF (ALLOCATED(signalList)) DEALLOCATE(signalList)
+         IF (ALLOCATED(work)) DEALLOCATE(work)
       ENDIF
-      CALL MPI_BCAST(ierr, 1, MPI_INTEGER, master, comm_, mpierr)
+  500 CONTINUE
+      CALL MPI_BCAST(ierr, 1, MPI_INTEGER, root, comm_, mpierr)
       IF (ierr /= 0) RETURN
       ! Set some basic information
-      CALL MPI_BCAST(root_,          1, MPI_INTEGER, master, comm_, mpierr)
-      CALL MPI_BCAST(npts_,          1, MPI_INTEGER, master, comm_, mpierr)
-      CALL MPI_BCAST(nptsPad_,       1, MPI_INTEGER, master, comm_, mpierr)
-      CALL MPI_BCAST(nSignalsTotal_, 1, MPI_INTEGER, master, comm_, mpierr)
-      CALL MPI_BCAST(verbose_,       1, MPI_INTEGER, master, comm_, mpierr)
-      CALL MPI_BCAST(accuracy_,      1, MPI_INTEGER, master, comm_, mpierr)
-      CALL MPI_BCAST(nptsInXCs_,     1, MPI_INTEGER, master, comm_, mpierr)
-      CALL MPI_BCAST(nXCsTotal_,     1, MPI_INTEGER, master, comm_, mpierr)
-      ! Load balance
-      ALLOCATE(myXCs_(nXCsTotal_))
-      ALLOCATE(myXCPtr_(nprocs_+1))
-      CALL xcloc_utils_partitionTasks(nXCsTotal_, nprocs_, myXCs_, myXCPtr_, ierr)
+      CALL MPI_Bcast(root_,          1, MPI_INTEGER, root, comm_, mpierr)
+      CALL MPI_Bcast(npts_,          1, MPI_INTEGER, root, comm_, mpierr)
+      CALL MPI_Bcast(nptsPad_,       1, MPI_INTEGER, root, comm_, mpierr)
+      CALL MPI_Bcast(nSignalsTotal_, 1, MPI_INTEGER, root, comm_, mpierr)
+      CALL MPI_Bcast(verbose_,       1, MPI_INTEGER, root, comm_, mpierr)
+      CALL MPI_Bcast(accuracy_,      1, MPI_INTEGER, root, comm_, mpierr)
+      CALL MPI_Bcast(precision_,     1, MPI_INTEGER, root, comm_, mpierr)
+      CALL MPI_Bcast(nptsInXCs_,     1, MPI_INTEGER, root, comm_, mpierr)
+      CALL MPI_Bcast(nXCsTotal_,     1, MPI_INTEGER, root, comm_, mpierr)
+      CALL MPI_Bcast(lds_,           1, MPI_INTEGER, root, comm_, mpierr)
+      IF (.NOT.ALLOCATED(myXCs))       ALLOCATE(myXCs(nXCsTotal_))
+      IF (.NOT.ALLOCATED(myXCPtr))     ALLOCATE(myXCPtr(nprocs_+1))
+      IF (.NOT.ALLOCATED(xcPairsWork)) ALLOCATE(xcPairsWork(2*nXCsTotal_))
+      IF (.NOT.ALLOCATED(uniqueGlobalSignalIDPtr_)) THEN
+         ALLOCATE(uniqueGlobalSignalIDPtr_(nprocs_+1))
+      ENDIF
+      IF (myid_ == root_) xcPairsWork(1:2*nXCsTotal_) = xcPairs(1:2*nXCsTotal_)
+      CALL MPI_Bcast(myXCs,       nXCsTotal_,   MPI_INTEGER, root_, comm_, mpierr)
+      CALL MPI_Bcast(myXCPtr,     nprocs_+1,    MPI_INTEGER, root_, comm_, mpierr)
+      CALL MPI_Bcast(xcPairsWork, 2*nXCsTotal_, MPI_INTEGER, root_, comm_, mpierr)
+      CALL MPI_Bcast(uniqueGlobalSignalIDPtr_, nprocs_+1, MPI_INTEGER, &
+                     root_, comm_, mpierr)
+      nwork = uniqueGlobalSignalIDPtr_(nprocs_+1) - 1
+      IF (.NOT.ALLOCATED(uniqueGlobalSignalIDs_)) ALLOCATE(uniqueGlobalSignalIDs_(nwork))
+      CALL MPI_Bcast(uniqueGlobalSignalIDs_, nwork, MPI_INTEGER, root_, comm_, mpierr)
       ! Figure out the number of cross-correlations that I need to perform
-      indx = myXCs_(myid+1)
-      nXCsLocal_ = myXCPtr_(indx+1) - myXCPtr_(indx)
-!     ALLOCATE(xcPairsLocal_(MAX(2*nLocalXCs_, 1))); xcPairsLoc_(:) = 0
+      nXCsLocal_ = myXCPtr(myid_+2) - myXCPtr(myid_+1)
+      CALL MPI_ALLREDUCE(nXCsLocal_, nwork, 1, MPI_INTEGER, MPI_SUM, comm_, mpierr)
+      IF (nwork /= nXCsTotal_) THEN
+         IF (myid_ == root_) WRITE(ERROR_UNIT,911) nwork, nXCsTotal_
+         ierr = 1
+         RETURN
+      ENDIF
+      ! Figure out the unique signals I must concern myself with
+      ALLOCATE(signalList(2*MAX(1, nXCsLocal_))); signalList(:) = 0
+      ierrLocal = 0
+      nSignalsLocal_ = 0
       IF (nXCsLocal_ > 0) THEN
-!        CALL xcloc_fdxc_initialize(npts_,      nptsPad_,    &
-!                                   nXCsLocal_, xcPairsLocal_, &
-!                                   verbose_, prec_, accuracy_, ierr) 
+         i1 = uniqueGlobalSignalIDPtr_(myid_+1)
+         i2 = uniqueGlobalSignalIDPtr_(myid_+2) - 1
+         nSignalsLocal_ = i2 - i1 + 1
+         ALLOCATE(local2GlobalSignal_(nSignalsLocal_))
+         local2GlobalSignal_(1:nSignalsLocal_) = uniqueGlobalSignalIDs_(i1:i2)
+         i1 = myXCPtr(myid_+1)
+         i2 = myXCPtr(myid_+2) - 1
+         i1 = 2*(i1 - 1) + 1
+         i2 = 2*i2
+         signalList(1:2*nXCsLocal_) = xcPairsWork(i1:i2)
+         IF (MINVAL(local2GlobalSignal_) < MINVAL(signalList) .OR. &
+             MAXVAL(local2GlobalSignal_) > MAXVAL(signalList) .OR. ierr /= 0) THEN
+             WRITE(ERROR_UNIT,912) myid_
+             ierrLocal = 1
+         ENDIF
+         ! Make a local xcPairs 
+         ALLOCATE(xcPairsLocal(2*nxcsLocal_)); xcPairsLocal(:) =-1
+         DO i=i1,i2
+            ! The index of global signal list that matches the signal index to
+            ! is the local signal index.
+            CALL xcloc_utils_bsearch32i(nSignalsLocal_, xcPairsWork(i),  &
+                                        local2GlobalSignal_, indx, ierr)
+            IF (ierr /= 0) THEN
+               WRITE(ERROR_UNIT,913) myid_
+               ierrLocal = 1
+            ENDIF
+            xcPairsLocal(i-i1+1) = indx
+         ENDDO
+         IF (MINVAL(xcPairsLocal) < 1 .OR. MINVAL(xcPairsLocal) > nSignalsLocal_) THEN
+            WRITE(ERROR_UNIT,914)
+            ierrLocal = 1
+         ENDIF
+         ! Can now initialize
+         CALL xcloc_fdxc_initialize(npts_, nptsPad_,                     &
+                                    nxcsLocal_, xcPairsLocal,            &
+                                    verbose_, precision_, accuracy_, ierr) 
+         IF (ierr /= 0) THEN
+            WRITE(ERROR_UNIT,915) myid_
+            ierrLocal = 1
+         ENDIF
+         ldoXC_ = .TRUE.
+      ELSE
+         ldoXC_ = .FALSE.
       ENDIF
-      ! Set space
-      !IF (precision_ == 
-      IF (myid_ == root_) THEN
-
-      ENDIF
-      !CALL MPI_Win_create( )
+      CALL MPI_ALLREDUCE(ierrLocal, ierr, 1, MPI_INTEGER, MPI_MAX, comm_, mpierr) 
+      IF (ierr /= 0) RETURN
+!     ! Create an RMA window to get the signals
+!     CALL MPI_Sizeof(1.d0, sizeDataType, mpierr)
+!     IF (precision_ == XCLOC_SINGLE_PRECISION) CALL MPI_Sizeof(1.0, sizeDataType, mpierr)
+!     IF (precision_ == XCLOC_SINGLE_PRECISION) THEN
+!        CALL MPI_Sizeof(inputSignalsRMA32f_, sizeDataType, mpierr)
+!        !arrayShape(1) = lds_
+!        !nalloc = arrayShape(1)*sizeDataType
+!        !IF (myid_ == root_) THEN
+!           arrayShape(1) = lds_*nSignalsTotal_
+!           nalloc = arrayShape(1)*sizeDataType
+!        !ENDIF
+!        CALL MPI_Alloc_mem(nalloc, MPI_INFO_NULL, dataPtr_, mpierr)
+!        CALL C_F_POINTER(dataPtr_, inputSignalsRMA32f_, arrayShape)
+!        CALL MPI_Win_create(dataPtr_, nalloc, sizeDataType,               &
+!                            MPI_INFO_NULL, comm_, signalRMAWindow_, mpierr)
+!        inputSignalsRMA32f_(:) = 0.0
+!        lfreeSignalRMA_ = .TRUE.
+!     ELSE
+!        CALL MPI_Sizeof(inputSignalsRMA64f_, sizeDataType, mpierr)
+!        !arrayShape(1) = lds_
+!        !nalloc = arrayShape(1)*sizeDataType
+!        !IF (myid_ == root_) THEN
+!           arrayShape(1) = lds_*nSignalsTotal_
+!           nalloc = arrayShape(1)*sizeDataType
+!        !ENDIF
+!        CALL MPI_Alloc_mem(nalloc, MPI_INFO_NULL, dataPtr_, mpierr)
+!        CALL C_F_POINTER(dataPtr_, inputSignalsRMA64f_, arrayShape)
+!        CALL MPI_Win_create(dataPtr_, nalloc, sizeDataType,               &
+!                            MPI_INFO_NULL, comm_, signalRMAWindow_, mpierr)
+!        inputSignalsRMA64f_(:) = 0.d0
+!        lfreeSignalRMA_ = .TRUE.
+!     ENDIF
+      ! Free workspace
+      IF (ALLOCATED(myXCs))       DEALLOCATE(myXCs)
+      IF (ALLOCATED(myXCPtr))     DEALLOCATE(myXCPtr)
+      IF (ALLOCATED(signalList))  DEALLOCATE(signalList)
+      IF (ALLOCATED(xcPairsWork)) DEALLOCATE(xcPairsWork)
       ! Format statements
-  905 FORMAT("xcloc_fdxcMPI_initialize: npts=", I8, "must be positive")
-  906 FORMAT("xcloc_fdxcMPI_initialize: nsignals=", I8, "must be at least 2")
-  907 FORMAT("xcloc_fdxcMPI_initialize: nptsPad=", I8, "must be greater than npts=", I8)
-  908 FORMAT("xcloc_fdxc_initialize: No correlation pairs=", I8)
+  905 FORMAT("xcloc_fdxcMPI_initialize: npts=", I8, " must be positive")
+  906 FORMAT("xcloc_fdxcMPI_initialize: nsignals=", I8, " must be at least 2")
+  907 FORMAT("xcloc_fdxcMPI_initialize: nptsPad=", I8, " must be greater than npts=", I8)
+  908 FORMAT("xcloc_fdxcMPI_initialize: No correlation pairs=", I8)
+  910 FORMAT('xcloc_fdxcMPI_initialize: Process', I4, ' has ', I6, ' correlations')
+  911 FORMAT('xcloc_fdxcMPI_initialize: Have ', I6, ' xcs but need ', I6, ' xcs')
+  912 FORMAT('xcloc_fdxcMPI_initialize: Local to global signal map is wrong on rank', I4)
+  913 FORMAT('xcloc_fdxcMPI_initialize: bsearch failure on rank:', I4, ' check l2g map')
+  914 FORMAT('xcloc_fdxcMPI_initialize: failed to generate xcPairsLocal on rank', I4)
+  915 FORMAT('xcloc_fdxcMPI_initialize: fdxc initialization failed on rank', I4)
       RETURN
       END
-
-      SUBROUTINE xcloc_fdxcMPI_finalize() &
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Releases memory on the module.
+!>
+      SUBROUTINE xcloc_fdxcMPI_finalize()  &
       BIND(C, NAME='xcloc_fdxcMPI_finalize')
-      IF (lfreeComm_) CALL MPI_COMM_FREE(comm_)
+      INTEGER mpierr
+      CALL xcloc_fdxc_finalize()
+      IF (ALLOCATED(uniqueGlobalSignalIDPtr_)) DEALLOCATE(uniqueGlobalSignalIDPtr_)
+      IF (ALLOCATED(uniqueGlobalSignalIDs_)) DEALLOCATE(uniqueGlobalSignalIDs_)
+!     IF (lfreeSignalRMA_) CALL MPI_Win_free(signalRMAWindow_, mpierr)
+      IF (lfreeComm_) CALL MPI_COMM_FREE(comm_, mpierr)
+      IF (ALLOCATED(local2GlobalSignal_)) DEALLOCATE(local2GlobalSignal_)
+!     ! could also use SIZEOF( ) > 0
+!     IF (ASSOCIATED(inputSignalsRMA32f_)) THEN
+!        CALL MPI_Free_mem(inputSignalsRMA32f_, mpierr)
+!     ENDIF
+!     IF (ASSOCIATED(inputSignalsRMA64f_)) THEN
+!        CALL MPI_Free_mem(inputSignalsRMA64f_, mpierr)
+!     ENDIF
       lfreeComm_ = .FALSE.
+!     lfreeSignalRMA_ = .FALSE.
+      ldoXC_ = .FALSE.
+      nsignalsLocal_ = 0
+      nsignalsTotal_ = 0
+      npts_ = 0
+      nptsPad_ = 0
+      nptsInXCs_ = 0
+      nXCsLocal_ = 0
       myid_ = MPI_UNDEFINED
       accuracy_ = XCLOC_HIGH_ACCURACY
       precision_ = XCLOC_SINGLE_PRECISION
       verbose_ = XCLOC_PRINT_WARNINGS
       RETURN
       END
-
 !                                                                                        !
 !========================================================================================!
 !                                                                                        !
@@ -215,65 +394,102 @@ MODULE XCLOC_FDXC_MPI
       INTEGER(C_INT), VALUE, INTENT(IN) :: ldx, npts, nsignals
       REAL(C_DOUBLE), INTENT(IN) :: x(*)
       INTEGER(C_INT), INTENT(OUT) :: ierr
-      DOUBLE PRECISION, ALLOCATABLE :: xwork(:)
-      INTEGER(KIND=MPI_ADDRESS_KIND) disp
-      INTEGER i1, i2, ierrLoc, is, isLoc, j1, j2, mpierr, rank
+      DOUBLE PRECISION, ALLOCATABLE :: work(:)
+      TYPE(MPI_Request), ALLOCATABLE :: send_request(:), recv_request(:)
+      INTEGER dest, i, i1, i2, ierrLoc, indx, ip, is, j1, mpierr, nrecv, nsend
+      LOGICAL flag
+      TYPE(MPI_Status) stat
       ierr = 0
       CALL xcloc_fdxc_haveNoSignals() ! Indicate that I have no signals set.
       IF (myid_ == MPI_UNDEFINED) RETURN ! I don't belong here
-      CALL MPI_Comm_rank(comm_, rank, mpierr)
-      IF (rank == root_) THEN
+      IF (myid_ == root_) THEN
          IF (ldx < npts .OR. npts /= npts_ .OR. nsignals /= nSignalsTotal_) THEN
-            IF (ldx < npts) WRITE(*,900) ldx, npts
-            IF (npts /= npts_) WRITE(*,901) npts_
-            IF (nsignals /= nSignalsTotal_) WRITE(*,902) nSignalsTotal_
+            IF (ldx < npts) WRITE(ERROR_UNIT,900) ldx, npts
+            IF (npts /= npts_) WRITE(ERROR_UNIT,901) npts_
+            IF (nsignals /= nSignalsTotal_) WRITE(ERROR_UNIT,902) nSignalsTotal_
             ierr = 1
-         ENDIF
-         ! Have the master copy the input data
-         IF (ierr == 0) THEN
-            DO is=1,nSignalsTotal_
-               i1 = (is - 1)*ldx + 1
-               i2 = i1 + npts - 1
-               j1 = (is - 1)*lds_ + 1
-               j2 = j1 + npts - 1
-               inputSignalsRMA64f_(j1:j2) = x(i1:i2) 
-            ENDDO
          ENDIF
       ENDIF
       CALL MPI_Bcast(ierr, 1, MPI_INTEGER, root_, comm_, mpierr)
       IF (ierr /= 0) RETURN
-      CALL MPI_Barrier(comm_, mpierr)
-      ! Have the processes fetch the signals that they require
-      CALL MPI_Win_fence(MPI_MODE_NOPRECEDE, signalRMAWindow_)
-      ! Get the signals that I need and set them
-      ALLOCATE(xwork(npts_))
-      DO isLoc=1,nSignalsLocal_
-         is = local2GlobalSignal_(isLoc) ! Get global signal number
-         disp = (is - 1)*lds_ + 1
-         IF (myid_ == root_ ) THEN
+      ierrLoc = 0
+      ! Have the root send the signals 
+      IF (myid_ == root_) THEN
+         ! Have the root send the input data to the other processes
+         nsend = uniqueGlobalSignalIDPtr_(nprocs_+1) &
+               - uniqueGlobalSignalIDPtr_(2) + 1
+         ALLOCATE(send_request(MAX(1, nsend))); send_request(:) = MPI_REQUEST_NULL 
+         is = 1
+         DO ip=2,nprocs_
+            i1 = uniqueGlobalSignalIDPtr_(ip)
+            i2 = uniqueGlobalSignalIDPtr_(ip+1) - 1
+            DO i=i1,i2
+               dest = uniqueGlobalSignalIDs_(i)
+               j1 = (dest - 1)*ldx + 1
+               call MPI_Isend(x(j1), npts_, MPI_DOUBLE_PRECISION, ip-1, root_, &
+                              comm_, send_request(is), mpierr)
+               is = is + 1
+               !print *, 'sending to:', ip, dest
+            ENDDO
+         ENDDO 
+         IF (is /= nsend) THEN
+            WRITE(ERROR_UNIT,910)
+            ierrLoc = 1
+         ENDIF
+         ! Set what I have to set
+         i1 = uniqueGlobalSignalIDPtr_(myid_+1)
+         i2 = uniqueGlobalSignalIDPtr_(myid_+2) - 1
+         DO i=i1,i2
+            is = local2GlobalSignal_(i)
             j1 = (is - 1)*ldx + 1
-            CALL xcloc_fdxc_setSignal64fF(isLoc, npts, x(j1), ierrLoc)
-         ELSE
-            CALL MPI_Get(xwork, npts_, MPI_DOUBLE_PRECISION, &
-                         root_, disp,                        &
-                         npts, MPI_DOUBLE_PRECISION,         &
-                         signalRMAWindow_, mpierr)
-            CALL xcloc_fdxc_setSignal64fF(isLoc, npts, xwork, ierrLoc)
-         ENDIF
-         IF (ierrLoc /= 0) THEN
-            WRITE(*,915) myid_, is
-            ierr = ierr + 1
-         ENDIF
-      ENDDO
-      IF (ALLOCATED(xwork)) DEALLOCATE(xwork)
-      ! Ensure all RMA operations complete before proceeding.
-      CALL MPI_Win_fence(MPI_MODE_NOSTORE + MPI_MODE_NOPUT + MPI_MODE_NOSUCCEED, &
-                         signalRMAWindow_, mpierr)
+            CALL xcloc_fdxc_setSignal64fF(i, npts_, x(j1), ierr)
+            IF (ierr /= 0) THEN
+               WRITE(ERROR_UNIT,915) i, myid_
+               ierrLoc = 1
+            ENDIF 
+         ENDDO
+         DEALLOCATE(send_request)
+      ELSE
+         ALLOCATE(work(npts_*nSignalsLocal_)); work(:) = 0.d0
+         ALLOCATE(recv_request(MAX(1, nSignalsLocal_))); recv_request(:) = MPI_REQUEST_NULL
+         ! Get the data from the root
+         DO i=1,nsignalsLocal_
+            indx = (i - 1)*npts_ + 1
+            CALL MPI_Irecv(work(indx), npts_, MPI_DOUBLE_PRECISION, root_, &
+                           MPI_ANY_TAG, comm_, recv_request(i), mpierr)
+         ENDDO
+         ! As I receive things put them into the signal buffer
+         nrecv = 0
+         DO WHILE (nrecv < nSignalsLocal_)
+            DO i=1,nSignalsLocal_
+               IF (recv_request(i) == MPI_REQUEST_NULL) CYCLE
+               CALL MPI_Test(recv_request(i), flag, stat, mpierr) 
+               IF (flag) THEN
+                  j1 = (i - 1)*npts_ + 1
+                  CALL xcloc_fdxc_setSignal64fF(i, npts_, work(j1), ierr)
+                  IF (ierr /= 0) THEN
+                     WRITE(ERROR_UNIT,915) i, myid_
+                     ierrLoc = 1
+                  ENDIF
+                  nrecv = nrecv + 1
+               ENDIF
+            ENDDO
+         ENDDO
+         ! Free my workspace
+         DEALLOCATE(work)
+         DEALLOCATE(recv_request)
+      ENDIF
+      CALL MPI_Allreduce(ierrLoc, ierr, 1, MPI_INTEGER, MPI_SUM, comm_, mpierr) 
+      IF (ierr /= 0) THEN
+         WRITE(ERROR_UNIT,920)
+         RETURN
+      ENDIF
   900 FORMAT('xcloc_fdxc_setSignals64f: Error ldx=', I6, '<', 'npts=', I6)
   901 FORMAT('xcloc_fdxc_setSignals64f: Error expecting npts=', I6)
   902 FORMAT('xcloc_fdxc_setSignals64f: Error expecting nsignals=', I6)
-  910 FORMAT('xcloc_fdxc_setSignals64f: Error setting signal index', I4)
+  910 FORMAT('xcloc_fdxc_setSignals64f: Some signals may not be sent')
   915 FORMAT('xcloc_fdxc_setSignals64f: Error setting signal:', I4, ' on process ', I4)
+  920 FORMAT('xcloc_fdxc_setSignals64f: Errors detected')
       RETURN
       END
 

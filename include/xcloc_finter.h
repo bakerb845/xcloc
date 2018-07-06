@@ -142,7 +142,7 @@ void xcloc_spxc_finalize(void);
 /*                        Frequency Domain Cross-Correlation                  */
 /*----------------------------------------------------------------------------*/
 /* Initialize parallel frequency domain cross correlation. */
-void xcloc_fdxcMPI_initialize(const MPI_Comm comm,
+void xcloc_fdxcMPI_initialize(const MPI_Fint comm, //const MPI_Comm *comm,
                               const int master, 
                               const int npts,
                               const int nptsPad,
@@ -162,6 +162,8 @@ void xcloc_fdxcMPI_setSignals32f(const int ldx,
                                  const int nsignals,
                                  const float x[], int *ierr);
 
+/* Finalize the module. */
+void xcloc_fdxcMPI_finalize(void);
 
 #endif
 
