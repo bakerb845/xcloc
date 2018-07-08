@@ -355,11 +355,11 @@ int test_serial_fdxc_random(const int precision)
     {
         xc = &phaseXcsAll[ixc*nptsInXC];
         for (i=0; i<lxc; i++)
-        {   
-            indx = ixc*lxc + i; 
+        {
+            indx = ixc*lxc + i;
             res = fabs((double) xc[i] - phaseXcs[indx]);
             if (res > 10.0*FLT_EPSILON)
-            {   
+            {
                 fprintf(stderr, "Failed on phase test: %d %d %f %e %e\n",
                         ixc, i, xc[i], phaseXcs[indx], res);
                 return EXIT_FAILURE;
@@ -377,7 +377,7 @@ int test_serial_fdxc_random(const int precision)
         {
             indx = ixc*lxc + i;  
             res = fabs((double) xc[i] - xcs[indx]);
-            if (res > 100.0*FLT_EPSILON)
+            if (res > 200.0*FLT_EPSILON)
             {
                 fprintf(stderr, "Failed on xcs test: %d %d %f %e %e\n",
                         ixc, i, xc[i], xcs[indx], res);

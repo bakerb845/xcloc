@@ -11,6 +11,10 @@ MODULE XCLOC_FDXC
       USE OMP_LIB
 #endif
       IMPLICIT NONE
+      !> Points to the ixc'th cross-correlogram.
+      REAL(C_DOUBLE), PROTECTED, SAVE, POINTER :: xc64f(:) => NULL()
+      !> Points to the ixc'th cross-correlogram.
+      REAL(C_FLOAT), PROTECTED, SAVE, POINTER :: xc32f(:) => NULL()
       !----------------------------------------------------------------------------------!
       !                                 Private Variables                                !
       !----------------------------------------------------------------------------------!
@@ -43,10 +47,10 @@ MODULE XCLOC_FDXC
       LOGICAL, PRIVATE, SAVE :: lhaveTable_ = .FALSE.
       !> Holds the cross-correlograms.  This is an array of dimension 
       !> [dataOffset_ x nxcs_].
-      REAL(C_DOUBLE), PRIVATE, ALLOCATABLE, SAVE :: xcs64f_(:)
+      REAL(C_DOUBLE), PRIVATE, ALLOCATABLE, TARGET, SAVE :: xcs64f_(:)
       !> Holds the cross-correlograms.  This is an array of dimension 
       !> [dataOffset_ x nxcs_].
-      REAL(C_FLOAT), PRIVATE, ALLOCATABLE, SAVE :: xcs32f_(:)
+      REAL(C_FLOAT), PRIVATE, ALLOCATABLE, TARGET, SAVE :: xcs32f_(:)
       !> Holds the input signals to transform.  This is an array of dimension 
       !> [dataOffset_ x nsignals_].
       REAL(C_DOUBLE), PRIVATE, ALLOCATABLE, SAVE :: inputSignals64f_(:)
@@ -100,6 +104,8 @@ MODULE XCLOC_FDXC
       PUBLIC :: xcloc_fdxc_haveNoSignals
       PUBLIC :: xcloc_fdxc_computePhaseCorrelograms
       PUBLIC :: xcloc_fdxc_computeCrossCorrelograms
+      PUBLIC :: xcloc_fdxc_makeCorrelogramPtr64f
+      PUBLIC :: xcloc_fdxc_makeCorrelogramPtr32f
 
       PRIVATE :: xcloc_fdxc_setXCTableF
       PRIVATE :: xcloc_fdxc_setAccuracy
@@ -248,6 +254,8 @@ MODULE XCLOC_FDXC
       BIND(C, NAME='xcloc_fdxc_finalize')
       IMPLICIT NONE
       INCLUDE 'fftw/fftw3.f03'
+      IF (ASSOCIATED(xc64f))           NULLIFY(xc64f)
+      IF (ASSOCIATED(xc32f))           NULLIFY(xc32f)
       IF (ALLOCATED(xcPairs_))         DEALLOCATE(xcPairs_)
       IF (ALLOCATED(inputSignals32f_)) DEALLOCATE(inputSignals32f_)
       IF (ALLOCATED(inputSignals64f_)) DEALLOCATE(inputSignals64f_)
@@ -504,10 +512,12 @@ MODULE XCLOC_FDXC
       INTEGER i1, ixc 
       ierr = 0 
       IF (ldxc < nptsInXCs_) THEN
+         WRITE(ERROR_UNIT,900) nptsInXCs_
          ierr = 1 
          RETURN
       ENDIF
       IF (nxcs < nxcs_) THEN
+         WRITE(ERROR_UNIT,905) nxcs_
          ierr = 1 
          RETURN
       ENDIF
@@ -515,6 +525,8 @@ MODULE XCLOC_FDXC
          i1 = (ixc - 1)*ldxc + 1 
          CALL xcloc_fdxc_getCorrelogram64fF(ixc, ldxc, xcs(i1), ierr)
       ENDDO
+  900 FORMAT('xcloc_fdxc_getCorrelograms64f: ldxc must be at least', I6)
+  905 FORMAT('xcloc_fdxc_getCorrelograms64f: nxcs must be at least', I6)
       RETURN
       END
 !                                                                                        !
@@ -537,10 +549,12 @@ MODULE XCLOC_FDXC
       INTEGER i1, ixc
       ierr = 0
       IF (ldxc < nptsInXCs_) THEN
+         WRITE(ERROR_UNIT,900) nptsInXCs_
          ierr = 1
          RETURN
       ENDIF
       IF (nxcs < nxcs_) THEN
+         WRITE(ERROR_UNIT,905) nxcs_
          ierr = 1
          RETURN
       ENDIF
@@ -548,7 +562,95 @@ MODULE XCLOC_FDXC
          i1 = (ixc - 1)*ldxc + 1
          CALL xcloc_fdxc_getCorrelogram32fF(ixc, ldxc, xcs(i1), ierr)
       ENDDO
+  900 FORMAT('xcloc_fdxc_getCorrelograms32f: ldxc must be at least', I6)
+  905 FORMAT('xcloc_fdxc_getCorrelograms32f: nxcs must be at least', I6)
       RETURN
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Makes a pointer to the entire
+!     SUBROUTINE xcloc_fdxc_makeCorrelogramsPtr64f(ierr)
+!     INTEGER, INTENT(OUT) :: ierr
+!     INTEGER i1, i2, ixcs, j1, j2
+!     ierr = 0
+!     NULLIFY(xc64f)
+!     IF (precision_ /= XCLOC_DOUBLE_PRECISION) THEN 
+!        WRITE(ERROR_UNIT,900)
+!        ierr = 1
+!        RETURN
+!     ENDIF
+!     DO ixcs=1,nxcs_
+!        i1 = (ixcs - 1)*dataOffset_ + 1
+!        i2 = i1 + nptsInXCs_ - 1
+!        j1 = (ixcs - 1)*nptsInXCs_ + 1
+!        j2 = j1 + nptsInXCs_ - 1
+!        xc64f(j1:j2) => xcs64f_(i1:i2)
+!     ENDDO
+! 900 FORMAT('xcloc_fdxc_makeCorrelogramPtr64f: Precision must be single')
+!     RETURN
+!     END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Makes a pointer to the corrNumber'th cross-correlation in the module.
+!>    @param[in] corrNumber  Correlation number to attach xc64f to.  This must be in
+!>                           the range [1, nxcs_].
+!>    @param[out] ierr       0 indicates success. 
+      SUBROUTINE xcloc_fdxc_makeCorrelogramPtr64f(corrNumber, ierr)
+      INTEGER, INTENT(IN) :: corrNumber
+      INTEGER, INTENT(OUT) :: ierr
+      INTEGER i1, i2
+      ierr = 0
+      NULLIFY(xc64f)
+      IF (precision_ /= XCLOC_DOUBLE_PRECISION) THEN
+         WRITE(ERROR_UNIT,900)
+         ierr = 1
+         RETURN
+      ENDIF
+      IF (corrNumber < 1 .OR. corrNumber > nxcs_) THEN 
+         WRITE(ERROR_UNIT,905) corrNumber, nxcs_,  nxcs_
+         ierr = 1
+         RETURN
+      ENDIF
+      i1 = (corrNumber - 1)*dataOffset_ + 1
+      i2 = i1 + nptsInXCs_ - 1
+      xc64f(1:nptsInXCs_) => xcs64f_(i1:i2)
+  900 FORMAT('xcloc_fdxc_makeCorrelogramPtr64f: Precision must be single')
+  905 FORMAT('xcloc_fdxc_makeCorrelogramPtr64f: corrNumber',I6,  &
+             'must be in range [1',I6,']')
+      RETURN 
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Makes a pointer to the corrNumber'th cross-correlation in the module.
+!>    @param[in] corrNumber  Correlation number to attach xc64f to.  This must be in
+!>                           the range [1, nxcs_].
+!>    @param[out] ierr       0 indicates success. 
+      SUBROUTINE xcloc_fdxc_makeCorrelogramPtr32f(corrNumber, ierr)
+      INTEGER, INTENT(IN) :: corrNumber
+      INTEGER, INTENT(OUT) :: ierr
+      INTEGER i1, i2
+      ierr = 0
+      NULLIFY(xc32f)
+      IF (precision_ /= XCLOC_SINGLE_PRECISION) THEN
+         WRITE(ERROR_UNIT,900)
+         ierr = 1
+         RETURN
+      ENDIF
+      IF (corrNumber < 1 .OR. corrNumber > nxcs_) THEN 
+         WRITE(ERROR_UNIT,905) corrNumber, nxcs_,  nxcs_
+         ierr = 1
+         RETURN
+      ENDIF
+      i1 = (corrNumber - 1)*dataOffset_ + 1
+      i2 = i1 + nptsInXCs_ - 1
+      xc32f(1:nptsInXCs_) => xcs32f_(i1:i2)
+  900 FORMAT('xcloc_fdxc_makeCorrelogramPtr32f: Precision must be single')
+  905 FORMAT('xcloc_fdxc_makeCorrelogramPtr32f: corrNumber',I6,  &
+             'must be in range [1',I6,']')
+      RETURN 
       END
 !                                                                                        !
 !========================================================================================!

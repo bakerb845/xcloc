@@ -38,7 +38,8 @@ MODULE XCLOC_FDXC_MPI
       !> This maps from the ip'th process to the start index of uniqueGlobalSignalIDs_.
       !> This has dimension [nprocs_ + 1].
       INTEGER, PRIVATE, ALLOCATABLE, SAVE :: uniqueGlobalSignalIDPtr_(:)
-      !> This
+      !> This is the number of cross-correlation the ip'th process must perform.
+      INTEGER, PRIVATE, ALLOCATABLE, SAVE :: nXCsPerProcess_(:)
       !> This maps from the isLoc'th local signal number to the global signal number.
       !> This has dimension [nsignalsLocal_].
       INTEGER, ALLOCATABLE, PRIVATE, SAVE :: local2GlobalSignal_(:)
@@ -73,7 +74,7 @@ MODULE XCLOC_FDXC_MPI
       !> If true then free the input signal RMA window
 !     LOGICAL, PRIVATE, SAVE :: lfreeSignalRMA_ = .FALSE. 
       !> If true then free the cross-correlation RMA window
-      INTEGER(KIND=8), PRIVATE, PARAMETER :: alignPage_ = 4096
+      INTEGER(KIND=8), PRIVATE, PARAMETER :: alignPage_ = 64
       !LOGICAL, PRIVATE, SAVE :: lfree
       PUBLIC :: xcloc_fdxcMPI_initialize
       CONTAINS
@@ -168,11 +169,14 @@ MODULE XCLOC_FDXC_MPI
          ALLOCATE(myXCs(nXCsTotal_))
          ALLOCATE(myXCPtr(nprocs_+1))
          CALL xcloc_utils_partitionTasks(nXCsTotal_, nprocs_, myXCPtr, myXCs, ierr)
-         IF (verbose_ > XCLOC_PRINT_WARNINGS) THEN
-            DO ip=1,nprocs_
-               WRITE(OUTPUT_UNIT,910) ip-1, myXCPtr(ip+1) - myXCPtr(ip)
-            ENDDO
-         ENDIF
+         ! Tabulate the number of XCs per process
+         ALLOCATE(nXCsPerProcess_(nprocs_))
+         DO ip=1,nprocs_
+            nXCsPerProcess_(ip) = myXCPtr(ip+1) - myXCPtr(ip)
+            IF (verbose_ > XCLOC_PRINT_WARNINGS) THEN
+               WRITE(OUTPUT_UNIT,910) ip-1, nXCsPerProcess_(ip) !myXCPtr(ip+1) - myXCPtr(ip)
+            ENDIF
+         ENDDO
          ! Now that the work is partitioned figure out which processes get which signals.
          ALLOCATE(signalList(2*nXCsTotal_)); signalList(:) = 0
          ALLOCATE(uniqueGlobalSignalIDPtr_(nprocs_+1)); uniqueGlobalSignalIDPtr_(:) = 0
@@ -219,6 +223,7 @@ MODULE XCLOC_FDXC_MPI
       IF (.NOT.ALLOCATED(myXCs))       ALLOCATE(myXCs(nXCsTotal_))
       IF (.NOT.ALLOCATED(myXCPtr))     ALLOCATE(myXCPtr(nprocs_+1))
       IF (.NOT.ALLOCATED(xcPairsWork)) ALLOCATE(xcPairsWork(2*nXCsTotal_))
+      IF (.NOT.ALLOCATED(nXCsPerProcess_)) ALLOCATE(nXCsPerProcess_(nprocs_))
       IF (.NOT.ALLOCATED(uniqueGlobalSignalIDPtr_)) THEN
          ALLOCATE(uniqueGlobalSignalIDPtr_(nprocs_+1))
       ENDIF
@@ -226,6 +231,7 @@ MODULE XCLOC_FDXC_MPI
       CALL MPI_Bcast(myXCs,       nXCsTotal_,   MPI_INTEGER, root_, comm_, mpierr)
       CALL MPI_Bcast(myXCPtr,     nprocs_+1,    MPI_INTEGER, root_, comm_, mpierr)
       CALL MPI_Bcast(xcPairsWork, 2*nXCsTotal_, MPI_INTEGER, root_, comm_, mpierr)
+      CALL MPI_Bcast(nXCsPerProcess_, nprocs_,  MPI_INTEGER, root_, comm_, mpierr)
       CALL MPI_Bcast(uniqueGlobalSignalIDPtr_, nprocs_+1, MPI_INTEGER, &
                      root_, comm_, mpierr)
       nwork = uniqueGlobalSignalIDPtr_(nprocs_+1) - 1
@@ -290,38 +296,6 @@ MODULE XCLOC_FDXC_MPI
       ENDIF
       CALL MPI_ALLREDUCE(ierrLocal, ierr, 1, MPI_INTEGER, MPI_MAX, comm_, mpierr) 
       IF (ierr /= 0) RETURN
-!     ! Create an RMA window to get the signals
-!     CALL MPI_Sizeof(1.d0, sizeDataType, mpierr)
-!     IF (precision_ == XCLOC_SINGLE_PRECISION) CALL MPI_Sizeof(1.0, sizeDataType, mpierr)
-!     IF (precision_ == XCLOC_SINGLE_PRECISION) THEN
-!        CALL MPI_Sizeof(inputSignalsRMA32f_, sizeDataType, mpierr)
-!        !arrayShape(1) = lds_
-!        !nalloc = arrayShape(1)*sizeDataType
-!        !IF (myid_ == root_) THEN
-!           arrayShape(1) = lds_*nSignalsTotal_
-!           nalloc = arrayShape(1)*sizeDataType
-!        !ENDIF
-!        CALL MPI_Alloc_mem(nalloc, MPI_INFO_NULL, dataPtr_, mpierr)
-!        CALL C_F_POINTER(dataPtr_, inputSignalsRMA32f_, arrayShape)
-!        CALL MPI_Win_create(dataPtr_, nalloc, sizeDataType,               &
-!                            MPI_INFO_NULL, comm_, signalRMAWindow_, mpierr)
-!        inputSignalsRMA32f_(:) = 0.0
-!        lfreeSignalRMA_ = .TRUE.
-!     ELSE
-!        CALL MPI_Sizeof(inputSignalsRMA64f_, sizeDataType, mpierr)
-!        !arrayShape(1) = lds_
-!        !nalloc = arrayShape(1)*sizeDataType
-!        !IF (myid_ == root_) THEN
-!           arrayShape(1) = lds_*nSignalsTotal_
-!           nalloc = arrayShape(1)*sizeDataType
-!        !ENDIF
-!        CALL MPI_Alloc_mem(nalloc, MPI_INFO_NULL, dataPtr_, mpierr)
-!        CALL C_F_POINTER(dataPtr_, inputSignalsRMA64f_, arrayShape)
-!        CALL MPI_Win_create(dataPtr_, nalloc, sizeDataType,               &
-!                            MPI_INFO_NULL, comm_, signalRMAWindow_, mpierr)
-!        inputSignalsRMA64f_(:) = 0.d0
-!        lfreeSignalRMA_ = .TRUE.
-!     ENDIF
       ! Free workspace
       IF (ALLOCATED(myXCs))       DEALLOCATE(myXCs)
       IF (ALLOCATED(myXCPtr))     DEALLOCATE(myXCPtr)
@@ -353,6 +327,7 @@ MODULE XCLOC_FDXC_MPI
       IF (ALLOCATED(uniqueGlobalSignalIDs_)) DEALLOCATE(uniqueGlobalSignalIDs_)
 !     IF (lfreeSignalRMA_) CALL MPI_Win_free(signalRMAWindow_, mpierr)
       IF (lfreeComm_) CALL MPI_COMM_FREE(comm_, mpierr)
+      IF (ALLOCATED(nXCsPerProcess_))     DEALLOCATE(nXCsPerProcess_)
       IF (ALLOCATED(local2GlobalSignal_)) DEALLOCATE(local2GlobalSignal_)
 !     ! could also use SIZEOF( ) > 0
 !     IF (ASSOCIATED(inputSignalsRMA32f_)) THEN
@@ -374,6 +349,118 @@ MODULE XCLOC_FDXC_MPI
       accuracy_ = XCLOC_HIGH_ACCURACY
       precision_ = XCLOC_SINGLE_PRECISION
       verbose_ = XCLOC_PRINT_WARNINGS
+      RETURN
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Computes the cross-correlograms.
+!>    @param[out] ierr   0 indicates success.
+      SUBROUTINE xcloc_fdxcMPI_computeCrossCorrelograms(ierr) &
+      BIND(C, NAME='xcloc_fdxcMPI_computeCrossCorrelograms')
+      INTEGER(C_INT), INTENT(OUT) :: ierr
+      INTEGER ierrLoc, mpierr 
+      ierr = 0
+      CALL xcloc_fdxc_computeCrossCorrelograms(ierrLoc)
+      IF (ierrLoc /= 0) THEN
+         WRITE(ERROR_UNIT,900) myid_
+         ierr = 1 
+      ENDIF
+      CALL MPI_Allreduce(ierrLoc, ierr, 1, MPI_INTEGER, MPI_SUM, comm_, mpierr)
+  900 FORMAT('xcloc_fdxcMPI_computeCrossCorrelograms: Error computing xcs on rank', I4) 
+      RETURN
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Computes the phase correlograms.
+!>    @param[out] ierr   0 indicates success.
+      SUBROUTINE xcloc_fdxcMPI_computePhaseCorrelograms(ierr) &
+      BIND(C, NAME='xcloc_fdxcMPI_computePhaseCorrelograms')
+      INTEGER(C_INT), INTENT(OUT) :: ierr
+      INTEGER ierrLoc, mpierr
+      ierr = 0
+      CALL xcloc_fdxc_computePhaseCorrelograms(ierrLoc)
+      IF (ierrLoc /= 0) THEN
+         WRITE(ERROR_UNIT,900) myid_
+         ierrLoc = 1
+      ENDIF
+      CALL MPI_Allreduce(ierrLoc, ierr, 1, MPI_INTEGER, MPI_SUM, comm_, mpierr)
+  900 FORMAT('xcloc_fdxcMPI_computePhaseCorrelograms: Error computing pxcs on rank', I4)
+      RETURN
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Gathers the correlograms onto the root process on the module.
+!>    @param[in] ldxcIn   The leading dimension of the correlograms.  This must be at
+!>                        least nptsInXCs_.  This is defined on the root process.
+!>    @param[in] nxcsIn   Total number of correlograms.  This must equal nXCsTotal_.
+!>                        This is defined on the root process.
+!>    @param[out] xcs     All of the cross-correlograms.  This is an array of dimension
+!>                        [ldxcIn x nxcsIn] with leading dimension ldxcIn.  This need
+!>                        only be defined on the root process.
+!>    @param[out] ierr    0 indicates succcess.
+      SUBROUTINE xcloc_fdxcMPI_gatherCorrelograms64f(ldxcIn, nxcsIn, root, xcs, ierr) &
+      BIND(C, NAME='xcloc_fdxcMPI_gatherCorrelograms64f')
+      INTEGER(C_INT), VALUE, INTENT(IN) :: ldxcin, nxcsIn, root
+      REAL(C_DOUBLE), INTENT(OUT) :: xcs(*)
+      INTEGER(C_INT), INTENT(OUT) :: ierr
+      DOUBLE PRECISION, DIMENSION(:), ALLOCATABLE :: work
+      INTEGER irecv, ldxc, mpierr, nxcs, nxcsLoc, sendCount
+      INTEGER, ALLOCATABLE :: displs(:), recvCount(:)
+      ierr = 0
+      IF (myid_ == MPI_UNDEFINED) RETURN
+      IF (root < 0 .OR. root > nprocs_ - 1) THEN
+         IF (myid_ == root_) WRITE(ERROR_UNIT,895) root
+         ierr = 1
+      ENDIF
+      IF (myid_ == root_) THEN
+         IF (ldxcIn < nptsInXCs_) THEN
+            WRITE(ERROR_UNIT,900) nptsInXCs_
+            ierr = 1
+         ENDIF
+         IF (nxcsIn < nXCsTotal_) THEN 
+            WRITE(ERROR_UNIT,905) nxcsIn
+            ierr = 1
+         ENDIF
+         ldxc = ldxcIn
+         nxcs = nxcsIn
+      ENDIF
+      CALL MPI_Bcast(ierr, 1, MPI_INTEGER, root, comm_, mpierr)
+      IF (ierr /= 0) RETURN
+      CALL MPI_Bcast(ldxc, 1, MPI_INTEGER, root, comm_, mpierr)
+      CALL MPI_Bcast(nxcs, 1, MPI_INTEGER, root, comm_, mpierr)
+      ! Set space to gather result
+      sendCount = nXCsLocal_*ldxc
+      ALLOCATE(work(sendCount))
+      ! Have master figure out who is sending what and how much
+      IF (myid_ == root) THEN
+         ALLOCATE(recvCount(nprocs_)); recvCount(:) = 0 
+         ALLOCATE(displs(nprocs_)); displs(:) = 0 
+         displs(1) = 0 ! This is C indexed
+         DO irecv=1,nprocs_
+            nxcsLoc = nXCsPerProcess_(irecv)
+            recvCount(irecv) = nxcsLoc*ldxc
+            IF (irecv < nprocs_) displs(irecv+1) = displs(irecv) + recvCount(irecv)
+         ENDDO
+      ENDIF
+      ! Get the data
+      CALL xcloc_fdxc_getCorrelograms64f(ldxc, nXCsLocal_, work, ierr)
+      IF (ierr /= 0) THEN
+         WRITE(ERROR_UNIT,910) myid_
+      ENDIF
+      ! Gather the data
+      CALL MPI_Gatherv(work, sendCount, MPI_DOUBLE_PRECISION,    &
+                       xcs, recvCount, displs,                   &
+                       MPI_DOUBLE_PRECISION, root, comm_, mpierr)
+      IF (ALLOCATED(work))      DEALLOCATE(work)
+      IF (ALLOCATED(recvCount)) DEALLOCATE(recvCount) 
+      IF (ALLOCATED(displs))    DEALLOCATE(displs)
+  895 FORMAT('xcloc_fdxcMPI_gatherCorrelograms64f: Invalid root', I6)
+  900 FORMAT('xcloc_fdxcMPI_gatherCorrelograms64f: ldxcIn must be at least', I6)
+  905 FORMAT('xcloc_fdxcMPI_gatherCorrelograms64f: nxcsIn must be at least', I6)
+  910 FORMAT("xcloc_fdxcMPI_gatherCorrelograms64f: Failed to get data on rank", I4)
       RETURN
       END
 !                                                                                        !
@@ -471,6 +558,7 @@ MODULE XCLOC_FDXC_MPI
                      WRITE(ERROR_UNIT,915) i, myid_
                      ierrLoc = 1
                   ENDIF
+                  !print *, local2GlobalSignal_(i), work(j1)
                   nrecv = nrecv + 1
                ENDIF
             ENDDO

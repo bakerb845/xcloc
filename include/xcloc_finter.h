@@ -161,6 +161,17 @@ void xcloc_fdxcMPI_setSignals32f(const int ldx,
                                  const int npts,
                                  const int nsignals,
                                  const float x[], int *ierr);
+/* Gathers the correlogram onto the root process. */
+void xcloc_fdxcMPI_gatherCorrelograms64f(const int ldxc, const int nxcs,
+                                         const int root,
+                                         double xcs[], int *ierr);
+void xcloc_fdxcMPI_gatherCorrelograms32f(const int ldxc, const int nxcs,
+                                         const int root,
+                                         float xcs[], int *ierr);
+/* Compute the cross-correlograms. */
+void xcloc_fdxcMPI_computeCrossCorrelograms(int *ierr);
+/* Compute the phase-correlograms. */
+void xcloc_fdxcMPI_computePhaseCorrelograms(int *ierr);
 
 /* Finalize the module. */
 void xcloc_fdxcMPI_finalize(void);
