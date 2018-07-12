@@ -65,8 +65,6 @@ It can be expedient to configure CMake with a script.  Though I sometimes have t
     -DH5_LIBRARY=/home/bakerb25/C/hdf5-1.10.1_intel/lib/libhdf5.so \
     -DSACIO_INCLUDE_DIR=/home/bakerb25/C/sacio/include \
     -DSACIO_LIBRARY=/home/bakerb25/C/sacio/lib/libsacio_shared.so \
-    -DISCL_LIBRARY=/home/bakerb25/C/iscl/lib/libiscl_shared.so \
-    -DISCL_INCLUDE_DIR=/home/bakerb25/C/iscl/include \
     -DXML2_INCLUDE_DIR=/usr/include/libxml2 \
     -DXML2_LIBRARY=/usr/lib/x86_64-linux-gnu/libxml2.so \
     -DINIPARSER_INCLUDE_DIR=/home/bakerb25/C/iniparser/src \
@@ -112,8 +110,6 @@ It can be expedient to configure CMake with a script.  Though I sometimes have t
     -DH5_LIBRARY=/home/bakerb25/C/hdf5-1.10.1_intel/lib/libhdf5.so \
     -DSACIO_INCLUDE_DIR=/home/bakerb25/C/sacio/include \
     -DSACIO_LIBRARY=/home/bakerb25/C/sacio/lib/libsacio_shared.so \
-    -DISCL_LIBRARY=/home/bakerb25/C/iscl/lib/libiscl_shared.so \
-    -DISCL_INCLUDE_DIR=/home/bakerb25/C/iscl/include \
     -DXML2_INCLUDE_DIR=/usr/include/libxml2 \
     -DXML2_LIBRARY=/usr/lib/x86_64-linux-gnu/libxml2.so \
     -DINIPARSER_INCLUDE_DIR=/home/bakerb25/C/iniparser/src \
