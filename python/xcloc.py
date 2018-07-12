@@ -22,6 +22,7 @@ from numpy import float64
 from numpy import sqrt
 from numpy import ascontiguousarray 
 from numpy import linspace
+from math import pi 
 import os
 #import mpi4py
 
@@ -515,6 +516,55 @@ class spxc:
             print("Failed to initialize spxc")
         return ierr
 
+    def compute(self, signals):
+        """
+        Computes the RMS or envelope of many signals.
+
+        Inputs
+        ------
+        signals : matrix 
+            A matrix of input data with dimension [nsignals x npts].
+
+        Returns
+        -------
+        sigProc : matrix
+            A matrix of envelopes or RMS filtered input signals.  This has
+            dimension [nsignals x npts]. 
+            On failure this is None.
+        """
+        ierr = c_int(1)
+        nsignals = signals.shape[0]
+        npts = signals.shape[1]
+        lds = npts # Leading dimension of fortran array
+        signals = reshape(signals, signals.size, order='C')
+        sigProc = zeros([nsignals, npts], dtype=signals.dtype)
+        if (signals.dtype == float32):
+            signals = ascontiguousarray(signals, float32)
+            signalPtr = signals.ctypes.data_as(POINTER(c_float)) 
+            sigProc = ascontiguousarray(sigProc, float32)
+            sigProcPtr = sigProc.ctypes.data_as(POINTER(c_float))
+            self.lib.xcloc_spxc_filterXCsOutOfPlace32f(lds, npts, nsignals,
+                                                       signalPtr, sigProcPtr,
+                                                       byref(ierr))
+            if (ierr.value != 0): 
+                print("Failed to filter float signals")
+        elif (signals.dtype == float64):
+            signals = ascontiguousarray(signals, float64)
+            signalPtr = signals.ctypes.data_as(POINTER(c_double))
+            sigProc = ascontiguousarray(sigProc, float64)
+            sigProcPtr = sigProc.ctypes.data_as(POINTER(c_double))
+            self.lib.xcloc_spxc_filterXCsOutOfPlace64f(lds, npts, nsignals,
+                                                       signalPtr, sigProcPtr,
+                                                       byref(ierr))
+            if (ierr.value != 0): 
+                print("Failed to filter double signals")
+        else:
+            print("Precision must be float32 or float64")
+            return None
+        sigProc = sigProc.reshape([nsignals, npts], order='C')
+        return sigProc
+        
+
     def finalize(self):
         """
         Finalizes the filtering library.
@@ -569,6 +619,20 @@ if __name__ == "__main__":
     # Compute the correlograms
     xcs = xcloc.fdxc.computeCrossCorrelograms()
     print(xcs) 
+    # Compute signal envelopes
+    from numpy import sin
+    from numpy import exp
+    import matplotlib.pyplot as plt
+    t = linspace(0, 3, 3001)
+    smat = zeros([nsignals, len(t)])#, dtype=float32)
+    for i in range(nsignals):
+        smat[i,:] = sin(2.*pi*7*t)*exp(-t/2)
+    xcloc.spxc.initialize()
+    env = xcloc.spxc.compute(smat)
+    #plt.plot(smat[2,:])
+    #plt.plot(env[2,:])
+    #plt.show()
+    xcloc.spxc.finalize()
     # Clean up
     xcloc.fdxc.finalize()
     

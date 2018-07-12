@@ -388,18 +388,18 @@ MODULE XCLOC_SPXC
          DO i=1,nCoeffs_
             hfiltR64f_(i) = 0.d0
             IF (i == (nCoeffs_+1)/2) hfiltR64f_(i) = 1.d0
-            IF (MOD(i, 2) == 0)      hfiltI64f_(i) = 0.d0
+            IF (MOD(i, 2) == 1)      hfiltI64f_(i) = 0.d0
          ENDDO
          ALLOCATE(hfiltR32f_(nCoeffs_)); hfiltR32f_(:) = SNGL(hfiltR64f_(:))
          ALLOCATE(hfiltI32f_(nCoeffs_)); hfiltI32f_(:) = SNGL(hfiltI64f_(:))
          ! Sparsify coefficients
          nnzReCoeffs_ = 1
-         nnzImCoeffs_ = (nCoeffs_ + 1)/2
+         nnzImCoeffs_ = (nCoeffs_ + 1)/2 - 1
          ALLOCATE(nzReIndices_(nnzReCoeffs_))
          ALLOCATE(nzImIndices_(nnzImCoeffs_))
          nzReIndices_(1) = (nCoeffs_+1)/2
          DO i=1,nnzImCoeffs_
-            nzImIndices_(i) = 2*(i - 1) + 1
+            nzImIndices_(i) = 2*i
          ENDDO
          ALLOCATE(sparseHfiltR64f_(nnzReCoeffs_))
          ALLOCATE(sparseHfiltI64f_(nnzImCoeffs_))
@@ -411,7 +411,15 @@ MODULE XCLOC_SPXC
          sparseHfiltI32f_(:) = SNGL(sparseHfiltI64f_(:))
          nzReIndices_(:) = nzReIndices_(:) - 1 ! C index
          nzImIndices_(:) = nzImIndices_(:) - 1 ! C index
+      ELSE
+         WRITE(ERROR_UNIT,900) 
+         ierr = 1
+         RETURN
       ENDIF
+!do i=1,nCoeffs_
+!print *, hfiltR64f_(i), hfiltI64f_(i)
+!enddo
+!print *, nzImIndices_
 !print *, nnzReCoeffs_, nnzImCoeffs_
 !print *, nzReIndices_
 !print *, nzImIndices_

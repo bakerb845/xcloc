@@ -82,7 +82,7 @@ MODULE XCLOC_FDXC_MPI
 !                                      Begin the Code                                    !
 !========================================================================================!
 !>    @brief Initializes the parallel frequency domain cross-correlation calculator.
-!>    @param[in] fcomm     MPI communicator.
+!>    @param[in] comm      MPI communicator.
 !>    @param[in] root      ID of root process.  This will likely be 0 and must be 
 !>                         defined on all processes.
 !>    @param[in] npts      Number of points in each input signal.  This is defined on
@@ -109,7 +109,7 @@ MODULE XCLOC_FDXC_MPI
                                           nxcs, xcPairs,                  &
                                           verbose, prec, accuracy, ierr)  &
       BIND(C, NAME='xcloc_fdxcMPI_initialize')
-      TYPE(MPI_Comm), VALUE, INTENT(IN) :: comm
+      TYPE(MPI_Comm),  VALUE, INTENT(IN) :: comm
       !INTEGER(C_INT), VALUE, INTENT(IN) :: fcomm !TODO could be problematic w/ *finter.h
       INTEGER(C_INT), VALUE, INTENT(IN) :: root, npts, nptsPad, nxcs, &
                                            verbose, prec, accuracy

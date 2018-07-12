@@ -150,6 +150,7 @@ int xcloc_firFilter_envelope32f(const int lds,
                                 const float imCoeffs[],
                                 float x[])
 {
+    int ierr = 0;
     if (nsignals == 0 || npts == 0){return 0;} // Nothing to do
     if (x == NULL || nzReCoeffs == NULL || nzImCoeffs == NULL ||
         reCoeffs == NULL || imCoeffs == NULL)
@@ -190,16 +191,17 @@ int xcloc_firFilter_envelope32f(const int lds,
     }
     int winLen, winLen2;
     ippsMax_32s(nzImCoeffs, nnzImCoeffs, &winLen);
-    winLen2 = winLen/2;
+    winLen2 = winLen/2 + 1; // Filter is symmetric so remove first half
     // Begin the parallel computation
     #pragma omp parallel default(none) \
      shared(imCoeffs, nzImCoeffs, stderr, x) \
-     firstprivate(winLen, winLen2)
+     firstprivate(winLen, winLen2) \
+     reduction(max:ierr)
     {
     IppStatus status;
     int filterLen = npts + winLen2;
     int bSizeIm, is;
-    int orderIm = nnzImCoeffs - 1; 
+    int orderIm = nzImCoeffs[nnzImCoeffs-1];
     Ipp8u *pBufIm = NULL;
     Ipp32f *xmean = NULL;
     Ipp32f *yfiltIm = NULL;
@@ -207,10 +209,11 @@ int xcloc_firFilter_envelope32f(const int lds,
     status = ippsFIRSparseGetStateSize_32f(nnzImCoeffs, orderIm, &bSizeIm);
     if (status != ippStsNoErr)
     {   
-        fprintf(stderr, "%s: Error getting state size\n", __func__);
+        fprintf(stderr, "%s: Error getting state size: %d\n", __func__, status);
+        ierr = 1;
         goto ERROR;
     }
-    pBufIm = ippsMalloc_8u(2*bSizeIm); // Seems to underestimate!
+    pBufIm = ippsMalloc_8u(bSizeIm);
     //ppStateIm = (IppsFIRSparseState_32f *) ippsMalloc_8u(bSizeIm);
     status = ippsFIRSparseInit_32f(&ppStateIm,
                                    imCoeffs,
@@ -219,7 +222,9 @@ int xcloc_firFilter_envelope32f(const int lds,
                                    NULL, pBufIm);
     if (status != ippStsNoErr)
     {
-        fprintf(stderr, "%s: Error initializing sparse filter\n", __func__);
+        fprintf(stderr, "%s: Error initializing sparse filter: %d\n",
+                __func__, status);
+        ierr = 1;
         goto ERROR;
     }
     xmean   = ippsMalloc_32f(filterLen);
@@ -258,7 +263,7 @@ ERROR:;
     //omp_barrier();
     }
 
-    return 0;
+    return ierr;
 }
 /*!
  * @brief Applies the RMS filter to the signals.
