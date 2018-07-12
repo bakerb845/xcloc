@@ -40,6 +40,10 @@ It can be expedient to configure CMake with a script.  Though I sometimes have t
        echo "Removing CMakeCache.txt"
        rm CMakeCache.txt
     fi
+    if [ -d CMakeFiles ]; then
+       echo "Removing CMakeFiles"
+       rm -rf CMakeFiles
+    fi
     cmake ./ \
     -DCMAKE_INSTALL_PREFIX=./ \
     -DCMAKE_C_COMPILER=gcc \
@@ -82,6 +86,10 @@ It can be expedient to configure CMake with a script.  Though I sometimes have t
     if [ -f CMakeCache.txt ]; then
        echo "Removing CMakeCache.txt"
        rm CMakeCache.txt
+    fi
+    if [ -d CMakeFiles ]; then
+       echo "Removing CMakeFiles"
+       rm -rf CMakeFiles
     fi
     cmake ./ \
     -DCMAKE_INSTALL_PREFIX=./ \
