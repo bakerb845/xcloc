@@ -6,8 +6,6 @@
 
 #include <limits.h>
 
-/* using intel libraries; this means both IPP and MKL */
-#cmakedefine XCLOC_USE_INTEL
 /* using MPI */
 #cmakedefine XCLOC_USE_MPI
 /* Profiling */

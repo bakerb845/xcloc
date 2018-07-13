@@ -52,6 +52,7 @@ class xcloc:
     def __init__(self,
                  xcloc_path=os.environ['LD_LIBRARY_PATH'].split(os.pathsep),
                  xcloc_library='libxcloc_shared.so'):
+        fname = '%s::%s'%(self.__class__.__name__, self.__init__.__name__)
         # Load the library
         lfound = False
         for path in xcloc_path:
@@ -62,7 +63,7 @@ class xcloc:
         if (lfound):
             xcloc_lib = cdll.LoadLibrary(xcloc_lib)
         else:
-            print("Couldn't find libxcloc") 
+            print("%s: Couldn't find libxcloc"%fname)
             return
         ##################################################################################
         #                                     XCLOC                                      #
@@ -157,6 +158,7 @@ class utils:
             signal (column 2).  The signal indices are C numbered.  
             Otherwise, this is None.
         """
+        fname = '%s::%s'%(self.__class__.__name__, self.computeDefaultXCTable.__name__)
         ierr = c_int(1)
         nxcs = c_int(1)
         # Space query
@@ -166,7 +168,7 @@ class utils:
                                                    byref(nxcs), None,
                                                    byref(ierr)) 
         if (ierr.value != 0): 
-            print("Error computing workspace size")
+            print("%s: Error computing workspace size"%fname)
             return None
         nwork = 2*nxcs.value
         xcPairs = ascontiguousarray(zeros(nwork, dtype=c_int))
@@ -176,7 +178,7 @@ class utils:
                                                    byref(nxcs), xcPairsPtr,
                                                    byref(ierr))
         if (ierr.value != 0): 
-            print("Error computing default table!")
+            print("%s: Error computing default table!"%fname)
             return None
         nxcs = nxcs.value
         xcPairs = xcPairs.reshape([nxcs, 2], order='C') - 1 # C numbering
@@ -272,22 +274,22 @@ class fdxc:
         ierr : int
             0 indicates success
         """
-        #self.lib.xcloc_initializeF(2)
+        fname = '%s::%s'%(self.__class__.__name__, self.initialize.__name__)
         # Input checks 
         if (npts < 1):
-            print("npts=%d must be positive"%npts)
+            print("%s: npts=%d must be positive"%(fname, npts))
             return -1
         if (nsignals < 2):
-            print("nsignals=%d must exceed 2"%nsignals)
+            print("%s: nsignals=%d must exceed 2"%(fname, nsignals))
             return -1
         if (precision != xcloc.XCLOC_SINGLE_PRECISION and
             precision != xcloc.XCLOC_DOUBLE_PRECISION):
-            print("precision=%d must be 0 or 1"%precision)
+            print("%s: precision=%d must be 0 or 1"%(fname, precision))
             return -1
         # If nptsPad is set then check that it makes sense; otherwise set it
         if (not nptsPad is None):
             if (nptsPad < npts):
-                print("nptsPad must be greater than npts", npts, nptsPad)
+                print("%s: nptsPad must be greater than npts"%(fname, npts, nptsPad))
                 return -1
         else:
             nptsPad = npts
@@ -295,7 +297,7 @@ class fdxc:
             xcPairs = self.utils.computeDefaultXCTable(nsignals)
             xcPairs = xcPairs + 1
         if (amin(xcPairs) == 0):
-            print("xcPairs must be Fortran indexed")
+            print("%s: xcPairs must be Fortran indexed"%fname)
             return -1
         nxcs = xcPairs.shape[0]
         xcPairs = xcPairs.flatten(order='C')
@@ -308,21 +310,22 @@ class fdxc:
                                        precision, accuracy, byref(ierr))
         ierr = ierr.value
         if (ierr != 0):
-            print("Failed to initialize cross-correlator")
+            print("%s: Failed to initialize cross-correlator"%fname)
         return ierr 
 
     def __getCorrelograms__(self):
+        fname = '%s::%s'%(self.__class__.__name__, self.__getCorrelograms__.__name__)
         nxcs = c_int(1) 
         nptsInXCs = c_int(1)
         ierr = c_int(1)
         self.lib.xcloc_fdxc_getNumberOfCorrelograms(nxcs, byref(ierr))
         if (ierr.value != 0):
-            print("Error getting number of xcs")
+            print("%s: Error getting number of xcs"%fname)
             return None
         nxcs = nxcs.value
         self.lib.xcloc_fdxc_getCorrelogramLength(nptsInXCs, byref(ierr))
         if (ierr.value != 0):
-            print("Error getting xc lengths")
+            print("%s: Error getting xc lengths"%fname)
             return None
         nptsInXCs = nptsInXCs.value
         precision = c_int(1)
@@ -334,7 +337,7 @@ class fdxc:
             self.lib.xcloc_fdxc_getCorrelograms32f(nptsInXCs, nxcs,
                                                    xcsPtr, byref(ierr))
             if (ierr.value != 0):
-                print("Error getting float correlograms")
+                print("%s: Error getting float correlograms"%fname)
                 return None
         elif (precision == xcloc.XCLOC_DOUBLE_PRECISION):
             xcs = ascontiguousarray(zeros(nxcs*nptsInXCs, dtype=c_double))
@@ -342,10 +345,10 @@ class fdxc:
             self.lib.xcloc_fdxc_getCorrelograms64f(nptsInXCs, nxcs,
                                                    xcsPtr, byref(ierr))
             if (ierr.value != 0):
-                print("Error getting double correlograms")
+                print("%s: Error getting double correlograms"%fname)
                 return None
         else:
-            print("Unknown precision", precision)
+            print("%s: Unknown precision %d"%(fname, precision))
             return None
         xcs = xcs.reshape([nxcs, nptsInXCs], order='C')
         return xcs
@@ -361,11 +364,12 @@ class fdxc:
            with shape [nxcs x nptsInXCs].
            On failure this is None.
         """
+        fname = '%s::%s'%(self.__class__.__name__, self.computePhaseCorrelograms.__name__)
         ierr = c_int(1)
         self.lib.xcloc_fdxc_computePhaseCorrelograms(ierr)
         ierr = ierr.value
         if (ierr != 0):
-            print("Error computing phase correlograms")
+            print("%s: Error computing phase correlograms"%fname)
             return None
         xcs = self.__getCorrelograms__()
         return xcs
@@ -381,11 +385,12 @@ class fdxc:
            with shape [nxcs x nptsInXCs].
            On failure this is None.
         """
+        fname = '%s::%s'%(self.__class__.__name__, self.computeCrossCorrelograms.__name__)
         ierr = c_int(1)
         self.lib.xcloc_fdxc_computeCrossCorrelograms(ierr)
         ierr = ierr.value
         if (ierr != 0):
-            print("Error computing cross correlograms")
+            print("%s: Error computing cross correlograms"%fname)
             return None
         xcs = self.__getCorrelograms__()
         return xcs
@@ -404,6 +409,7 @@ class fdxc:
         ierr : int
             0 indicates success. 
         """
+        fname = '%s::%s'%(self.__class__.__name__, self.setSignals.__name__)
         ierr = c_int(1)
         nsignals = signals.shape[0]
         npts = signals.shape[1]
@@ -415,16 +421,16 @@ class fdxc:
             self.lib.xcloc_fdxc_setSignals32f(lds, npts, nsignals, signalPtr,
                                               byref(ierr))
             if (ierr.value != 0):
-                print("Failed to call setSignals32f")
+                print("%s: Failed to call setSignals32f"%fname)
         elif (signals.dtype == float64):
             signals = ascontiguousarray(signals, float64)
             signalPtr = signals.ctypes.data_as(POINTER(c_double))
             self.lib.xcloc_fdxc_setSignals64f(lds, npts, nsignals, signalPtr,
                                               byref(ierr))
             if (ierr.value != 0):
-                print("Failed to call setSignals64f")
+                print("%s: Failed to call setSignals64f"%fname)
         else:
-            print("Precision must be float32 or float64")
+            print("%s: Precision must be float32 or float64"%fname)
         ierr = ierr.value
         return ierr
 
@@ -432,6 +438,7 @@ class fdxc:
         """
         Finalizes the frequency domain cross-correlation library.
         """
+        fname = '%s::%s'%(self.__class__.__name__, self.finalize.__name__)
         self.lib.xcloc_fdxc_finalize()
         #self.lib.xcloc_finalizeF()
         return
@@ -500,20 +507,21 @@ class spxc:
         ierr : int
            0 indicates success.
         """ 
+        fname = '%s::%s'%(self.__class__.__name__, self.initialize.__name__)
         if (ftype == xcloc.XCLOC_SPXC_ENVELOPE_FILTER or
             ftype == xcloc.XCLOC_SPXC_RMS_FILTER):
             if (n%2 != 1):
-                print("Adding a point to the filter length")
+                print("%s: Adding a point to the filter length"%fname)
                 n = n + 1
         else:
             if (ftype != xcloc.XCLOC_SPXC_DONOT_FILTER):
-                print("Invalid filter type")
+                print("%s: Invalid filter type"%fname)
                 return -1
         ierr = c_int(1)
         self.lib.xcloc_spxc_initialize(n, ftype, ierr)
         ierr = ierr.value
         if (ierr != 0):
-            print("Failed to initialize spxc")
+            print("%s: Failed to initialize spxc"%fname)
         return ierr
 
     def compute(self, signals):
@@ -532,6 +540,7 @@ class spxc:
             dimension [nsignals x npts]. 
             On failure this is None.
         """
+        fname = '%s::%s'%(self.__class__.__name__, self.compute.__name__)
         ierr = c_int(1)
         nsignals = signals.shape[0]
         npts = signals.shape[1]
@@ -547,7 +556,7 @@ class spxc:
                                                        signalPtr, sigProcPtr,
                                                        byref(ierr))
             if (ierr.value != 0): 
-                print("Failed to filter float signals")
+                print("%s: Failed to filter float signals"%fname)
         elif (signals.dtype == float64):
             signals = ascontiguousarray(signals, float64)
             signalPtr = signals.ctypes.data_as(POINTER(c_double))
@@ -557,9 +566,9 @@ class spxc:
                                                        signalPtr, sigProcPtr,
                                                        byref(ierr))
             if (ierr.value != 0): 
-                print("Failed to filter double signals")
+                print("%s: Failed to filter double signals"%fname)
         else:
-            print("Precision must be float32 or float64")
+            print("%s: Precision must be float32 or float64"%fname)
             return None
         sigProc = sigProc.reshape([nsignals, npts], order='C')
         return sigProc
@@ -624,6 +633,7 @@ if __name__ == "__main__":
     from numpy import exp
     import matplotlib.pyplot as plt
     t = linspace(0, 3, 3001)
+    #nsignals = 600
     smat = zeros([nsignals, len(t)])#, dtype=float32)
     for i in range(nsignals):
         smat[i,:] = sin(2.*pi*7*t)*exp(-t/2)

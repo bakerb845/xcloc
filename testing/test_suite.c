@@ -12,16 +12,17 @@
 int main(int argc, char *argv[])
 {
     int ierr, myid, provided;
-    MPI_Comm comm = MPI_COMM_WORLD;
-    const int root = 0;
     ierr = EXIT_SUCCESS;
+    const int root = 0;
 #ifdef XCLOC_USE_MPI
+    MPI_Comm comm = MPI_COMM_WORLD;
     MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED, &provided);
     //MPI_Init(&argc, &argv);
     MPI_Comm_rank(comm, &myid);
 #else
     myid = root;
 #endif 
+    ierr = EXIT_SUCCESS;
     // Initialize ISCL to make reference solution
     srand(SEED);
     if (myid == root)
