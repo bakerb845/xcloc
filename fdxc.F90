@@ -438,7 +438,7 @@ MODULE XCLOC_FDXC
 !                                                                                        !
 !>    @brief Returns the number of input time domain signals.
 !>    @param[out] nsignals  Number of time domain input signals to correlate.
-!>    @parma[out] ierr      0 indicates success. 
+!>    @param[out] ierr      0 indicates success. 
       SUBROUTINE xcloc_fdxc_getNumberOfSignals(nsignals, ierr) &
       BIND(C, NAME='xcloc_fdxc_getNumberOfSignals')
       IMPLICIT NONE

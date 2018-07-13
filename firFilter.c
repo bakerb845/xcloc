@@ -273,9 +273,9 @@ ERROR:;
  * @param[in] tapsLen    Number of filter coefficients.  This will be odd.
  * @param[in] taps       The FIR filter coefficients for computing the runinng
  *                       average.  This has dimension [tapsLen].
- * @param[in] x          The matrix of signals to filter.  This is a column
+ * @param[in,out] x      The matrix of signals to filter.  This is a column
  *                       major matrix of dimension [lds x nsignals].
- * @param[out] xfilt     The RMS filtered signals.  This is a column major
+ * @param[in,out] x      The RMS filtered signals.  This is a column major
  *                       major matrix of dimension [lds x nsignals]. 
  * @result 0 indicates success.
  * @ingroup xcloc_spxc
@@ -367,7 +367,7 @@ int xcloc_firFilter_rmsFilter64f(const int lds,
  *                       average.  This has dimension [tapsLen].
  * @param[in,out] x      The matrix of signals to filter.  This is a column
  *                       major matrix of dimension [lds x nsignals].
- * @param[in,out] xfilt  On exit these are the RMS filtered signal.  Again, this
+ * @param[in,out] x      On exit these are the RMS filtered signal.  Again, this
  *                       is a column major matrix of dimension [lds x nsignals].
  * @result 0 indicates success.
  * @ingroup xcloc_spxc

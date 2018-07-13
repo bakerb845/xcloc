@@ -524,9 +524,9 @@ class spxc:
             print("%s: Failed to initialize spxc"%fname)
         return ierr
 
-    def compute(self, signals):
+    def filter(self, signals):
         """
-        Computes the RMS or envelope of many signals.
+        Filters many signals using an RMS averaging or envelope.
 
         Inputs
         ------
@@ -540,7 +540,7 @@ class spxc:
             dimension [nsignals x npts]. 
             On failure this is None.
         """
-        fname = '%s::%s'%(self.__class__.__name__, self.compute.__name__)
+        fname = '%s::%s'%(self.__class__.__name__, self.filter.__name__)
         ierr = c_int(1)
         nsignals = signals.shape[0]
         npts = signals.shape[1]
@@ -638,7 +638,7 @@ if __name__ == "__main__":
     for i in range(nsignals):
         smat[i,:] = sin(2.*pi*7*t)*exp(-t/2)
     xcloc.spxc.initialize()
-    env = xcloc.spxc.compute(smat)
+    env = xcloc.spxc.filter(smat)
     #plt.plot(smat[2,:])
     #plt.plot(env[2,:])
     #plt.show()

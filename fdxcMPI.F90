@@ -82,7 +82,7 @@ MODULE XCLOC_FDXC_MPI
 !                                      Begin the Code                                    !
 !========================================================================================!
 !>    @brief Initializes the parallel frequency domain cross-correlation calculator.
-!>    @param[in] comm      MPI communicator.
+!>    @param[in] comm      MPI communicator.  This must be defined on all processes.
 !>    @param[in] root      ID of root process.  This will likely be 0 and must be 
 !>                         defined on all processes.
 !>    @param[in] npts      Number of points in each input signal.  This is defined on
@@ -115,21 +115,18 @@ MODULE XCLOC_FDXC_MPI
                                            verbose, prec, accuracy
       INTEGER(C_INT), INTENT(IN) :: xcPairs(*)
       INTEGER(C_INT), INTENT(OUT) :: ierr
-      !> Maps from 
       INTEGER, ALLOCATABLE, DIMENSION(:) :: l2gSignal, myXCs,  myXCPtr, signalList, &
                                             work, xcPairsWork, xcPairsLocal
       INTEGER i, i1, i2, ierrLocal, indx, ip, mpierr, nsignals, nsloc, nwork
+      ! Release module in case someone called this twice.
+      CALL xcloc_fdxcMPI_finalize()
+      ! Get communicator size and my rank
       root_ = root
-      ! Copy the communicator
-      CALL MPI_COMM_DUP_WITH_INFO(comm, MPI_INFO_NULL, comm_, mpierr)
-      lfreeComm_ = .TRUE.
-      ! Get information 
-      CALL MPI_COMM_RANK(comm_, myid_, mpierr)
-      CALL MPI_COMM_SIZE(comm_, nprocs_, mpierr)
+      CALL MPI_COMM_RANK(comm, myid_, mpierr)
+      CALL MPI_COMM_SIZE(comm, nprocs_, mpierr)
       ! Some basic checks by root process
-      ierr = 1
-      IF (myid_ == root) THEN
-         ierr = 0
+      ierr = 0
+      IF (myid_ == root_) THEN
          root_ = root
          IF (npts < 1 .OR. nptsPad < npts .OR. nxcs < 1) THEN
             IF (npts < 1) WRITE(ERROR_UNIT,905) npts 
@@ -164,11 +161,14 @@ MODULE XCLOC_FDXC_MPI
          ELSE
             lds_ = xcloc_memory_padLength(alignPage_, SIZEOF(1.d0), nptsPad_)
          ENDIF
-         !nwork = lds_*
          ! Need to partition the work
          ALLOCATE(myXCs(nXCsTotal_))
          ALLOCATE(myXCPtr(nprocs_+1))
          CALL xcloc_utils_partitionTasks(nXCsTotal_, nprocs_, myXCPtr, myXCs, ierr)
+         IF (ierr /= 0) THEN
+            WRITE(ERROR_UNIT,920)
+            GOTO 500
+         ENDIF
          ! Tabulate the number of XCs per process
          ALLOCATE(nXCsPerProcess_(nprocs_))
          DO ip=1,nprocs_
@@ -207,8 +207,11 @@ MODULE XCLOC_FDXC_MPI
          IF (ALLOCATED(work)) DEALLOCATE(work)
       ENDIF
   500 CONTINUE
-      CALL MPI_BCAST(ierr, 1, MPI_INTEGER, root, comm_, mpierr)
+      CALL MPI_BCAST(ierr, 1, MPI_INTEGER, root_, comm, mpierr)
       IF (ierr /= 0) RETURN
+      ! Copy the communicator
+      CALL MPI_COMM_DUP_WITH_INFO(comm, MPI_INFO_NULL, comm_, mpierr)
+      lfreeComm_ = .TRUE.
       ! Set some basic information
       CALL MPI_Bcast(root_,          1, MPI_INTEGER, root, comm_, mpierr)
       CALL MPI_Bcast(npts_,          1, MPI_INTEGER, root, comm_, mpierr)
@@ -312,6 +315,7 @@ MODULE XCLOC_FDXC_MPI
   913 FORMAT('xcloc_fdxcMPI_initialize: bsearch failure on rank:', I4, ' check l2g map')
   914 FORMAT('xcloc_fdxcMPI_initialize: failed to generate xcPairsLocal on rank', I4)
   915 FORMAT('xcloc_fdxcMPI_initialize: fdxc initialization failed on rank', I4)
+  920 FORMAT('xcloc_fdxcMPI_initialize: Failed to partition XCs')
       RETURN
       END
 !                                                                                        !
@@ -325,19 +329,10 @@ MODULE XCLOC_FDXC_MPI
       CALL xcloc_fdxc_finalize()
       IF (ALLOCATED(uniqueGlobalSignalIDPtr_)) DEALLOCATE(uniqueGlobalSignalIDPtr_)
       IF (ALLOCATED(uniqueGlobalSignalIDs_)) DEALLOCATE(uniqueGlobalSignalIDs_)
-!     IF (lfreeSignalRMA_) CALL MPI_Win_free(signalRMAWindow_, mpierr)
       IF (lfreeComm_) CALL MPI_COMM_FREE(comm_, mpierr)
       IF (ALLOCATED(nXCsPerProcess_))     DEALLOCATE(nXCsPerProcess_)
       IF (ALLOCATED(local2GlobalSignal_)) DEALLOCATE(local2GlobalSignal_)
-!     ! could also use SIZEOF( ) > 0
-!     IF (ASSOCIATED(inputSignalsRMA32f_)) THEN
-!        CALL MPI_Free_mem(inputSignalsRMA32f_, mpierr)
-!     ENDIF
-!     IF (ASSOCIATED(inputSignalsRMA64f_)) THEN
-!        CALL MPI_Free_mem(inputSignalsRMA64f_, mpierr)
-!     ENDIF
       lfreeComm_ = .FALSE.
-!     lfreeSignalRMA_ = .FALSE.
       ldoXC_ = .FALSE.
       nsignalsLocal_ = 0
       nsignalsTotal_ = 0
@@ -397,6 +392,7 @@ MODULE XCLOC_FDXC_MPI
 !>                        least nptsInXCs_.  This is defined on the root process.
 !>    @param[in] nxcsIn   Total number of correlograms.  This must equal nXCsTotal_.
 !>                        This is defined on the root process.
+!>    @param[in] root     The root process ID on which to gather the correlograms.
 !>    @param[out] xcs     All of the cross-correlograms.  This is an array of dimension
 !>                        [ldxcIn x nxcsIn] with leading dimension ldxcIn.  This need
 !>                        only be defined on the root process.

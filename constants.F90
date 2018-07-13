@@ -66,7 +66,7 @@ MODULE XCLOC_CONSTANTS
       RETURN
       END
 !>    @brief Determines if the accuracy is supported.
-!>    @param[in] accuracy   Accuracy to test.
+!>    @param[in] acc   Accuracy to test.
 !>    @result True if the accuracy is supported.
 !>    @result False if the accuracy is not supported.
       LOGICAL(C_BOOL) FUNCTION xcloc_constants_isValidAccuracy(acc) &

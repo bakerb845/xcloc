@@ -61,6 +61,10 @@ MODULE XCLOC_DSMXC
       PUBLIC :: xcloc_dsmxc_setCorrelograms32f
       PUBLIC :: xcloc_dsmxc_setCorrelogram64fF 
       PUBLIC :: xcloc_dsmxc_setCorrelogram32fF
+      ! Public but for Fortran only
+      PUBLIC :: xcloc_dsmxc_getImagePtr
+
+      PRIVATE :: xcloc_dsmxc_checkTables
       CONTAINS
 !----------------------------------------------------------------------------------------!
 !                                   Begin the Code                                       !
@@ -161,7 +165,28 @@ MODULE XCLOC_DSMXC
 !                                                                                        !
 !========================================================================================!
 !                                                                                        !
-!>    Gets the diffraction stack migration image of the correlograms from the module.
+!>    @brief Gets a pointer to the migration image.
+!>    @param[out] imagePtr  A pointer to the image. 
+!>    @param[out] ierr      0 indicates success.
+!>
+      SUBROUTINE xcloc_dsmxc_getImagePtr(imagePtr, ierr)
+      REAL(C_FLOAT), CONTIGUOUS, POINTER, DIMENSION(:), INTENT(OUT) :: imagePtr
+      INTEGER(C_INT), INTENT(OUT) :: ierr
+      ierr = 0
+      IF (ngrd_ < 1) THEN
+         WRITE(ERROR_UNIT,900)
+         NULLIFY(imagePtr)
+         ierr = 1
+      ENDIF
+      imagePtr(1:ngrd_) => image32f_(1:ngrd_)
+  900 FORMAT('xcloc_dsmxc_getImagePtr: ngrd_ is zero - check initialization')
+      RETURN
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Gets the diffraction stack migration image of the correlograms from the
+!>           module.
 !>    @param[in] nwork   Size of image.
 !>    @param[out] image  This contains the DSM image.  This is an array of dimension
 !>                       [nwork] but only the first ngrd_ points are accessed. 
@@ -211,7 +236,7 @@ MODULE XCLOC_DSMXC
 !>                          to nptsInXCs.
 !>    @param[in] nptsInXCs  The number of points in each correlogram.  This must
 !>                          equal nptsInXCs_.
-!>    @param[in] nxcs       The number of correlograms.  This must equal nxcPairs_.
+!>    @param[in] nxcPairs   The number of correlogram pairs.  This must equal nxcPairs_.
 !>    @param[in] xcs        The cross-correlograms to migrate.  This an array of dimension
 !>                          [ldxc x nxcPairs] in column major format with leading
 !>                          dimension ldxc.  The order of the correlograms is dictated
@@ -252,12 +277,15 @@ MODULE XCLOC_DSMXC
   902 FORMAT('xcloc_dsmxc_setCorrelograms64f: Error setting xc number', I4) 
       RETURN
       END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
 !>    @brief Sets the correlograms to migrate on the module.
 !>    @param[in] ldxc       Leading dimension of nxcs.  This must be greater than or equal
 !>                          to nptsInXCs.
 !>    @param[in] nptsInXCs  The number of points in each correlogram.  This must
 !>                          equal nptsInXCs_.
-!>    @param[in] nxcs       The number of correlograms.  This must equal nxcPairs_.
+!>    @param[in] nxcPairs   The number of correlograms pairs.  This must equal nxcPairs_.
 !>    @param[in] xcs        The cross-correlograms to migrate.  This an array of dimension
 !>                          [ldxc x nxcPairs] in column major format with leading
 !>                          dimension ldxc.  The order of the correlograms is dictated
@@ -428,7 +456,11 @@ MODULE XCLOC_DSMXC
       ENDDO
       lhaveAllTables_ = .TRUE.
   500 CONTINUE
-      IF (lhaveAllTables_) WRITE(OUTPUT_UNIT,910)
+      ! Check the tables
+      IF (lhaveAllTables_) THEN
+         CALL xcloc_dsmxc_checkTables(ierr)
+         IF (ierr /= 0) WRITE(OUTPUT_UNIT,910)
+      ENDIF
   900 FORMAT('xcloc_dsmxc_setTable64fF: tableNumber=', I4, ' must be in range [1,',I4,']')
   905 FORMAT('xcloc_dsmxc_setTable64fF: ngrd=', I6, ' expecting ngrd_=', I6) 
   910 FORMAT('xcloc_dsmxc_setTable64fF: All tables set')
@@ -474,7 +506,11 @@ MODULE XCLOC_DSMXC
       ENDDO
       lhaveAllTables_ = .TRUE.
   500 CONTINUE
-      IF (lhaveAllTables_) WRITE(OUTPUT_UNIT,910) 
+      ! Check the tables
+      IF (lhaveAllTables_) THEN
+         CALL xcloc_dsmxc_checkTables(ierr)
+         IF (ierr /= 0) WRITE(OUTPUT_UNIT,910) 
+      ENDIF
   900 FORMAT('xcloc_dsmxc_setTable32fF: tableNumber=', I4, ' must be in range [1,',I4,']')
   905 FORMAT('xcloc_dsmxc_setTable32fF: ngrd=', I6, ' expecting ngrd_=', I6)
   910 FORMAT('xcloc_dsmxc_setTable32fF: All tables set')
@@ -547,5 +583,70 @@ MODULE XCLOC_DSMXC
       ENDDO
       RETURN
       END
-
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Verifies that the migration will not segfault wen accessing the correlograms.
+!>    @param[out] ierr    0 indicates success.
+!>
+      SUBROUTINE xcloc_dsmxc_checkTables(ierr)
+      INTEGER, INTENT(OUT) :: ierr
+      INTEGER igrd, igrd1, igrd2, indxXC, indxMaxXC, indxMinXC, &
+              it1, it2, ixc, ixc1, ixc2, jgrd1, jgrd2, kgrd1, kgrd2, lxc2, ngrdLoc
+      INTEGER(C_INT), CONTIGUOUS, POINTER :: tt1(:), tt2(:)
+      ierr = 0
+      IF (.NOT.lhaveAllTables_) THEN
+         WRITE(ERROR_UNIT,905)
+         ierr = 1
+         RETURN
+      ENDIF
+      indxMaxXC = 0
+      indxMinXC = HUGE(1)
+      lxc2 = nptsInXCs_/2
+      !$OMP PARALLEL DO DEFAULT(NONE) &
+      !$OMP SHARED(blockSize_, dataOffset_, image32f_, ldg_, ngrd_) &
+      !$OMP SHARED(nptsInXCs_, nxcPairs_, ttimes_, xcPairs_, xcs32f_) &
+      !$OMP PRIVATE(igrd, igrd1, ixc, ixc1, ixc2, igrd2, it1, it2, indxXC) &
+      !$OMP PRIVATE(jgrd1, jgrd2, kgrd1, kgrd2, ngrdLoc)   &
+      !$OMP PRIVATE(tt1, tt2) &
+      !$OMP FIRSTPRIVATE(lxc2) &
+      !$OMP REDUCTION(max:indxMaxXC) REDUCTION(min:indxMinXC)
+      DO igrd=1,ngrd_,blockSize_
+         ngrdLoc = MIN(ngrd_ - igrd + 1, blockSize_)
+         igrd1 = igrd
+         igrd2 = igrd + ngrdLoc - 1
+         DO ixc=1,nxcPairs_
+            it1 = xcPairs_(2*(ixc-1)+1)
+            it2 = xcPairs_(2*(ixc-1)+2)
+            jgrd1 = (it1 - 1)*ldg_ + igrd1
+            jgrd2 = (it1 - 1)*ldg_ + igrd2
+            kgrd1 = (it2 - 1)*ldg_ + igrd1 
+            kgrd2 = (it2 - 1)*ldg_ + igrd2
+            ixc1 = (ixc - 1)*dataOffset_ + 1 
+            ixc2 = (ixc - 1)*dataOffset_ + nptsInXCs_
+            tt1(1:ngrdLoc) => ttimes_(jgrd1:jgrd2)
+            tt2(1:ngrdLoc) => ttimes_(kgrd1:kgrd2)
+            indxXC = lxc2 + MAXVAL(tt1(1:ngrdLoc) - tt2(1:ngrdLoc))
+            indxMinXC = MIN(indxMinXC, lxc2 + MINVAL(tt1(1:ngrdLoc) - tt2(1:ngrdLoc)))
+            indxMaxXC = MAX(indxMaxXC, lxc2 + MAXVAL(tt1(1:ngrdLoc) - tt2(1:ngrdLoc)))
+            NULLIFY(tt1)
+            NULLIFY(tt2)
+         ENDDO
+      ENDDO
+      IF (indxMinXC < 1) THEN
+         WRITE(ERROR_UNIT,910) indxMinXC
+         ierr = 1
+      ENDIF
+      IF (indxMaxXC > nptsInXCs_) THEN
+         WRITE(ERROR_UNIT,911) indxMaxXC, nptsInXCs_
+         WRITE(ERROR_UNIT,912) nptsInXCs_
+         ierr = 1
+      ENDIF
+      !print *, indxMinXC, indxMaxXC, nptsInXCs_
+  905 FORMAT('xcloc_dsmxc_checkTables: Only a subset of tables were set')
+  910 FORMAT('xcloc_dsmxc_checkTables: Min index=', I6, ' is less than 0')
+  911 FORMAT('xcloc_dsmxc_checkTables: Max index=', I6, ' exceeds nptsInXCs_=', I6)
+  912 FORMAT('xcloc_dsmxc_checktables: Segfault will occur - increase nptsInXCs to:', I6)
+      RETURN
+      END
 END MODULE
