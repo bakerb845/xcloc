@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
-"""
-Python interface to the xcloc interferometric location software.
-Copyright: Ben Baker distributed under the MIT license.
-"""
+
 import sys
 from ctypes import cdll
 from ctypes import c_int
@@ -32,9 +29,11 @@ from xclocTypes import xclocTypes as xctypes
 #import mpi4py
 
 class xcloc:
-    """
-    Interface to the xcloc library.
-    """
+    ##
+    # @defgroup pyxcloc pyxcloc
+    # @brief Interface to the xcloc library.
+    # @ingroup pyxcloc
+    # @copyright Ben Baker distributed under the MIT license.
     def __init__(self,
                  xcloc_path=os.environ['LD_LIBRARY_PATH'].split(os.pathsep),
                  xcloc_library='libxcloc_shared.so'):

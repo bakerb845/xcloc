@@ -1,9 +1,4 @@
 #!/usr/bin/env python3
-"""
-Purpose: Python interface to the utilities for computing the RMS or envelope
-         of the correlograms.
-Copyright: Ben Baker distributed under the MIT license.
-"""
 import sys
 from ctypes import cdll
 from ctypes import c_int
@@ -26,12 +21,14 @@ from math import pi
 from xclocTypes import xclocTypes as xctypes
 
 class spxc:
-    """
-    This class helps filter the cross-correlograms prior to migration.
-    To mitigate deconstructive interface in the sidelobes due to an
-    imperfect velocity model it is useful to either compute an envelope
-    or RMS Filter of the correlograms prior to migration.
-    """
+    ##
+    # @defgroup spxc Signals Processing of Correlograms
+    # @brief This class helps filter the cross-correlograms prior to migration.
+    #        To mitigate deconstructive interface in the sidelobes due to an
+    #        imperfect velocity model it is useful to either compute an envelope
+    #        or RMS Filter of the correlograms prior to migration.
+    # @ingroup pyxcloc
+    # @copyright Ben Baker distributed under the MIT license.
     def __init__(self, xcloc_lib):
         xcloc_lib.xcloc_spxc_initialize.argtypes = (c_int, # number of filter coefficients
                                                     c_int, # filter type

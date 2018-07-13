@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""
-Purpose: Defines types in the xcloc module.
-Copyright: Ben Baker distributed under the MIT license.
-"""
+
 class xclocTypes:
+    ##  
+    # @defgroup xclocTypes Types
+    # @brief Defines types in the xcloc module. 
+    # @ingroup pyxcloc
+    # @copyright Ben Baker distributed under the MIT license.
     (
        XCLOC_HIGH_ACCURACY, # High accuracy vector math calculations
        XCLOC_LOW_ACCURACY,  # Low accuracy vector math calculations

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""
-Purpose: Python interface to the utilities that compute the diffraction
-         stack image of the correlograms.
-Copyright: Ben Baker distributed under the MIT license.
-"""
+
+#Purpose: Python interface to the utilities that compute the diffraction
+#         stack image of the correlograms.
+#Copyright: Ben Baker distributed under the MIT license.
+
 import sys 
 from ctypes import cdll
 from ctypes import c_int
@@ -26,10 +26,11 @@ from math import pi
 from xclocTypes import xclocTypes as xctypes
 
 class dsmxc:
-    """
-    This class computes the diffraction stack migration image of the
-    correlograms.
-    """
+    ##
+    # @defgroup dsmxc Diffraction Stack Migration of Correlograms
+    # @brief This class computes the diffraction stack migration image of the
+    #        correlograms.
+    # @ingroup pyxcloc
     def __init__(self, xcloc_lib):
         xcloc_lib.xcloc_dsmxc_initialize.argtypes = (c_int, # ntables
                                                      c_int, # ngrd

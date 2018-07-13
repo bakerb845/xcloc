@@ -1,8 +1,4 @@
 #!/usr/bin/env python3
-"""
-Purpose: Python interface to the generic xcloc utilities.
-Copyright: Ben Baker distributed under the MIT license.
-"""
 import sys
 from ctypes import cdll
 from ctypes import c_int
@@ -25,9 +21,11 @@ from math import pi
 from xclocTypes import xclocTypes as xctypes
 
 class utils:
-    """
-    Generic utilities to help with using the library.
-    """
+    ##  
+    # @defgroup utils Utilities
+    # @brief Generic utilities to help with using the library.
+    # @ingroup pyxcloc
+    # @copyright Ben Baker distributed under the MIT license.
     def __init__(self, xcloc_lib):
         xcloc_lib.xcloc_utils_computeDefaultXCTable.argtypes = (c_bool, # ldoAutoCorrs
                                                                 c_int,  # nsignals
