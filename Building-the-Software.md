@@ -64,6 +64,8 @@ The simplest build can be done with GCC and without MPI.  An example script may 
 
 ### MPI and Configuring With GNU Compilers
 
+Contained is an example script for compiling with OpenMPI and the GNU compilers.  It is important to observed that the XCLOC\_USE\_MPI flag must be toggled.
+
     #!/bin/sh
     export CC=gcc
     export FC=gfortran
@@ -87,7 +89,6 @@ The simplest build can be done with GCC and without MPI.  An example script may 
     -DCMAKE_C_FLAGS="-g -O2 -fopenmp -Wall -std=c11" \
     -DCMAKE_Fortran_FLAGS="-g -O2 -fopenmp -fbounds-check -Wall -m64" \
     -DXCLOC_USE_MPI=TRUE \
-    -DXCLOC_PROFILE=TRUE \
     -DMKL_INCLUDE_DIR=/opt/intel/mkl/include \
     -DMKL_LIBRARY="-Wl,--start-group ${MKL_LIB_ROOT}/libmkl_gf_lp64.a ${MKL_LIB_ROOT}/libmkl_sequential.a ${MKL_LIB_ROOT}/libmkl_core.a -Wl,--end-group" \
     -DIPP_INCLUDE_DIR=/opt/intel/ipp/include \
@@ -98,8 +99,6 @@ The simplest build can be done with GCC and without MPI.  An example script may 
     -DMPI_Fortran_LIBRARIES="/home/bakerb25/C/openmpi-3.0.2/lib/libmpi_usempif08.so" \
     -DH5_C_INCLUDE_DIR=/home/bakerb25/C/hdf5-1.10.1_intel/include \
     -DH5_LIBRARY=/home/bakerb25/C/hdf5-1.10.1_intel/lib/libhdf5.so \
-    -DSACIO_INCLUDE_DIR=/home/bakerb25/C/sacio/include \
-    -DSACIO_LIBRARY=/home/bakerb25/C/sacio/lib/libsacio_shared.so \
     -DXML2_INCLUDE_DIR=/usr/include/libxml2 \
     -DXML2_LIBRARY=/usr/lib/x86_64-linux-gnu/libxml2.so \
     -DINIPARSER_INCLUDE_DIR=/home/bakerb25/C/iniparser/src \
