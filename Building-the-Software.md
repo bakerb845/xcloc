@@ -51,7 +51,6 @@ It can be expedient to configure CMake with a script.  Though I sometimes have t
     -DCMAKE_C_FLAGS="-g -O2 -fopenmp -Wall -std=c11" \
     -DCMAKE_Fortran_FLAGS="-g -O2 -fopenmp -fbounds-check -Wall -m64" \
     -DXCLOC_USE_MPI=TRUE \
-    -DXCLOC_USE_INTEL=TRUE \
     -DXCLOC_PROFILE=TRUE \
     -DMKL_INCLUDE_DIR=/opt/intel/mkl/include \
     -DMKL_LIBRARY="-Wl,--start-group ${MKL_LIB_ROOT}/libmkl_gf_lp64.a ${MKL_LIB_ROOT}/libmkl_sequential.a ${MKL_LIB_ROOT}/libmkl_core.a -Wl,--end-group" \
