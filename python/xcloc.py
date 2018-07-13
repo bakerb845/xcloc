@@ -30,9 +30,9 @@ from xclocTypes import xclocTypes as xctypes
 
 class xcloc:
     ##
+    # @class pyxcloc pyxcloc 
     # @defgroup pyxcloc pyxcloc
     # @brief Interface to the xcloc library.
-    # @ingroup pyxcloc
     # @copyright Ben Baker distributed under the MIT license.
     def __init__(self,
                  xcloc_path=os.environ['LD_LIBRARY_PATH'].split(os.pathsep),

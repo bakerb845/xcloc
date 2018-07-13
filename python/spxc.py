@@ -66,21 +66,14 @@ class spxc:
     def initialize(self,
                    n=301,
                    ftype=xctypes.XCLOC_SPXC_ENVELOPE_FILTER):
-        """
-        Initializes the module module that will filter the correlograms.
-
-        Inputs
-        ------
-        n : int
-           Number of filtering coefficients.  This must be an odd number.
-        ftype : int
-           The filtering type.  This can be none, an envelope, or an RMS filter.
-           If it is none, then the value of n does not matter.
-
-        Returns
-        -------
-        ierr : int
-           0 indicates success.
+        """!
+        @brief Initializes the module module that will filter the correlograms.
+        @param[in] n       Number of filtering coefficients.  This must be an
+                           odd number.
+        @param[in] ftype   The filtering type.  This can be an envelope,
+                           or an RMS filter.
+        @retval ierr   0 indicates success.
+        @ingroup spxc
         """ 
         fname = '%s::%s'%(self.__class__.__name__, self.initialize.__name__)
         if (ftype == xctypes.XCLOC_SPXC_ENVELOPE_FILTER or
@@ -100,20 +93,14 @@ class spxc:
         return ierr
 
     def filter(self, signals):
-        """
-        Filters many signals using an RMS averaging or envelope.
-
-        Inputs
-        ------
-        signals : matrix 
-            A matrix of input data with dimension [nsignals x npts].
-
-        Returns
-        -------
-        sigProc : matrix
-            A matrix of envelopes or RMS filtered input signals.  This has
-            dimension [nsignals x npts]. 
-            On failure this is None.
+        """!
+        @brief Filters many signals using an RMS averaging or envelope.
+        @param[in] signals  A matrix of input data with dimension
+                            [nsignals x npts].
+        @retval  sigProc  A matrix of envelopes or RMS filtered input
+                          signals.  This has dimension [nsignals x npts].
+        @retval  sigProc  On failure this is None.
+        @ingroup spxc
         """
         fname = '%s::%s'%(self.__class__.__name__, self.filter.__name__)
         ierr = c_int(1)
