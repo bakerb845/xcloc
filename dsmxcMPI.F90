@@ -38,6 +38,12 @@ MODULE XCLOC_DSMXC_MPI
 !========================================================================================!
 !                                       Begin the Code                                   !
 !========================================================================================!
+!>    @brief Initializes the MPI-based module to compute the diffraction stack migration
+!>           of correlograms. 
+!>    @param[in] comm     MPI communicator.  This must be defined on all processes.
+!>    @param[in] root     The root process ID on the communicator.  This likely will be 0.
+!>    @param[in] ntables  
+!>    @param[out] ierr    0 indicates success.
       SUBROUTINE xcloc_dsmxcMPI_initialize(comm, root,                         &
                                            ntables, ngrd, nxcPairs, nptsInXCs, &
                                            dt, xcPairs, ierr)                  &
