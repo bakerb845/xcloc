@@ -9,12 +9,15 @@ To build it is required that one have
 - [CMake](https://cmake.org/) version at least 2.6
 - A fully C11 compliant C compiler.
 - A fully Fortran2008 compliant Fortran compiler.
-- Message Passing Interface v3.  Recommended free versions are [MPICH](https://www.mpich.org/) and [OpenMPI](https://www.open-mpi.org/).  The Fortran 2008 bindings must be available.
 - [Intel MKL](https://software.intel.com/en-us/mkl)
 - [Intel Performance Primitives](https://software.intel.com/en-us/intel-ipp)
 - [HDF5](https://support.hdfgroup.org/HDF5/)
 - [libxml2](http://xmlsoft.org/) 
 - [iniparser](https://github.com/ndevilla/iniparser)
+
+To build the fully parallel software one must additionally obtain
+
+- Message Passing Interface v3.  Recommended free versions are [MPICH](https://www.mpich.org/) and [OpenMPI](https://www.open-mpi.org/).  The Fortran 2008 bindings must be available.
 
 ## Configuring CMake
 
