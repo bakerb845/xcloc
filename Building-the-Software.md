@@ -25,7 +25,7 @@ It can be expedient to configure CMake with a script.  Though I sometimes have t
 
 # Serial GCC Build
 
-The simplest build can be done with GCC and without MPI.  An example script may look something like
+In this section the simplest example of compiling with GCC and without MPI is presented.  This may be useful for experimentation purposes. 
 
     #!/bin/sh
     export CC=gcc
@@ -64,7 +64,7 @@ The simplest build can be done with GCC and without MPI.  An example script may 
 
 ### MPI and Configuring With GNU Compilers
 
-Contained is an example script for compiling with OpenMPI and the GNU compilers.  It is important to observed that the XCLOC\_USE\_MPI flag must be toggled.
+In this section OpenMPI is introduced to the build.  It is important to observed that the XCLOC\_USE\_MPI flag must be toggled.
 
     #!/bin/sh
     export CC=gcc
@@ -105,6 +105,8 @@ Contained is an example script for compiling with OpenMPI and the GNU compilers.
     -DINIPARSER_LIBRARY=/home/bakerb25/C/iniparser/libiniparser.so.1
 
 ### Configuring With the Intel Compilers
+
+In this section an example configuration script using the Intel compiler suite is used.  Commercial compilers, particularly with respect to Fortran, can squeeze a little more performance out of hardware.  
 
     #!/bin/sh
     export CC=/opt/intel/bin/icc
