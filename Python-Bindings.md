@@ -1,3 +1,3 @@
 # Python
 
-Python3 bindings are beginning to be made available.  This uses ctypes to call the underlying Fortran library.  Stay tuned for examples...
+Python3 bindings are being crafted to interface to the xcloc library.  They can be found in the Python directory.  Unless the library path is explicitly specified then it is important to understand that Python will scrape the system's load library path, LD\_LIBRARY\_PATH in attempt to find the xcloc shared library.  After the library is obtained a [ctypes](https://docs.python.org/3/library/ctypes.html) interface is used to access xcloc.
