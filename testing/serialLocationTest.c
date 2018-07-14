@@ -74,7 +74,7 @@ int test_serial_dsmLocation(void)
     double dx = (x1 - x0)/(double) (nx - 1); // should be less than 2m
     double dy = (y1 - y0)/(double) (ny - 1); // should be less than 2m
     double dz = 0.0;
-    int i, ierr;
+    int i, ierr, it;
     // Set the receiver location to the center of the model
     const int nsrc = 2; 
     const double srcScale[2] = {1, 1.1};
@@ -159,9 +159,8 @@ fclose(fl);
     //---------------------------Compute the DSM------------------------------//
     fprintf(stdout, "%s: Initializing DSM...\n", __func__);
     int nxcPairs = nxcs;
-    int ntables = nrec;
-    xcloc_dsmxc_initialize(ntables, ngrd, nxcPairs, nptsInXCs,
-                           dt, xcPairs, &ierr);
+    xcloc_dsmxc_initialize(ngrd, nxcPairs, nptsInXCs,
+                           dt, xcPairs, verbose, &ierr);
     CHKERR(ierr, "failed to initialize dsm");
     fprintf(stdout, "%s: Setting travel time tables...\n", __func__);
     double *ttable = (double *) calloc((size_t) ngrd, sizeof(double));
@@ -169,7 +168,8 @@ fclose(fl);
     {
         computeTravelTimeTable(nx, ny, nz, vel, x0, y0, z0, dx, dy, dz,
                                xr[3*i], xr[3*i+1], xr[3*i+2], ttable);
-        xcloc_dsmxc_setTable64fF(i+1, ngrd, ttable, &ierr);
+        xcloc_dsmxc_signalToTableIndex(i+1, &it, &ierr);
+        xcloc_dsmxc_setTable64f(it, ngrd, ttable, &ierr);
     } 
     free(ttable);
     fprintf(stdout, "%s: Setting observations...\n", __func__);

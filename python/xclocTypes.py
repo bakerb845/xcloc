@@ -28,4 +28,10 @@ class xclocTypes:
        XCLOC_SPXC_RMS_FILTER       # RMS filter of correlograms
     ) = map(int, range(3))
 
-
+    (
+    XCLOC_PRINT_NONE,     # Print nothing.
+    XCLOC_PRINT_ERRORS,   # Print errors.
+    XCLOC_PRINT_WARNINGS, # Print errors and warnings.
+    XCLOC_PRINT_INFO,     # Print errors, warnings, and general information.
+    XCLOC_PRINT_DEBUG     # Print everything.
+    ) = map(int, range(-1,4))

@@ -7,6 +7,7 @@ MODULE XCLOC_DSMXC
       USE XCLOC_CONSTANTS
       USE XCLOC_IPPS
       USE XCLOC_MEMORY
+      USE XCLOC_UTILS
 #ifdef _OPENMP
       USE OMP_LIB
 #endif
@@ -19,9 +20,15 @@ MODULE XCLOC_DSMXC
       INTEGER(C_INT), PRIVATE, TARGET, ALLOCATABLE, SAVE :: ttimes_(:)
       !> Holds the migration image.  This is an array of dimension [ngrd_].
       REAL(C_FLOAT), PRIVATE, TARGET, ALLOCATABLE, SAVE :: image32f_(:)
+      !> Maps from the is'th signal number to the table index.  This is an array
+      !> of dimension [ntables_].
+      INTEGER, PRIVATE, ALLOCATABLE, SAVE :: signal2Table_(:)
+      !> This is defines the two signal numbers comprising a correlation pair.
+      !> This is an array of dimension [2 x nxcPairs_] stored in column major format.
+      INTEGER, PRIVATE, ALLOCATABLE, SAVE :: xcPairs_(:)
       !> Maps from the ixc'th correlation to the table pairs.  This in an array of
       !> dimension [2 x nxcPairs_] stored in column major format.
-      INTEGER, PRIVATE, ALLOCATABLE, SAVE :: xcPairs_(:)
+      INTEGER, PRIVATE, ALLOCATABLE, SAVE :: xcTablePairs_(:)
       !> Determines if all tables are set.
       LOGICAL, PRIVATE, ALLOCATABLE, SAVE :: lhaveTable_(:)
       !> Sampling period (seconds) of signals.
@@ -38,6 +45,8 @@ MODULE XCLOC_DSMXC
       INTEGER, PRIVATE, SAVE :: nxcPairs_ = 0
       !> Leading dimension of correlograms.
       INTEGER, PRIVATE, SAVE :: dataOffset_ = 0
+      !> Controls the verbosity.
+      INTEGER, PRIVATE, SAVE :: verbose_ = XCLOC_PRINT_WARNINGS
       !> Flag indicating that all tables are set.
       LOGICAL, PRIVATE, SAVE :: lhaveAllTables_ = .FALSE.
       !> A tuning parameter that can improve performance by emphasizing cache coherency.
@@ -53,14 +62,16 @@ MODULE XCLOC_DSMXC
       PUBLIC :: xcloc_dsmxc_compute
       PUBLIC :: xcloc_dsmxc_finalize
       PUBLIC :: xcloc_dsmxc_setBlockSize
-      PUBLIC :: xcloc_dsmxc_setTable64fF
-      PUBLIC :: xcloc_dsmxc_setTable32fF
+      PUBLIC :: xcloc_dsmxc_setTable64f
+      PUBLIC :: xcloc_dsmxc_setTable32f
       PUBLIC :: xcloc_dsmxc_getImage64f
       PUBLIC :: xcloc_dsmxc_getImage32f
+      PUBLIC :: xcloc_dsmxc_getNumberOfTables
       PUBLIC :: xcloc_dsmxc_setCorrelograms64f
       PUBLIC :: xcloc_dsmxc_setCorrelograms32f
       PUBLIC :: xcloc_dsmxc_setCorrelogram64fF 
       PUBLIC :: xcloc_dsmxc_setCorrelogram32fF
+      PUBLIC :: xcloc_dsmxc_signalToTableIndex
       ! Public but for Fortran only
       PUBLIC :: xcloc_dsmxc_getImagePtr
 
@@ -70,7 +81,6 @@ MODULE XCLOC_DSMXC
 !                                   Begin the Code                                       !
 !----------------------------------------------------------------------------------------!
 !>    @brief Initializes the diffraction statck migration cross-correlation module.
-!>    @param[in] ntables    Number of travel time tables.
 !>    @param[in] ngrd       Number of grid points in each table.
 !>    @param[in] nxcPairs   Number of cross-correlation pairs.
 !>    @param[in] nptsInXCs  Number of points in cross-correlograms.
@@ -78,16 +88,18 @@ MODULE XCLOC_DSMXC
 !>    @param[in] xcPairs    This is a map from the ixc'th correlation to the table
 !>                          pairs.  It is a column major matrix with dimension 
 !>                          [2 x nxcPairs].
+!>    @param[in] verbose    Controls the verbosity.
 !>    @param[out] ierr      0 indicates success.  
 !>
-      SUBROUTINE xcloc_dsmxc_initialize(ntables, ngrd, nxcPairs, nptsInXCs, &
-                                        dt, xcPairs, ierr)                  &
+      SUBROUTINE xcloc_dsmxc_initialize(ngrd, nxcPairs, nptsInXCs,   &
+                                        dt, xcPairs, verbose, ierr)  &
       BIND(C, NAME='xcloc_dsmxc_initialize')
       IMPLICIT NONE
-      INTEGER(C_INT), VALUE, INTENT(IN) :: ntables, ngrd, nptsInXCs, nxcPairs
+      INTEGER(C_INT), VALUE, INTENT(IN) :: ngrd, nptsInXCs, nxcPairs, verbose
       REAL(C_DOUBLE), VALUE, INTENT(IN) :: dt
       INTEGER(C_INT), INTENT(IN) :: xcPairs(2*nxcPairs)
       INTEGER(C_INT), INTENT(OUT) :: ierr
+      INTEGER ixc
       ! Check the variables
       ierr = 0
       CALL xcloc_dsmxc_finalize()
@@ -103,23 +115,31 @@ MODULE XCLOC_DSMXC
          WRITE(ERROR_UNIT,902)
          ierr = 1
       ENDIF
-      IF (MINVAL(xcPairs) < 1 .OR. MAXVAL(xcPairs) > ntables) THEN
-         IF (MINVAL(xcPairs) < 1) WRITE(ERROR_UNIT,903) 
-         IF (MAXVAL(xcPairs) > ntables) WRITE(ERROR_UNIT,904) MAXVAL(xcPairs), ntables
+      ! Create a map of unique tables
+      CALL xcloc_utils_unique32s(2*nxcPairs, xcPairs, ntables_, signal2Table_, ierr)
+      IF (ierr /= 0) THEN
+         WRITE(ERROR_UNIT,905)
+         ierr = 1
+      ENDIF
+      IF (ntables_ < 2) THEN
+         WRITE(ERROR_UNIT,906)
          ierr = 1
       ENDIF
       IF (nptsInXCs < 1 .OR. MOD(nptsInXCs, 2) /= 1) THEN
-         IF (nptsInXCs < 1) WRITE(ERROR_UNIT,905)
-         IF (MOD(nptsInXCs, 2) /= 1) WRITE(ERROR_UNIT,906) nptsInXCs
+         IF (nptsInXCs < 1) WRITE(ERROR_UNIT,907)
+         IF (MOD(nptsInXCs, 2) /= 1) WRITE(ERROR_UNIT,908) nptsInXCs
          ierr = 1
       ENDIF
-      IF (ierr /= 0) RETURN
+      IF (ierr /= 0) THEN
+         CALL xcloc_dsmxc_finalize()
+         RETURN
+      ENDIF
       ! Set the variables 
       lhaveAllTables_ = .FALSE.
       ngrd_ = ngrd
       nptsInXCs_ = nptsInXCs
-      ntables_ = ntables
       nxcPairs_ = nxcPairs
+      verbose_ = verbose
       dt_ = dt
       dataOffset_ = xcloc_memory_padLength(dataAlignment, sizeof_float, nptsInXCs_) 
       ldg_ = xcloc_memory_padLength(dataAlignment, sizeof_int, ngrd_)
@@ -128,14 +148,22 @@ MODULE XCLOC_DSMXC
       ALLOCATE(image32f_(ldg_)); image32f_(:) = 0.0
       ALLOCATE(ttimes_(ldg_*ntables_)); ttimes_(:) = 0
       ALLOCATE(xcPairs_(2*nxcPairs_)); xcPairs_(:) = 0
+      ALLOCATE(xcTablePairs_(2*nxcPairs_)); xcTablePairs_(:) = 0
       xcPairs_(1:2*nxcPairs_) = xcPairs(1:2*nxcPairs_)
+      DO ixc=1,2*nxcPairs_
+         CALL xcloc_dsmxc_signalToTableIndex(xcPairs_(ixc), xcTablePairs_(ixc), ierr) 
+         IF (ierr /= 0) THEN
+            WRITE(ERROR_UNIT,910) ixc
+         ENDIF
+      ENDDO
   900 FORMAT('xcloc_dsmxc_initialize: No grid points')
   901 FORMAT('xcloc_dsmxc_initialize: No correlation pairs')
   902 FORMAT('xcloc_dsmxc_initialize: Sampling period must be positive')
-  903 FORMAT('xcloc_dsmxc_initialize: All table indices must be positive')
-  904 FORMAT('xcloc_dsmxc_initialize: Max table index=', I6, 'greater than ntables=', I6)
-  905 FORMAT('xcloc_dsmxc_initialize: No points in xcs')
-  906 FORMAT('xcloc_dsmxc_initialize: Number of points in xcs is even', I6)
+  905 FORMAT('xcloc_dsmxc_initialize: Failed to make signal to table map')
+  906 FORMAT('xcloc_dsmxc_initialize: There should be at least two unique tables') 
+  907 FORMAT('xcloc_dsmxc_initialize: No points in xcs')
+  908 FORMAT('xcloc_dsmxc_initialize: Number of points in xcs is even', I6)
+  910 FORMAT('xcloc_dsmxc_initialize: Failed to from signal', I4, ' to table index')
       RETURN
       END
 !                                                                                        !
@@ -146,11 +174,13 @@ MODULE XCLOC_DSMXC
       SUBROUTINE xcloc_dsmxc_finalize( ) &
       BIND(C, NAME='xcloc_dsmxc_finalize')
       IMPLICIT NONE
-      IF (ALLOCATED(lhaveTable_)) DEALLOCATE(lhaveTable_)
-      IF (ALLOCATED(xcs32f_))     DEALLOCATE(xcs32f_)
-      IF (ALLOCATED(ttimes_))     DEALLOCATE(ttimes_)
-      IF (ALLOCATED(image32f_))   DEALLOCATE(image32f_)
-      IF (ALLOCATED(xcPairs_))    DEALLOCATE(xcPairs_)
+      IF (ALLOCATED(lhaveTable_))   DEALLOCATE(lhaveTable_)
+      IF (ALLOCATED(xcs32f_))       DEALLOCATE(xcs32f_)
+      IF (ALLOCATED(ttimes_))       DEALLOCATE(ttimes_)
+      IF (ALLOCATED(image32f_))     DEALLOCATE(image32f_)
+      IF (ALLOCATED(xcPairs_))      DEALLOCATE(xcPairs_)
+      IF (ALLOCATED(xcTablePairs_)) DEALLOCATE(xcTablePairs_)
+      IF (ALLOCATED(signal2Table_)) DEALLOCATE(signal2Table_)
       dt_  = 0.d0
       ldg_ = 0 
       ngrd_ = 0 
@@ -158,8 +188,20 @@ MODULE XCLOC_DSMXC
       ntables_ = 0 
       nxcPairs_ = 0 
       dataOffset_ = 0 
+      verbose_ = XCLOC_PRINT_WARNINGS
       lhaveAllTables_ = .FALSE.
       blockSize_ = XCLOC_DEFAULT_BLOCKSIZE
+      RETURN
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Returns the number of travel time tables on the module.
+!>    @param[out] ntables  The number of travel time tables.
+      SUBROUTINE xcloc_dsmxc_getNumberOfTables(ntables) &
+      BIND(C, NAME='xcloc_dsmxc_getNumberOfTables')
+      INTEGER(C_INT), INTENT(OUT) :: ntables
+      ntables = ntables_
       RETURN
       END
 !                                                                                        !
@@ -420,6 +462,26 @@ MODULE XCLOC_DSMXC
 !                                                                                        !
 !========================================================================================!
 !                                                                                        !
+!>    @brief Maps a signal number to the table index.
+!>    @param[in] is     Signal number.  This must be in the xcPairs table.
+!>    @param[out] it    The table index corresponding to is.
+!>    @param[out] ierr  0 indicates success.
+      SUBROUTINE xcloc_dsmxc_signalToTableIndex(is, it, ierr) &
+      BIND(C, NAME='xcloc_dsmxc_signalToTableIndex')
+      INTEGER(C_INT), VALUE, INTENT(IN) :: is
+      INTEGER(C_INT), INTENT(OUT) :: it, ierr
+      CALL xcloc_utils_bsearch32i(ntables_, is, signal2Table_, it, ierr)
+      IF (ierr /= 0) THEN
+         WRITE(ERROR_UNIT,900) is
+         it = 0
+      ENDIF
+  900 FORMAT('xcloc_dsmxc_signal2TableIndex: Failed to find signal number', I4, &
+             ' in table')
+      RETURN
+      END 
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
 !>    @brief Sets a travel time table.
 !>    @param[in] tableNumber  Table index to set.  This must be in the range 
 !>                            [1, ntables_].
@@ -428,8 +490,8 @@ MODULE XCLOC_DSMXC
 !>                            grid in seconds.  This has dimension [ngrd].
 !>    @param[out] ierr        0 indicates success.
 !>
-      SUBROUTINE xcloc_dsmxc_setTable64fF(tableNumber, ngrd, table, ierr) &
-      BIND(C, NAME='xcloc_dsmxc_setTable64fF')
+      SUBROUTINE xcloc_dsmxc_setTable64f(tableNumber, ngrd, table, ierr) &
+      BIND(C, NAME='xcloc_dsmxc_setTable64f')
       IMPLICIT NONE
       INTEGER(C_INT), VALUE, INTENT(IN) :: tableNumber, ngrd
       REAL(C_DOUBLE), INTENT(IN) :: table(ngrd)
@@ -477,8 +539,8 @@ MODULE XCLOC_DSMXC
 !>                            grid in seconds.  This has dimension [ngrd].
 !>    @param[out] ierr        0 indicates success.
 !>
-      SUBROUTINE xcloc_dsmxc_setTable32fF(tableNumber, ngrd, table, ierr) &
-      BIND(C, NAME='xcloc_dsmxc_setTable32fF')
+      SUBROUTINE xcloc_dsmxc_setTable32f(tableNumber, ngrd, table, ierr) &
+      BIND(C, NAME='xcloc_dsmxc_setTable32f')
       IMPLICIT NONE
       INTEGER(C_INT), VALUE, INTENT(IN) :: tableNumber, ngrd
       REAL(C_FLOAT), INTENT(IN) :: table(ngrd)
@@ -546,7 +608,7 @@ MODULE XCLOC_DSMXC
       lxc2 = nptsInXCs_/2 
       !$OMP PARALLEL DO DEFAULT(NONE) &
       !$OMP SHARED(blockSize_, dataOffset_, image32f_, ldg_, ngrd_) &
-      !$OMP SHARED(nptsInXCs_, nxcPairs_, ttimes_, xcPairs_, xcs32f_) &
+      !$OMP SHARED(nptsInXCs_, nxcPairs_, ttimes_, xcTablePairs_, xcs32f_) &
       !$OMP PRIVATE(i, igrd, igrd1, ixc, ixc1, ixc2, igrd2, it1, it2, indxXC) &
       !$OMP PRIVATE(jgrd1, jgrd2, kgrd1, kgrd2, imagePtr32f, ngrdLoc)   &
       !$OMP PRIVATE(tt1, tt2, xcPtr32f) &
@@ -559,8 +621,8 @@ MODULE XCLOC_DSMXC
          imagePtr32f(1:ngrdLoc) = 0.0 ! 0 out block prior to stack
          ! Loop on correlation pairs
          DO ixc=1,nxcPairs_
-            it1 = xcPairs_(2*(ixc-1)+1)
-            it2 = xcPairs_(2*(ixc-1)+2)
+            it1 = xcTablePairs_(2*(ixc-1)+1)
+            it2 = xcTablePairs_(2*(ixc-1)+2)
             jgrd1 = (it1 - 1)*ldg_ + igrd1
             jgrd2 = (it1 - 1)*ldg_ + igrd2
             kgrd1 = (it2 - 1)*ldg_ + igrd1 
@@ -605,7 +667,7 @@ MODULE XCLOC_DSMXC
       lxc2 = nptsInXCs_/2
       !$OMP PARALLEL DO DEFAULT(NONE) &
       !$OMP SHARED(blockSize_, dataOffset_, image32f_, ldg_, ngrd_) &
-      !$OMP SHARED(nptsInXCs_, nxcPairs_, ttimes_, xcPairs_, xcs32f_) &
+      !$OMP SHARED(nptsInXCs_, nxcPairs_, ttimes_, xcTablePairs_, xcs32f_) &
       !$OMP PRIVATE(igrd, igrd1, ixc, ixc1, ixc2, igrd2, it1, it2, indxXC) &
       !$OMP PRIVATE(jgrd1, jgrd2, kgrd1, kgrd2, ngrdLoc)   &
       !$OMP PRIVATE(tt1, tt2) &
@@ -616,8 +678,8 @@ MODULE XCLOC_DSMXC
          igrd1 = igrd
          igrd2 = igrd + ngrdLoc - 1
          DO ixc=1,nxcPairs_
-            it1 = xcPairs_(2*(ixc-1)+1)
-            it2 = xcPairs_(2*(ixc-1)+2)
+            it1 = xcTablePairs_(2*(ixc-1)+1)
+            it2 = xcTablePairs_(2*(ixc-1)+2)
             jgrd1 = (it1 - 1)*ldg_ + igrd1
             jgrd2 = (it1 - 1)*ldg_ + igrd2
             kgrd1 = (it2 - 1)*ldg_ + igrd1 

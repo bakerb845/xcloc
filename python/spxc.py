@@ -137,8 +137,9 @@ class spxc:
         
 
     def finalize(self):
-        """
+        """!
         Finalizes the filtering library.
+        @ingroup spxc
         """
         self.lib.xcloc_spxc_finalize()
         return

@@ -30,7 +30,6 @@ from xclocTypes import xclocTypes as xctypes
 
 class xcloc:
     ##
-    # @class pyxcloc pyxcloc 
     # @defgroup pyxcloc pyxcloc
     # @brief Interface to the xcloc library.
     # @copyright Ben Baker distributed under the MIT license.

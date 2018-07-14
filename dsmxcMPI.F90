@@ -9,12 +9,13 @@ MODULE XCLOC_DSMXC_MPI
       USE XCLOC_MEMORY
       USE XCLOC_DSMXC
       USE XCLOC_UTILS
+      IMPLICIT NONE
 #if defined(__INTEL_COMPILER)
       TYPE(MPI_Comm), PRIVATE, SAVE :: comm_ = MPI_COMM_WORLD
 #else
       TYPE(MPI_Comm), PRIVATE, SAVE :: comm_
 #endif
-
+      !> The sampling period of the correlograms.
       DOUBLE PRECISION, PRIVATE, SAVE :: dt_ = 0.d0
       !> Root process ID.
       INTEGER, PRIVATE, SAVE :: root_ = 0
@@ -26,6 +27,14 @@ MODULE XCLOC_DSMXC_MPI
       INTEGER, PRIVATE, SAVE :: ngrdTotal_ = 0
       !> Number of grid points specific to this process.
       INTEGER, PRIVATE, SAVE :: ngrdLocal_ = 0
+      !> Number of points in correlograms.
+      INTEGER, PRIVATE, SAVE :: nptsInXCs_ = 0
+      !> The number of tables.
+      INTEGER, PRIVATE, SAVE :: ntables_ = 0
+      !> The number of cross-correlatin pairs.
+      INTEGER, PRIVATE, SAVE :: nxcPairs_ = 0
+      !> Verbosity on the module.
+      INTEGER, PRIVATE, SAVE :: verbose_ = XCLOC_PRINT_WARNINGS
       !> Number of grid points belonging to each process.
       INTEGER, PRIVATE, DIMENSION(:), ALLOCATABLE, SAVE :: nGridPtsPerProcess_
       !> If true then free the communicator.
@@ -40,22 +49,37 @@ MODULE XCLOC_DSMXC_MPI
 !========================================================================================!
 !>    @brief Initializes the MPI-based module to compute the diffraction stack migration
 !>           of correlograms. 
-!>    @param[in] comm     MPI communicator.  This must be defined on all processes.
-!>    @param[in] root     The root process ID on the communicator.  This likely will be 0.
-!>    @param[in] ntables  
-!>    @param[out] ierr    0 indicates success.
-      SUBROUTINE xcloc_dsmxcMPI_initialize(comm, root,                         &
-                                           ntables, ngrd, nxcPairs, nptsInXCs, &
-                                           dt, xcPairs, ierr)                  &
+!>    @param[in] comm       MPI communicator.  This must be defined on all processes.
+!>    @param[in] root       The root process ID on the communicator.  This likely will
+!>                          be 0.
+!>    @param[in] ngrd       Number of points in migration grid.  This is defined on the
+!>                          root process.
+!>    @param[in] nxcPairs   The nmber of cross-correlation pairs.  This is defined on the
+!>                          root process.
+!>    @param[in] nptsInXCs  The number of points in the correlograms.  This must be
+!>                          positive and an odd number.  This is defined on the root
+!>                          process.
+!>    @param[in] dt         The sampling period of the correlograms in seconds.  This
+!>                          must be defined on the root process.
+!>    @param[in] xcPairs    This is a [2 x ncxPairs] matrix stored in column major format
+!>                          that defines the signal indices comprising a correlation
+!>                          pairs.  This is defined on the root process. 
+!>    @param[in] verbose    Controls the verbosity. 
+!>    @param[out] ierr      0 indicates success.
+!>    @bug Need to verify that MPI_Comm is the same size as MPI_Fcomm.
+      SUBROUTINE xcloc_dsmxcMPI_initialize(comm, root,                 &
+                                           ngrd, nxcPairs, nptsInXCs,  &
+                                           dt, xcPairs, verbose, ierr) &
       BIND(C, NAME='xcloc_dsmxcMPI_initialize')
       TYPE(MPI_Comm),  VALUE, INTENT(IN) :: comm
       !INTEGER(C_INT), VALUE, INTENT(IN) :: fcomm !TODO could be problematic w/ *finter.h
-      INTEGER(C_INT), VALUE, INTENT(IN) :: root, ntables, ngrd, nxcPairs, nptsInXCs
+      INTEGER(C_INT), VALUE, INTENT(IN) :: root, ngrd, nxcPairs, nptsInXCs, &
+                                           verbose
       REAL(C_DOUBLE), VALUE, INTENT(IN) :: dt
       INTEGER(C_INT), INTENT(IN) :: xcPairs(2*nxcPairs)
       INTEGER(C_INT), INTENT(OUT) :: ierr
-      INTEGER, ALLOCATABLE :: myGrid(:), myGridPtr(:)
-      INTEGER ip, mpierr
+      INTEGER, ALLOCATABLE :: myGrid(:), myGridPtr(:), xcPairsWork(:)
+      INTEGER ierrLoc, ip, mpierr
       ! iRelease module in case someone called this twice.
       CALL xcloc_dsmxcMPI_finalize()
       ! Get communicator size and my rank
@@ -72,11 +96,6 @@ MODULE XCLOC_DSMXC_MPI
             IF (dt <= 0.d0) WRITE(ERROR_UNIT,902)
             ierr = 1
          ENDIF
-         IF (MINVAL(xcPairs) < 1 .OR. MAXVAL(xcPairs) > ntables) THEN
-            IF (MINVAL(xcPairs) < 1) WRITE(ERROR_UNIT,903) 
-            IF (MAXVAL(xcPairs) > ntables) WRITE(ERROR_UNIT,904) MAXVAL(xcPairs), ntables
-            ierr = 1 
-         ENDIF
          IF (nptsInXCs < 1 .OR. MOD(nptsInXCs, 2) /= 1) THEN
             IF (nptsInXCs < 1) WRITE(ERROR_UNIT,905)
             IF (MOD(nptsInXCs, 2) /= 1) WRITE(ERROR_UNIT,906) nptsInXCs
@@ -85,9 +104,10 @@ MODULE XCLOC_DSMXC_MPI
          IF (ierr /= 0) GOTO 500
          ! Copy some input variables 
          ngrdTotal_ = ngrd
-         ntables_ = ntables
          dt_ = dt
+         nptsInXCs_ = nptsInXCs
          nxcPairs_ = nxcPairs
+         verbose_ = verbose
          ! Decompose the grid
          ALLOCATE(myGrid(ngrdTotal_))
          ALLOCATE(myGridPtr(nprocs_+1))
@@ -99,7 +119,12 @@ MODULE XCLOC_DSMXC_MPI
          ALLOCATE(nGridPtsPerProcess_(nprocs_))
          DO ip=1,nprocs_
             nGridPtsPerProcess_(ip) = myGridPtr(ip+1) - myGridPtr(ip)
+            IF (verbose_ > XCLOC_PRINT_WARNINGS) THEN
+               WRITE(OUTPUT_UNIT,910) ip-1, nGridPtsPerProcess_(ip)
+            ENDIF
          ENDDO
+         ALLOCATE(xcPairsWork(2*nxcPairs_))
+         xcPairsWork(1:2*nxcPairs_) = xcPairs(1:2*nxcPairs_) 
       ENDIF
   500 CONTINUE
       CALL MPI_Bcast(ierr, 1, MPI_INTEGER, root_, comm, mpierr)
@@ -109,25 +134,37 @@ MODULE XCLOC_DSMXC_MPI
       lfreeComm_ = .TRUE.
       ! Send some information to the other processes
       CALL MPI_Bcast(ngrdTotal_, 1, MPI_INTEGER, root_, comm_, mpierr)
-      CALL MPI_Bcast(ntables_,   1, MPI_INTEGER, root_, comm_, mpierr)
+      CALL MPI_Bcast(nxcPairs_,  1, MPI_INTEGER, root_, comm_, mpierr)
+      CALL MPI_Bcast(nptsInXCs_, 1, MPI_INTEGER, root_, comm_, mpierr)
+      CALL MPI_Bcast(verbose_,   1, MPI_INTEGER, root_, comm_, mpierr)
       CALL MPI_Bcast(dt_, 1, MPI_DOUBLE_PRECISION, root_, comm_, mpierr)
       IF (.NOT.ALLOCATED(nGridPtsPerProcess_)) ALLOCATE(nGridPtsPerProcess_(nprocs_))
+      IF (.NOT.ALLOCATED(xcPairsWork)) ALLOCATE(xcPairsWork(2*nxcPairs_))
       CALL MPI_Bcast(nGridPtsPerProcess_, nprocs_, MPI_INTEGER, root_, comm_, mpierr)
+      CALL MPI_Bcast(xcPairsWork, 2*nxcPairs_, MPI_INTEGER, root_, comm_, mpierr)
+      ierrLoc = 0
       IF (ngrdLocal_ > 0) THEN
-!        CALL xcloc_dsmxc_initialize(ntables_, ngrdLocal_, nxcPairs_, nptsInXCs_, &
-!                                    dt_, xcPairsWork, ierr)
+         CALL xcloc_dsmxc_initialize(ngrdLocal_, nxcPairs_, nptsInXCs_, &
+                                     dt_, xcPairsWork, verbose_, ierrLoc)
+         IF (ierrLoc /= 0) THEN
+            WRITE(ERROR_UNIT,930) myid_
+            ierrLoc = 1
+         ENDIF
+         CALL xcloc_dsmxc_getNumberOfTables(ntables_)
       ENDIF
+      CALL MPI_Allreduce(ierrLoc, ierr, 1, MPI_INTEGER, MPI_MAX, comm_, mpierr) 
       ! Free workspace
-      IF (ALLOCATED(myGrid))    DEALLOCATE(myGrid)
-      IF (ALLOCATED(myGridPtr)) DEALLOCATE(myGridPtr)
+      IF (ALLOCATED(myGrid))      DEALLOCATE(myGrid)
+      IF (ALLOCATED(myGridPtr))   DEALLOCATE(myGridPtr)
+      IF (ALLOCATED(xcPairsWork)) DEALLOCATE(xcPairsWork)
   900 FORMAT('xcloc_dsmxcMPI_initialize: No grid points')
   901 FORMAT('xcloc_dsmxcMPI_initialize: No correlation pairs')
   902 FORMAT('xcloc_dsmxcMPI_initialize: Sampling period must be positive')
-  903 FORMAT('xcloc_dsmxcMPI_initialize: All table indices must be positive')
-  904 FORMAT('xcloc_dsmxcMPI_initialize: Max table index=', I6, 'exceeds ntables=', I6)
   905 FORMAT('xcloc_dsmxcMPI_initialize: No points in xcs')
   906 FORMAT('xcloc_dsmxcMPI_initialize: Number of points in xcs is even', I6)
+  910 FORMAT('xcloc_dsmxcMPI_initialize: Process', I4, ' has ', I6, ' grid points')
   920 FORMAT('xcloc_dsmxcMPI_initialize: Failed to partition grid')
+  930 FORMAT('xcloc_dsmxcMPI_initialize: Failed to initialize dsmxc on rank', I4)
       RETURN
       END
 !                                                                                        !
@@ -137,13 +174,16 @@ MODULE XCLOC_DSMXC_MPI
 !>
       SUBROUTINE xcloc_dsmxcMPI_finalize() &
       BIND(C, NAME='xcloc_dsmxcMPI_finalize')
+      INTEGER mpierr
       CALL xcloc_dsmxc_finalize()
       IF (ALLOCATED(nGridPtsPerProcess_)) DEALLOCATE(nGridPtsPerProcess_)
       IF (lfreeComm_) CALL MPI_COMM_FREE(comm_, mpierr)
       lfreeComm_ = .FALSE.
       ngrdTotal_ = 0
       ngrdLocal_ = 0
+      nptsInXCs_ = 0
       ntables_ = 0
+      dt_ = 0.d0
       myid_ = MPI_UNDEFINED
       RETURN
       END

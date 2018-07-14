@@ -24,10 +24,10 @@ void xcloc_utils_computeDefaultXCTable(const bool ldoAutoCorrs,
 /*                Diffraction Stack Migration of Correlograms                 */
 /*----------------------------------------------------------------------------*/
 /* Initialize the DSM. */
-void xcloc_dsmxc_initialize(const int ntables, const int ngrd,
+void xcloc_dsmxc_initialize(const int ngrd,
                             const int nxcPairs, const int nptsInXCs,
                             const double dt, const int xcPairs[],
-                            int *ierr);
+                            const int verbose, int *ierr);
 /* Computes the DSM image. */
 void xcloc_dsmxc_compute(int *ierr);
 /* Sets correlograms. */
@@ -46,15 +46,17 @@ void xcloc_dsmxc_getImage64f(const int nwork,
 void xcloc_dsmxc_getImage32f(const int nwork, 
                              float image[],
                              int *ierr);
+/* Maps from the signal in the xcPairs table to the */
+void xcloc_dsmxc_signalToTableIndex(const int is, int *it, int *ierr);
 /* Sets a travel time table. */
-void xcloc_dsmxc_setTable64fF(const int tableNumber,
-                              const int ngrd,
-                              const double table[],
-                              int *ierr);
-void xcloc_dsmxc_setTable32fF(const int tableNumber,
-                              const int ngrd,
-                              const float table[],
-                              int *ierr);
+void xcloc_dsmxc_setTable64f(const int tableNumber, /* Fortran indexed. */
+                             const int ngrd,
+                             const double table[],
+                             int *ierr);
+void xcloc_dsmxc_setTable32f(const int tableNumber, /* Fortran indexed. */
+                             const int ngrd,
+                             const float table[],
+                             int *ierr);
 /* Release the memory on the DSM structure. */
 void xcloc_dsmxc_finalize(void);
 /*----------------------------------------------------------------------------*/

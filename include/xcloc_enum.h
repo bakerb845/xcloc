@@ -36,6 +36,15 @@ enum xclocXCFilterType_enum
     XCLOC_SPXC_RMS_FILTER = 2 /*!< Compute RMS Filter of correlograms. */
 };
 
+enum xclocXCVerbose_enum
+{
+    XCLOC_PRINT_NONE =-1,     /*!< Print nothing. */
+    XCLOC_PRINT_ERRORS = 0,   /*!< Print errors. */
+    XCLOC_PRINT_WARNINGS = 1, /*!< Print errors and warnings. */
+    XCLOC_PRINT_INFO = 2,     /*!< Print errors, warnings, and general information. */
+    XCLOC_PRINT_DEBUG = 3     /*!< Print everything. */
+};
+
 
 
 #endif

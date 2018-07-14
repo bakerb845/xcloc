@@ -37,25 +37,19 @@ class utils:
         self.lib = xcloc_lib
 
     def computeDefaultXCTable(self, nsignals, ldoAutoCorrs = False):
-        """
+        """!
         Computes a default cross-correlation table pair.
  
-        Inputs
-        ------
-        nsignals : int
-            Number of signals.
-
-        ldoAutoCorrs : bool
-            If true then compute auto-correlations.
-            Otherwise, only compute cross correlations.
-
-        Returns
-        -------
-        xcPairs : matrix 
-            On successful exit this is a [nxcs x 2] table of cross correlation
-            pairs.  Each row is a correlation pair between signal (column 1) and
-            signal (column 2).  The signal indices are C numbered.  
-            Otherwise, this is None.
+        @param[in] nsignals   Number of signals.
+        @param[in] ldoAutoCorrs   If true then compute auto-correlations.
+        @param[in] ldoAutoCorrs   Otherwise, only compute cross correlations.
+        @retval xcPairs           On successful exit this is a [nxcs x 2] table
+                                  of cross correlation pairs.  Each row is a
+                                  correlation pair between signal (column 1) and
+                                  signal (column 2).  The signal indices are
+                                  C numbered.  
+        @retval xcPairs           If None then an error occurred.
+        @ingroup utils
         """
         fname = '%s::%s'%(self.__class__.__name__, self.computeDefaultXCTable.__name__)
         ierr = c_int(1)
