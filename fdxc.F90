@@ -509,7 +509,7 @@ MODULE XCLOC_FDXC
       INTEGER(C_INT), VALUE, INTENT(IN) :: ldxc, nxcs
       REAL(C_DOUBLE), INTENT(OUT) :: xcs(ldxc*nxcs)
       INTEGER(C_INT), INTENT(OUT) :: ierr
-      INTEGER i1, ixc 
+      INTEGER i1, i2, ixc 
       ierr = 0 
       IF (ldxc < nptsInXCs_) THEN
          WRITE(ERROR_UNIT,900) nptsInXCs_
@@ -523,7 +523,8 @@ MODULE XCLOC_FDXC
       ENDIF
       DO ixc=1,nxcs_
          i1 = (ixc - 1)*ldxc + 1 
-         CALL xcloc_fdxc_getCorrelogram64fF(ixc, ldxc, xcs(i1), ierr)
+         i2 = i1 + nptsInXCs_ - 1 
+         CALL xcloc_fdxc_getCorrelogram64fF(ixc, ldxc, xcs(i1:i2), ierr)
       ENDDO
   900 FORMAT('xcloc_fdxc_getCorrelograms64f: ldxc must be at least', I6)
   905 FORMAT('xcloc_fdxc_getCorrelograms64f: nxcs must be at least', I6)
@@ -546,7 +547,7 @@ MODULE XCLOC_FDXC
       INTEGER(C_INT), VALUE, INTENT(IN) :: ldxc, nxcs
       REAL(C_FLOAT), INTENT(OUT) :: xcs(ldxc*nxcs)
       INTEGER(C_INT), INTENT(OUT) :: ierr
-      INTEGER i1, ixc
+      INTEGER i1, i2, ixc
       ierr = 0
       IF (ldxc < nptsInXCs_) THEN
          WRITE(ERROR_UNIT,900) nptsInXCs_
@@ -560,7 +561,8 @@ MODULE XCLOC_FDXC
       ENDIF
       DO ixc=1,nxcs_
          i1 = (ixc - 1)*ldxc + 1
-         CALL xcloc_fdxc_getCorrelogram32fF(ixc, ldxc, xcs(i1), ierr)
+         i2 = i1 + nptsInXCs_ - 1
+         CALL xcloc_fdxc_getCorrelogram32fF(ixc, ldxc, xcs(i1:i2), ierr)
       ENDDO
   900 FORMAT('xcloc_fdxc_getCorrelograms32f: ldxc must be at least', I6)
   905 FORMAT('xcloc_fdxc_getCorrelograms32f: nxcs must be at least', I6)
@@ -669,7 +671,7 @@ MODULE XCLOC_FDXC
       USE ISO_C_BINDING
       IMPLICIT NONE
       INTEGER(C_INT), VALUE, INTENT(IN) :: corrNumber, lwork
-      REAL(C_DOUBLE), INTENT(OUT) :: xc(*)
+      REAL(C_DOUBLE), DIMENSION(:), INTENT(OUT) :: xc
       INTEGER(C_INT), INTENT(OUT) :: ierr
       INTEGER i1
       ierr = 0 
@@ -711,7 +713,7 @@ MODULE XCLOC_FDXC
       USE ISO_C_BINDING
       IMPLICIT NONE
       INTEGER(C_INT), VALUE, INTENT(IN) :: corrNumber, lwork
-      REAL(C_FLOAT), INTENT(OUT) :: xc(*)
+      REAL(C_FLOAT), DIMENSION(:), INTENT(OUT) :: xc
       INTEGER(C_INT), INTENT(OUT) :: ierr
       INTEGER i1
       ierr = 0

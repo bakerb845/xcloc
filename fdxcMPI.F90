@@ -113,7 +113,7 @@ MODULE XCLOC_FDXC_MPI
       !INTEGER(C_INT), VALUE, INTENT(IN) :: fcomm !TODO could be problematic w/ *finter.h
       INTEGER(C_INT), VALUE, INTENT(IN) :: root, npts, nptsPad, nxcs, &
                                            verbose, prec, accuracy
-      INTEGER(C_INT), INTENT(IN) :: xcPairs(*)
+      INTEGER(C_INT), INTENT(IN) :: xcPairs(2*nxcs) !(*)
       INTEGER(C_INT), INTENT(OUT) :: ierr
       INTEGER, ALLOCATABLE, DIMENSION(:) :: l2gSignal, myXCs,  myXCPtr, signalList, &
                                             work, xcPairsWork, xcPairsLocal
@@ -400,7 +400,7 @@ MODULE XCLOC_FDXC_MPI
       SUBROUTINE xcloc_fdxcMPI_gatherCorrelograms64f(ldxcIn, nxcsIn, root, xcs, ierr) &
       BIND(C, NAME='xcloc_fdxcMPI_gatherCorrelograms64f')
       INTEGER(C_INT), VALUE, INTENT(IN) :: ldxcin, nxcsIn, root
-      REAL(C_DOUBLE), INTENT(OUT) :: xcs(*)
+      REAL(C_DOUBLE), INTENT(OUT) :: xcs(ldxcIn*nxcsIn)
       INTEGER(C_INT), INTENT(OUT) :: ierr
       DOUBLE PRECISION, DIMENSION(:), ALLOCATABLE :: work
       INTEGER irecv, ldxc, mpierr, nxcs, nxcsLoc, sendCount
@@ -475,11 +475,11 @@ MODULE XCLOC_FDXC_MPI
       SUBROUTINE xcloc_fdxcMPI_setSignals64f(ldx, npts, nsignals, x, ierr) &
       BIND(C, NAME='xcloc_fdxcMPI_setSignals64f')
       INTEGER(C_INT), VALUE, INTENT(IN) :: ldx, npts, nsignals
-      REAL(C_DOUBLE), INTENT(IN) :: x(*)
+      REAL(C_DOUBLE), INTENT(IN) :: x(ldx*nsignals)
       INTEGER(C_INT), INTENT(OUT) :: ierr
       DOUBLE PRECISION, ALLOCATABLE :: work(:)
       TYPE(MPI_Request), ALLOCATABLE :: send_request(:), recv_request(:)
-      INTEGER dest, i, i1, i2, ierrLoc, indx, ip, is, j1, mpierr, nrecv, nsend
+      INTEGER dest, i, i1, i2, ierrLoc, indx, ip, is, j1, j2, mpierr, nrecv, nsend
       LOGICAL flag
       TYPE(MPI_Status) stat
       ierr = 0
@@ -525,7 +525,8 @@ MODULE XCLOC_FDXC_MPI
          DO i=i1,i2
             is = local2GlobalSignal_(i)
             j1 = (is - 1)*ldx + 1
-            CALL xcloc_fdxc_setSignal64fF(i, npts_, x(j1), ierr)
+            j2 = j1 + npts_ - 1
+            CALL xcloc_fdxc_setSignal64fF(i, npts_, x(j1:j2), ierr)
             IF (ierr /= 0) THEN
                WRITE(ERROR_UNIT,915) i, myid_
                ierrLoc = 1

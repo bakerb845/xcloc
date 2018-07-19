@@ -170,6 +170,17 @@ MODULE XCLOC_DSMXC_MPI
 !                                                                                        !
 !========================================================================================!
 !                                                                                        !
+      SUBROUTINE xcloc_dsmxcMPI_setTable64f(tableNumber, ngrd, table, ierr) &
+      BIND(C, NAME='xcloc_dsmxcMPI_setTable64f')
+      INTEGER(C_INT), VALUE, INTENT(IN) :: tableNumber, ngrd
+      REAL(C_DOUBLE), DIMENSION(:), INTENT(IN) :: table
+      INTEGER(C_INT), INTENT(OUT) :: ierr
+
+      RETURN
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
 !>    @brief Releases memory on the module.
 !>
       SUBROUTINE xcloc_dsmxcMPI_finalize() &
@@ -202,7 +213,7 @@ MODULE XCLOC_DSMXC_MPI
       SUBROUTINE xcloc_dsmxcMPI_gatherImage32f(nwork, root, image, ierr) &
       BIND(C, NAME='xcloc_dsmxcMPI_gatherImage32f')
       INTEGER(C_INT), VALUE, INTENT(IN) :: nwork, root
-      REAL(C_FLOAT), INTENT(OUT) :: image(*)
+      REAL(C_FLOAT), DIMENSION(:), INTENT(OUT) :: image
       INTEGER(C_INT), INTENT(OUT) :: ierr
       REAL(C_FLOAT), CONTIGUOUS, DIMENSION(:), POINTER :: imagePtr
       INTEGER, ALLOCATABLE :: displs(:), recvCount(:)
