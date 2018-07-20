@@ -1,3 +1,5 @@
+!> @defgroup dsmxc Diffraction Stack Migration of Correlograms
+!> @ingroup xcloc
 !> @brief Diffraction stack migration of cross-correlograms.
 !> @author Ben Baker
 !> @copyright Ben Baker distributed the MIT license.
@@ -90,7 +92,7 @@ MODULE XCLOC_DSMXC
 !>                          [2 x nxcPairs].
 !>    @param[in] verbose    Controls the verbosity.
 !>    @param[out] ierr      0 indicates success.  
-!>
+!>    @ingroup dsmxc
       SUBROUTINE xcloc_dsmxc_initialize(ngrd, nxcPairs, nptsInXCs,   &
                                         dt, xcPairs, verbose, ierr)  &
       BIND(C, NAME='xcloc_dsmxc_initialize')
@@ -170,7 +172,7 @@ MODULE XCLOC_DSMXC
 !========================================================================================!
 !                                                                                        !
 !>    @brief Releases the memory on the module.
-!>
+!>    @ingroup dsmxc
       SUBROUTINE xcloc_dsmxc_finalize( ) &
       BIND(C, NAME='xcloc_dsmxc_finalize')
       IMPLICIT NONE
@@ -198,6 +200,7 @@ MODULE XCLOC_DSMXC
 !                                                                                        !
 !>    @brief Returns the number of travel time tables on the module.
 !>    @param[out] ntables  The number of travel time tables.
+!>    @ingroup dsmxc
       SUBROUTINE xcloc_dsmxc_getNumberOfTables(ntables) &
       BIND(C, NAME='xcloc_dsmxc_getNumberOfTables')
       INTEGER(C_INT), INTENT(OUT) :: ntables
@@ -210,7 +213,7 @@ MODULE XCLOC_DSMXC
 !>    @brief Gets a pointer to the migration image.
 !>    @param[out] imagePtr  A pointer to the image. 
 !>    @param[out] ierr      0 indicates success.
-!>
+!>    @ingroup dsmxc
       SUBROUTINE xcloc_dsmxc_getImagePtr(imagePtr, ierr)
       REAL(C_FLOAT), CONTIGUOUS, POINTER, DIMENSION(:), INTENT(OUT) :: imagePtr
       INTEGER(C_INT), INTENT(OUT) :: ierr
@@ -233,7 +236,7 @@ MODULE XCLOC_DSMXC
 !>    @param[out] image  This contains the DSM image.  This is an array of dimension
 !>                       [nwork] but only the first ngrd_ points are accessed. 
 !>    @param[out] ierr   0 indicates success.
-!>
+!>    @ingroup dsmxc
       SUBROUTINE xcloc_dsmxc_getImage64f(nwork, image, ierr) &
       BIND(C, NAME='xcloc_dsmxc_getImage64f')
       INTEGER(C_INT), VALUE, INTENT(IN) :: nwork
@@ -254,7 +257,7 @@ MODULE XCLOC_DSMXC
 !>    @param[out] image  This contains the DSM image.  This is an array of dimension
 !>                       [nwork] but only the first ngrd_ points are accessed. 
 !>    @param[out] ierr   0 indicates success.
-!>
+!>    @ingroup dsmxc
       SUBROUTINE xcloc_dsmxc_getImage32f(nwork, image, ierr) &
       BIND(C, NAME='xcloc_dsmxc_getImage32f')
       INTEGER(C_INT), VALUE, INTENT(IN) :: nwork
@@ -287,7 +290,7 @@ MODULE XCLOC_DSMXC
 !>                          signal index pairs given by xcPairs_(2*(ixc-1)+1) and
 !>                          xcPairs_(2*ixc).
 !>    @param[out] ierr      0 indicates success.
-!>
+!>    @ingroup dsmxc
       SUBROUTINE xcloc_dsmxc_setCorrelograms64f(ldxc, nptsInXCs, nxcPairs, xcs, ierr) &
       BIND(C, NAME='xcloc_dsmxc_setCorrelograms64f')
       IMPLICIT NONE
@@ -336,7 +339,7 @@ MODULE XCLOC_DSMXC
 !>                          signal index pairs given by xcPairs_(2*(ixc-1)+1) and
 !>                          xcPairs_(2*ixc).
 !>    @param[out] ierr      0 indicates success.
-!>
+!>    @ingroup dsmxc
       SUBROUTINE xcloc_dsmxc_setCorrelograms32f(ldxc, nptsInXCs, nxcPairs, xcs, ierr) &
       BIND(C, NAME='xcloc_dsmxc_setCorrelograms32f')
       IMPLICIT NONE
@@ -378,7 +381,7 @@ MODULE XCLOC_DSMXC
 !>                          nptsInXCs_.
 !>    @param[in] xc         Cross-correlogram to set.  This has dimension [nptsInXCs].
 !>    @param[out] ierr      0 indicates success.
-!>
+!>    @ingroup dsmxc
       SUBROUTINE xcloc_dsmxc_setCorrelogram64fF(xcIndex, nptsInXCs, xc, ierr) &
       BIND(C, NAME='xcloc_dsmxc_setCorrelogram64fF')
       INTEGER(C_INT), VALUE, INTENT(IN) :: xcIndex, nptsInXCs
@@ -409,7 +412,7 @@ MODULE XCLOC_DSMXC
 !>                          nptsInXCs_.
 !>    @param[in] xc         Cross-correlogram to set.  This has dimension [nptsInXCs].
 !>    @param[out] ierr      0 indicates success.
-!>
+!>    @ingroup dsmxc
       SUBROUTINE xcloc_dsmxc_setCorrelogram32fF(xcIndex, nptsInXCs, xc, ierr) &
       BIND(C, NAME='xcloc_dsmxc_setCorrelogram32fF')
       INTEGER(C_INT), VALUE, INTENT(IN) :: xcIndex, nptsInXCs
@@ -437,7 +440,7 @@ MODULE XCLOC_DSMXC
 !>    @param[in] blockSize  This many grid points will be updated during the migration.
 !>                          This must be a power of 2.
 !>    @param[out] ierr      0 indicates success.  
-!>
+!>    @ingroup dsmxc
       SUBROUTINE xcloc_dsmxc_setBlockSize(blockSize, ierr) &
       BIND(C, NAME='xcloc_dsmxc_setBlockSize')
       IMPLICIT NONE
@@ -466,6 +469,7 @@ MODULE XCLOC_DSMXC
 !>    @param[in] is     Signal number.  This must be in the xcPairs table.
 !>    @param[out] it    The table index corresponding to is.
 !>    @param[out] ierr  0 indicates success.
+!>    @ingroup dsmxc
       SUBROUTINE xcloc_dsmxc_signalToTableIndex(is, it, ierr) &
       BIND(C, NAME='xcloc_dsmxc_signalToTableIndex')
       INTEGER(C_INT), VALUE, INTENT(IN) :: is
@@ -489,7 +493,7 @@ MODULE XCLOC_DSMXC
 !>    @param[in] table        The travel times from the source to all points in the
 !>                            grid in seconds.  This has dimension [ngrd].
 !>    @param[out] ierr        0 indicates success.
-!>
+!>    @ingroup dsmxc
       SUBROUTINE xcloc_dsmxc_setTable64f(tableNumber, ngrd, table, ierr) &
       BIND(C, NAME='xcloc_dsmxc_setTable64f')
       IMPLICIT NONE
@@ -523,9 +527,9 @@ MODULE XCLOC_DSMXC
          CALL xcloc_dsmxc_checkTables(ierr)
          IF (ierr /= 0) WRITE(OUTPUT_UNIT,910)
       ENDIF
-  900 FORMAT('xcloc_dsmxc_setTable64fF: tableNumber=', I4, ' must be in range [1,',I4,']')
-  905 FORMAT('xcloc_dsmxc_setTable64fF: ngrd=', I6, ' expecting ngrd_=', I6) 
-  910 FORMAT('xcloc_dsmxc_setTable64fF: All tables set')
+  900 FORMAT('xcloc_dsmxc_setTable64f: tableNumber=', I4, ' must be in range [1,',I4,']')
+  905 FORMAT('xcloc_dsmxc_setTable64f: ngrd=', I6, ' expecting ngrd_=', I6) 
+  910 FORMAT('xcloc_dsmxc_setTable64f: All tables set')
       RETURN
       END
 !                                                                                        !
@@ -538,7 +542,7 @@ MODULE XCLOC_DSMXC
 !>    @param[in] table        The travel times from the source to all points in the
 !>                            grid in seconds.  This has dimension [ngrd].
 !>    @param[out] ierr        0 indicates success.
-!>
+!>    @ingroup dsmxc
       SUBROUTINE xcloc_dsmxc_setTable32f(tableNumber, ngrd, table, ierr) &
       BIND(C, NAME='xcloc_dsmxc_setTable32f')
       IMPLICIT NONE
@@ -573,9 +577,9 @@ MODULE XCLOC_DSMXC
          CALL xcloc_dsmxc_checkTables(ierr)
          IF (ierr /= 0) WRITE(OUTPUT_UNIT,910) 
       ENDIF
-  900 FORMAT('xcloc_dsmxc_setTable32fF: tableNumber=', I4, ' must be in range [1,',I4,']')
-  905 FORMAT('xcloc_dsmxc_setTable32fF: ngrd=', I6, ' expecting ngrd_=', I6)
-  910 FORMAT('xcloc_dsmxc_setTable32fF: All tables set')
+  900 FORMAT('xcloc_dsmxc_setTable32f: tableNumber=', I4, ' must be in range [1,',I4,']')
+  905 FORMAT('xcloc_dsmxc_setTable32f: ngrd=', I6, ' expecting ngrd_=', I6)
+  910 FORMAT('xcloc_dsmxc_setTable32f: All tables set')
       RETURN
       END
 !                                                                                        !
@@ -590,7 +594,7 @@ MODULE XCLOC_DSMXC
 !>           best aligned with signal 1.
 !>
 !>    @param[out] ierr 0 indicates success.
-!>
+!>    @ingroup dsmxc
       SUBROUTINE xcloc_dsmxc_compute(ierr) &
       BIND(C, NAME='xcloc_dsmxc_compute')
       IMPLICIT NONE
@@ -650,7 +654,7 @@ MODULE XCLOC_DSMXC
 !                                                                                        !
 !>    @brief Verifies that the migration will not segfault wen accessing the correlograms.
 !>    @param[out] ierr    0 indicates success.
-!>
+!>    @ingroup dsmxc
       SUBROUTINE xcloc_dsmxc_checkTables(ierr)
       INTEGER, INTENT(OUT) :: ierr
       INTEGER igrd, igrd1, igrd2, indxXC, indxMaxXC, indxMinXC, &

@@ -1,3 +1,5 @@
+!> @defgroup constants Constants
+!> @ingroup xcloc
 !> @brief Holds constants for Fortran modules.
 !> @author Ben Baker
 !> @copyright Ben Baker distributed under the MIT license.

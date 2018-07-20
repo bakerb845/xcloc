@@ -1,3 +1,5 @@
+!> @ingroup xcloc
+!> @defgroup fdxc Computation of Correlograms
 !> @brief Computes the cross-correlograms via the Fourier transform.
 !> @author Ben Baker
 !> @copyright Ben Baker distributed under the MIT license.
@@ -131,7 +133,7 @@ MODULE XCLOC_FDXC
 !>    @param[in] accuracy  Controls the accuracy of the vector calculations in MKL.
 !>
 !>    @param[out] ierr     0 indicates success.
-!>
+!>    @ingroup fdxc 
       SUBROUTINE xcloc_fdxc_initialize(npts, nptsPad,                 &
                                        nxcs, xcPairs,                 &
                                        verbose, prec, accuracy, ierr) &

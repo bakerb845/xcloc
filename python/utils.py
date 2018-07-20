@@ -22,7 +22,7 @@ from xclocTypes import xclocTypes as xctypes
 
 class utils:
     ##  
-    # @defgroup utils Utilities
+    # @defgroup pyutils Utilities
     # @brief Generic utilities to help with using the library.
     # @ingroup pyxcloc
     # @copyright Ben Baker distributed under the MIT license.

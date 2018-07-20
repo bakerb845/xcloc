@@ -1,3 +1,5 @@
+!> @defgroup ipps IPP Fortran Interface
+!> @ingroup xcloc
 !> @brief Some Fortran interfaces to IPP functions.
 !> @author Ben Baker
 !> @copyright Ben Baker distributed under the MIT license.
@@ -10,6 +12,7 @@ MODULE XCLOC_IPPS
       !> @param[out] pSrc  Double precision source array.
       !> @param[in] pDst   Float precision copy of pSrc.
       !> @param[in] len    Length of arrays.
+      !> @ingroup ipps
       INTEGER(C_INT) FUNCTION ippsConvert_64f32f(pSrc, pDst, len) &
       BIND(C, NAME='ippsConvert_64f32f')
       USE ISO_C_BINDING
@@ -22,6 +25,7 @@ MODULE XCLOC_IPPS
       !> @param[out] pSrc  Float precision source array.
       !> @param[in] pDst   Double precision copy of pSrc.
       !> @param[in] len    Length of arrays.
+      !> @ingroup ipps
       INTEGER(C_INT) FUNCTION ippsConvert_32f64f(pSrc, pDst, len) &
       BIND(C, NAME='ippsConvert_64f32f')
       USE ISO_C_BINDING
@@ -35,6 +39,7 @@ MODULE XCLOC_IPPS
       !> @param[out] pSpecSize  Size of the internal constant specification structure.
       !> @param[out] pBufSize   Size of the work buffer required for FIR filtering.
       !> @result 0 indicates success.
+      !> @ingroup ipps
       INTEGER(C_INT) FUNCTION ippsFIRSRGetSize_finter64f(tapsLen, pSpecSize, pBufSize) &
       BIND(C, NAME='ippsFIRSRGetSize_finter64f')
       USE ISO_C_BINDING
@@ -47,6 +52,7 @@ MODULE XCLOC_IPPS
       !> @param[out] pSpecSize  Size of the internal constant specification structure.
       !> @param[out] pBufSize   Size of the work buffer required for FIR filtering.
       !> @result 0 indicates success.
+      !> @ingroup ipps
       INTEGER(C_INT) FUNCTION ippsFIRSRGetSize_finter32f(tapsLen, pSpecSize, pBufSize) &
       BIND(C, NAME='ippsFIRSRGetSize_finter32f')
       USE ISO_C_BINDING
@@ -61,6 +67,7 @@ MODULE XCLOC_IPPS
       !> @param[in] n           Number of elements in n.
       !> @param[in] alpha       Controls shape of Kaiser window. 
       !> @result 0 indicates success.
+      !> @ingroup ipps
       INTEGER(C_INT) FUNCTION ippsWinKaiser_64f_I(pSrcDst, n, alpha) &
       BIND(C, NAME='ippsWinKaiser_64f_I')
       USE ISO_C_BINDING
@@ -76,6 +83,7 @@ MODULE XCLOC_IPPS
       !> @param[in] n           Number of elements in n.
       !> @param[in] alpha       Controls shape of Kaiser window. 
       !> @result 0 indicates success.
+      !> @ingroup ipps
       INTEGER(C_INT) FUNCTION ippsWinKaiser_32f_I(pSrcDst, n, alpha) &
       BIND(C, NAME='ippsWinKaiser_32f_I')
       USE ISO_C_BINDING
@@ -89,6 +97,7 @@ MODULE XCLOC_IPPS
       !> @param[in,out] pSrcDst   On exit this is the sorted array.
       !> @param[in] len           The length of the array.
       !> @result 0 indicates success.
+      !> @ingroup ipps
       INTEGER(C_INT) FUNCTION ippsSortAscend_32s_I(pSrcDst, len) &
       BIND(C, NAME='ippsSortAscend_32s_I')
       USE ISO_C_BINDING

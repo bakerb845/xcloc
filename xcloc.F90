@@ -1,3 +1,4 @@
+!> @defgroup xcloc xcloc
 !> @brief Utilities for driving xcloc.
 !> @author Ben Baker 
 !> @copyright Ben Baker distributed under the MIT license.

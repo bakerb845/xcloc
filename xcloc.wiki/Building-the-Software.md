@@ -18,12 +18,21 @@ To build it is required that one have
 To build the fully parallel software one must additionally obtain
 
 - Message Passing Interface v3.  Recommended free versions are [MPICH](https://www.mpich.org/) and [OpenMPI](https://www.open-mpi.org/).  The Fortran 2008 bindings must be available.
+- [Python3](https://www.python.org/) and [ctypes](https://docs.python.org/3/library/ctypes.html).
+
+## Downloading the Software
+
+In the directory of your choosing the software and documentation can be obtained by specifying
+
+    git clone https://github.com/bakerb845/xcloc.git
+    cd xcloc
+    git clone https://github.com/bakerb845/xcloc.wiki.git
 
 ## Configuring CMake
 
-It can be expedient to configure CMake with a script.  Though I sometimes have to run the script twice for whatever reason.
+I find that the most efficient way to configure CMake is with a script.  Here, multiple examples scripts are presented that, ideally, can be modified to match the details of your system.
 
-# Serial GCC Build
+### Serial GCC Build
 
 In this section the simplest example of compiling with GCC and without MPI is presented.  This may be useful for experimentation purposes. 
 

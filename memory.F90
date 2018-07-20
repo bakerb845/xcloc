@@ -1,3 +1,5 @@
+!> @defgroup memory Memory Utilities
+!> @ingroup xcloc
 !> @brief Memory handling routines.
 !> @author Ben Baker
 !> @copyright Ben Baker distributed under the MIT license.

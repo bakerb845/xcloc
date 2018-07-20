@@ -28,7 +28,7 @@ from xclocTypes import xclocTypes as xctypes
 
 class dsmxc:
     ##
-    # @defgroup dsmxc Diffraction Stack Migration of Correlograms
+    # @defgroup pydsmxc Diffraction Stack Migration of Correlograms
     # @brief This class computes the diffraction stack migration image of the
     #        correlograms.
     # @ingroup pyxcloc

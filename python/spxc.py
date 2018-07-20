@@ -22,7 +22,7 @@ from xclocTypes import xclocTypes as xctypes
 
 class spxc:
     ##
-    # @defgroup spxc Signals Processing of Correlograms
+    # @defgroup pyspxc Signals Processing of Correlograms
     # @brief This class helps filter the cross-correlograms prior to migration.
     #        To mitigate deconstructive interface in the sidelobes due to an
     #        imperfect velocity model it is useful to either compute an envelope
@@ -68,12 +68,12 @@ class spxc:
                    ftype=xctypes.XCLOC_SPXC_ENVELOPE_FILTER):
         """!
         @brief Initializes the module module that will filter the correlograms.
-        @param[in] n       Number of filtering coefficients.  This must be an
-                           odd number.
-        @param[in] ftype   The filtering type.  This can be an envelope,
-                           or an RMS filter.
+        @param n       Number of filtering coefficients.  This must be an
+                       odd number.
+        @param ftype   The filtering type.  This can be an envelope,
+                       or an RMS filter.
         @retval ierr   0 indicates success.
-        @ingroup spxc
+        @ingroup pyspxc
         """ 
         fname = '%s::%s'%(self.__class__.__name__, self.initialize.__name__)
         if (ftype == xctypes.XCLOC_SPXC_ENVELOPE_FILTER or
@@ -95,12 +95,12 @@ class spxc:
     def filter(self, signals):
         """!
         @brief Filters many signals using an RMS averaging or envelope.
-        @param[in] signals  A matrix of input data with dimension
-                            [nsignals x npts].
+        @param signals    A matrix of input data with dimension
+                          [nsignals x npts].
         @retval  sigProc  A matrix of envelopes or RMS filtered input
                           signals.  This has dimension [nsignals x npts].
         @retval  sigProc  On failure this is None.
-        @ingroup spxc
+        @ingroup pyspxc
         """
         fname = '%s::%s'%(self.__class__.__name__, self.filter.__name__)
         ierr = c_int(1)
@@ -139,7 +139,7 @@ class spxc:
     def finalize(self):
         """!
         Finalizes the filtering library.
-        @ingroup spxc
+        @ingroup pyspxc
         """
         self.lib.xcloc_spxc_finalize()
         return

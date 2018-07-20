@@ -1,3 +1,5 @@
+!> @defgroup fdxcmpi Parallel Computation of Correlograms 
+!> @ingroup xcloc
 !> @brief Computes the cross-correlograms via the Fourier transform with MPI.
 !> @author Ben Baker
 !> @copyright Ben Baker distributed under the MIT license.

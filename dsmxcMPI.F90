@@ -1,3 +1,5 @@
+!> @defgroup dsmxcMPI Parallel Diffraction Stack Migration of Correlograms
+!> @ingroup xcloc 
 !> @brief Computes the diffraction stack migration images in parallel with MPI.
 !> @author Ben Baker
 !> @copyright Ben Baker distributed under the MIT license.
@@ -42,6 +44,7 @@ MODULE XCLOC_DSMXC_MPI
 
       PUBLIC :: xcloc_dsmxcMPI_initialize
       PUBLIC :: xcloc_dsmxcMPI_finalize
+      PUBLIC :: xcloc_dsmxcMPI_setTable64f
 
       CONTAINS
 !========================================================================================!
@@ -66,6 +69,7 @@ MODULE XCLOC_DSMXC_MPI
 !>                          pairs.  This is defined on the root process. 
 !>    @param[in] verbose    Controls the verbosity. 
 !>    @param[out] ierr      0 indicates success.
+!>    @ingroup dsmxcMPI
 !>    @bug Need to verify that MPI_Comm is the same size as MPI_Fcomm.
       SUBROUTINE xcloc_dsmxcMPI_initialize(comm, root,                 &
                                            ngrd, nxcPairs, nptsInXCs,  &
@@ -170,19 +174,70 @@ MODULE XCLOC_DSMXC_MPI
 !                                                                                        !
 !========================================================================================!
 !                                                                                        !
+!>    @brief Sets the travel time table on the module.
+!>    @param[in] tableNumber  Index of the table to set.  This must be defined on the
+!>                            root process. 
+!>    @param[in] ngrd         Number of grid points in table.  This must match
+!>                            ngrdTotal_.   This must be defined on the root process.
+!>    @param[in] table        Travel time (seconds) from the receiver to all points.
+!>                            This is an array of dimension [ngrd] and must be defined
+!>                            on the root process.
+!>    @param[out] ierr        0 indicates success.
+!>    @ingroup dsmxcMPI
       SUBROUTINE xcloc_dsmxcMPI_setTable64f(tableNumber, ngrd, table, ierr) &
       BIND(C, NAME='xcloc_dsmxcMPI_setTable64f')
       INTEGER(C_INT), VALUE, INTENT(IN) :: tableNumber, ngrd
-      REAL(C_DOUBLE), DIMENSION(:), INTENT(IN) :: table
+      REAL(C_DOUBLE), INTENT(IN) :: table(ngrd)
       INTEGER(C_INT), INTENT(OUT) :: ierr
-
+      DOUBLE PRECISION, ALLOCATABLE :: twork(:)
+      INTEGER, ALLOCATABLE :: displs(:), sendCounts(:)
+      INTEGER i, ierrLoc, mpierr, recvCount, tnumber
+      ierr = 0
+      IF (myid_ == root_) THEN
+         tnumber = tableNumber
+         IF (ngrd /= ngrdTotal_) THEN
+            WRITE(ERROR_UNIT,900) ngrd, ngrdTotal_
+            ierr = 1
+         ENDIF
+         IF (tableNumber < 1 .OR. tableNumber > ntables_) THEN
+            WRITE(ERROR_UNIT,905) tableNumber, ntables_
+            ierr = 1
+         ENDIF
+         ALLOCATE(displs(nprocs_)); displs(:) = 0
+         ALLOCATE(sendCounts(nprocs_)); sendCounts(:) = nGridPtsPerProcess_(:)
+         DO i=1,nprocs_-1
+            displs(i+1) = displs(i) + nGridPtsPerProcess_(i)
+         ENDDO
+      ENDIF
+      CALL MPI_Bcast(ierr, 1, MPI_INTEGER, root_, comm_, mpierr)
+      IF (ierr /= 0) RETURN
+      ! Distribute the table
+      CALL MPI_Bcast(tnumber, 1, MPI_INTEGER, root_, comm_, mpierr)
+      recvCount = ngrdLocal_
+      ALLOCATE(twork(ngrdLocal_))
+      CALL MPI_Scatterv(table, sendCounts, displs,                &
+                        MPI_DOUBLE_PRECISION, twork, recvcount,   &
+                        MPI_DOUBLE_PRECISION, root_, comm_, mpierr)
+      CALL xcloc_dsmxc_setTable64f(tnumber, ngrdLocal_, twork, ierrLoc)
+      IF (ALLOCATED(displs))     DEALLOCATE(displs)
+      IF (ALLOCATED(sendCounts)) DEALLOCATE(sendCounts)
+      IF (ALLOCATED(twork))      DEALLOCATE(twork)
+      IF (ierrLoc /= 0) THEN
+         WRITE(ERROR_UNIT,910) myid_
+         ierrLoc = 1
+      ENDIF
+      CALL MPI_Allreduce(ierrLoc, ierr, 1, MPI_INTEGER, MPI_MAX, comm_, mpierr)
+  900 FORMAT('xcloc_dsmxcMPI_setTable64f: tableNumber=', I4, &
+             ' must be in range [1,',I4,']')
+  905 FORMAT('xcloc_dsmxcMPI_setTable64f: ngrd=', I6, ' expecting ngrdTotal_=', I6)
+  910 FORMAT('xcloc_dsmxcMPI_setTable64f: Failed to set table on rank', I4)
       RETURN
       END
 !                                                                                        !
 !========================================================================================!
 !                                                                                        !
 !>    @brief Releases memory on the module.
-!>
+!>    @ingroup dsmxcMPI
       SUBROUTINE xcloc_dsmxcMPI_finalize() &
       BIND(C, NAME='xcloc_dsmxcMPI_finalize')
       INTEGER mpierr
@@ -209,7 +264,7 @@ MODULE XCLOC_DSMXC_MPI
 !>    @param[out] image  The migrated image.  This is only pertinent to the root process
 !>                       and on the root process this must have dimension [nwork].
 !>    @param[out] ierr   0 indicates success.
-!>
+!>    @ingroup dsmxcMPI
       SUBROUTINE xcloc_dsmxcMPI_gatherImage32f(nwork, root, image, ierr) &
       BIND(C, NAME='xcloc_dsmxcMPI_gatherImage32f')
       INTEGER(C_INT), VALUE, INTENT(IN) :: nwork, root

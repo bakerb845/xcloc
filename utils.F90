@@ -1,4 +1,6 @@
-!> Generic utilities to simplify using the library.
+!> @defgroup utils Utilities
+!> @ingroup xcloc
+!> @brief Generic utilities to simplify using the library.
 !> @author Ben Baker
 !> @copyright Ben Baker distributed under the MIT license.
 MODULE XCLOC_UTILS

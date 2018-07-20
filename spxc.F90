@@ -1,3 +1,5 @@
+!> @defgroup spxc Cross Correlogram Signals Processing
+!> @ingroup xcloc
 !> @brief Performs some signals processing on the cross-correlograms.
 !> @author Ben Baker
 !> @copyright Ben Baker distributed under the MIT license.
@@ -78,6 +80,7 @@ MODULE XCLOC_SPXC
 !>    @param[in] ftype     XCLOC_SPXC_ENVELOPE_FILTER will apply envelope to correlograms.
 !>    @param[in] ftype     XCLOC_SPXC_RMS_FILTER will comptue RMS of correlograms.
 !>    @param[out] ierr     0 indicates success.
+!>    @ingroup spxc
       SUBROUTINE xcloc_spxc_initialize(n, ftype, ierr) &
       BIND(C, NAME='xcloc_spxc_initialize')
       INTEGER(C_INT), VALUE, INTENT(IN) :: n, ftype

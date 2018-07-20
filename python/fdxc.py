@@ -23,7 +23,7 @@ import os
 
 class fdxc:
     ##
-    # @defgroup fdxc Frequency Domain Cross-Correlation
+    # @defgroup pyfdxc Frequency Domain Cross-Correlation
     # @brief Python interface to the FFT-based correlation computation routines.
     # @ingroup pyxcloc
     # @copyright Ben Baker distributed under the MIT license.
@@ -80,35 +80,26 @@ class fdxc:
                    verbose=0,
                    precision=xctypes.XCLOC_SINGLE_PRECISION,
                    accuracy=xctypes.XCLOC_HIGH_ACCURACY):
-        """
-        Initializes the Fourier domain based cross-correlation class.
+        """!
+        @brief Initializes the Fourier domain based cross-correlation class.
 
-        Inputs
-        ------
-        npts : int
-            Number of points in input signals.
-        nsignals : int
-            Number of signals that will be input.
+        @param npts       Number of points in input signals.
+        @param nsignals   Number of signals that will be input.
 
-        Optional Inputs
-        ---------------
-        nptsPad : int
-            This is a tuning parameter for avoiding pathologic DFT lengths.
-            It is related to the length of the cross-correlograms by:
-              xcLen = 2*nptsPad - 1
-        verbose : int
-            Controls the verbosity of the Fortran module.  0 is quiet.
-        precision : int
-            Controls the precision (single or double) in the Fortran modules.
-        accuracy: int
-            Controls the accuracy of some of the vectorized calculations.
-            For single precision it is recommended to use high accuracy.
-            It is always recommended to avoided extended precision.
+        @param nptsPad    This is a tuning parameter for avoiding pathologic DFT
+                          lengths.  It is related to the length of the
+                          cross-correlograms by: xcLen = 2*nptsPad - 1
+        @param verbose    Controls the verbosity of the Fortran module. 
+                          0 is quiet.
+        @param precision  Controls the precision (single or double) in the
+                          Fortran modules.
+        @param accuracy   Controls the accuracy of some of the vectorized
+                          calculations.  For single precision it is
+                          recommended to use high accuracy.  It is always
+                          recommended to avoided extended precision.
  
-        Returns
-        -------
-        ierr : int
-            0 indicates success
+        @retval ierr 0 indicates success
+        @ingroup pyfdxc
         """
         fname = '%s::%s'%(self.__class__.__name__, self.initialize.__name__)
         # Input checks 
@@ -190,15 +181,14 @@ class fdxc:
         return xcs
 
     def computePhaseCorrelograms(self):
-        """
-        Computes the phase correlograms.
- 
-        Returns
-        -------
-        xcs : matrix
-           On successful exit this contains the phase correlograms in a matrix
-           with shape [nxcs x nptsInXCs].
-           On failure this is None.
+        """!
+        @brief Computes the phase correlograms.
+
+        @retval xcs  On successful exit this contains the phase correlograms
+                     in a matrix with shape [nxcs x nptsInXCs].
+        @retval xcs  On failure this is None.
+
+        @ingroup pyfdxc
         """
         fname = '%s::%s'%(self.__class__.__name__, self.computePhaseCorrelograms.__name__)
         ierr = c_int(1)
@@ -211,15 +201,13 @@ class fdxc:
         return xcs
 
     def computeCrossCorrelograms(self):
-        """
-        Computes the cross correlograms.
+        """!
+        @brief Computes the cross correlograms.
 
-        Returns
-        -------
-        xcs : matrix
-           On successful exit this contains the cross correlograms in a matrix
-           with shape [nxcs x nptsInXCs].
-           On failure this is None.
+        @retval xcs  On successful exit this contains the cross correlograms
+                     in a matrix with shape [nxcs x nptsInXCs].
+        @retval xcs  On failure this is None.
+        @ingroup pyfdxc
         """
         fname = '%s::%s'%(self.__class__.__name__, self.computeCrossCorrelograms.__name__)
         ierr = c_int(1)
@@ -232,18 +220,12 @@ class fdxc:
         return xcs
 
     def setSignals(self, signals):
-        """
-        Sets the matrix of signals to correlate.
+        """!
+        @brief Sets the matrix of signals to correlate.
 
-        Inputs
-        ------
-        signals : matrix 
-            A matrix of input data with dimension [nsignals x npts].
-
-        Returns
-        -------
-        ierr : int
-            0 indicates success. 
+        @param signals  A matrix of input data with dimension [nsignals x npts].
+        @retval ierr    0 indicates success. 
+        @ingroup pyfdxc
         """
         fname = '%s::%s'%(self.__class__.__name__, self.setSignals.__name__)
         ierr = c_int(1)
@@ -271,8 +253,9 @@ class fdxc:
         return ierr
 
     def finalize(self):
-        """
-        Finalizes the frequency domain cross-correlation library.
+        """!
+        @brief Finalizes the frequency domain cross-correlation library.
+        @ingroup pyfdxc
         """
         fname = '%s::%s'%(self.__class__.__name__, self.finalize.__name__)
         self.lib.xcloc_fdxc_finalize()
