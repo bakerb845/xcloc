@@ -16,6 +16,14 @@ MODULE XCLOC
       USE XCLOC_CONSTANTS
       IMPLICIT NONE
 
+      !> @ingroup xcloc
+      !> The number of cross-correlograms.
+      INTEGER, PRIVATE, SAVE :: nptsInXCs_ = 0
+      !> @ingroup xcloc
+      !> The number of cross-correlations pairs.
+      INTEGER, PRIVATE, SAVE :: nxcs_ = 0 
+      !> @ingroup xcloc
+      INTEGER, PRIVATE, SAVE :: ngrd_ = 0
       !> Signal to migrate.
       INTEGER, PRIVATE, SAVE :: signalMigrationType_ = XCLOC_MIGRATE_PHASE_XCS
       !> Controls verbosity.
@@ -27,7 +35,7 @@ MODULE XCLOC
       !> Determines whether or not the signals have been set.
       LOGICAL, PRIVATE, SAVE :: lhaveSignals_ = .FALSE.
       !> A flag determining if the travel time tables have been set.
-      LOGICAL, PRIVATE, SAVE :: lhaveAllTables_ = .FALSE.
+      LOGICAL(C_BOOL), PRIVATE, SAVE :: lhaveAllTables_ = .FALSE.
       !> A flag determining if the migration image is computed.
       LOGICAL, PRIVATE, SAVE :: lhaveImage_ = .FALSE.
       !> A flag indicating the cross-correlograms are computed.
@@ -35,9 +43,15 @@ MODULE XCLOC
 
       PUBLIC :: xcloc_initialize
       PUBLIC :: xcloc_finalize
+      PUBLIC :: xcloc_signalToTableIndex
+      PUBLIC :: xcloc_setTable64f
+      PUBLIC :: xcloc_setTable32f
       PUBLIC :: xcloc_setSignals64f
       PUBLIC :: xcloc_setSignals32f
+      PUBLIC :: xcloc_setSignalToMigrate
+      PUBLIC :: xcloc_setXCFilter
       PUBLIC :: xcloc_getPrecision
+      PUBLIC :: xcloc_compute
       CONTAINS
 !========================================================================================!
 !                                     Begin the Code                                     !
@@ -101,8 +115,13 @@ MODULE XCLOC
          CALL xcloc_finalize()
          RETURN
       ENDIF
-      ! Initialize the processing module. 
-      CALL xcloc_spxc_initialize(nfcoeffs, ftype, ierr)
+      ! Initialize the processing module.
+      CALL xcloc_setXCFilter(nfcoeffs, ftype, ierr)
+      IF (ierr /= 0) THEN
+         WRITE(ERROR_UNIT,902)
+         CALL xcloc_finalize()
+         RETURN
+      ENDIF
       ! Initialize the diffraction stack migration module.
       CALL xcloc_dsmxc_initialize(ngrd, nxcs, nptsInXCs,    &
                                   dt, xcPairs, verbose, ierr)
@@ -111,20 +130,128 @@ MODULE XCLOC
          CALL xcloc_finalize()
          RETURN
       ENDIF
+      CALL xcloc_fdxc_getNumberOfCorrelograms(nxcs_, ierr)
+      CALL xcloc_fdxc_getCorrelogramLength(nptsInXCs_, ierr)
+      CALL xcloc_dsmxc_getNumberOGridPointsInTable(ngrd_)
       ! Set some basic info
       precision_ = prec
       verbose_ = verbose
   895 FORMAT('xcloc_initialize: Failed to set signal migration type')
   900 FORMAT('xcloc_initialize: Failed to initialize fdxc')
   901 FORMAT('xcloc_initialize: Failed to get length of correlograms')
+  902 FORMAT('xcloc_initialize: Failed to initialize spxc') 
   905 FORMAT('xcloc_initialize: Failed to initialize dsmxc')
       RETURN
       END
 !                                                                                        !
 !========================================================================================!
 !                                                                                        !
-!>    @param[in] signalToMigrate  Type of signal to migrate.  This can be 
-!>                                XCLOC_MIGRATE_PHASE_XCS or XCLOC_MIGRATE_XCS.
+!>    @brief Initializes the correlogram filter.
+!>    @param[in] nfcoeffs  The number of filter coefficients.  If the processing is
+!>                         to be done then this must be odd.
+!>    @param[in] ftype     XCLOC_SPXC_DONOT_FILTER will not filter correlograms.
+!>    @param[in] ftype     XCLOC_SPXC_ENVELOPE_FILTER will apply envelope to correlograms.
+!>    @param[in] ftype     XCLOC_SPXC_RMS_FILTER will comptue RMS of correlograms.
+!>    @param[out] ierr     0 indicates success.
+!>    @ingroup xcloc_xcloc
+      SUBROUTINE xcloc_setXCFilter(nfcoeffs, ftype, ierr) &
+      BIND(C, NAME='xcloc_setXCFilter')
+      INTEGER(C_INT), VALUE, INTENT(IN) :: nfcoeffs, ftype
+      INTEGER(C_INT), INTENT(OUT) :: ierr
+      CALL xcloc_spxc_finalize()
+      CALL xcloc_spxc_initialize(nfcoeffs, ftype, ierr)
+      IF (ierr /= 0) THEN
+         WRITE(ERROR_UNIT,900)
+         ierr = 1
+      ENDIF
+  900 FORMAT('xcloc_setXCFilter: Failed to set filter for correlograms')
+      RETURN
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Maps a signal number to the table index.
+!>    @param[in] is     Signal number.  This must be in the xcPairs table.
+!>    @param[out] it    The table index corresponding to is.
+!>    @param[out] ierr  0 indicates success.
+!>    @ingroup xcloc_xcloc 
+      SUBROUTINE xcloc_signalToTableIndex(is, it, ierr) &
+      BIND(C, NAME='xcloc_signalToTableIndex')
+      INTEGER(C_INT), VALUE, INTENT(IN) :: is
+      INTEGER(C_INT), INTENT(OUT) :: it, ierr
+      CALL xcloc_dsmxc_signalToTableIndex(is, it, ierr) 
+      IF (ierr /= 0) THEN
+         WRITE(ERROR_UNIT,900) is
+         it = 0
+      ENDIF
+  900 FORMAT('xcloc_signalToTableIndex: Failed map signal', I4, ' to table')
+      RETURN
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Sets the it'th signal corresponding to the is'th signal.  One should call
+!>           xcloc_signalToTableIndex to get the appropriate table index for this signal.
+!>    @param[in] tableNumber  Table index to set.  The table number for the is'th
+!>                            signal can be determined with xcloc_signalToTableIndex.
+!>    @param[in] ngrd         Number of grid points in the table.  This must equal ngrd_.
+!>    @param[in] table        The travel times from the source to all points in the
+!>                            grid in seconds.  This has dimension [ngrd].
+!>    @param[out] ierr        0 indicates success.
+!>    @ingroup xcloc_xcloc 
+      SUBROUTINE xcloc_setTable64f(tableNumber, ngrd, table, ierr) &
+      BIND(C, NAME='xcloc_setTable64f')
+      IMPLICIT NONE
+      INTEGER(C_INT), VALUE, INTENT(IN) :: tableNumber, ngrd
+      REAL(C_DOUBLE), INTENT(IN) :: table(ngrd)
+      INTEGER(C_INT), INTENT(OUT) :: ierr
+      CALL xcloc_dsmxc_setTable64f(tableNumber, ngrd, table, ierr)
+      IF (ierr /= 0) THEN
+         WRITE(ERROR_UNIT,900) tableNumber
+         ierr = 1
+      ENDIF
+      CALL xcloc_dsmxc_haveAllTables(lhaveAllTables_)
+      IF (lhaveAllTables_ .AND. verbose_ > XCLOC_PRINT_WARNINGS) WRITE(OUTPUT_UNIT,905)
+  900 FORMAT('xcloc_setTable64f: Failed to set table number', I4)
+  905 FORMAT('xcloc_setTable64f: All tables set')
+      RETURN
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Sets the it'th signal corresponding to the is'th signal.  One should call
+!>           xcloc_signalToTableIndex to get the appropriate table index for this signal.
+!>    @param[in] tableNumber  Table index to set.  The table number for the is'th
+!>                            signal can be determined with xcloc_signalToTableIndex.
+!>    @param[in] ngrd         Number of grid points in the table.  This must equal ngrd_.
+!>    @param[in] table        The travel times from the source to all points in the
+!>                            grid in seconds.  This has dimension [ngrd].
+!>    @param[out] ierr        0 indicates success.
+!>    @ingroup xcloc_xcloc 
+      SUBROUTINE xcloc_setTable32f(tableNumber, ngrd, table, ierr) &
+      BIND(C, NAME='xcloc_setTable32f')
+      IMPLICIT NONE
+      INTEGER(C_INT), VALUE, INTENT(IN) :: tableNumber, ngrd
+      REAL(C_FLOAT), INTENT(IN) :: table(ngrd)
+      INTEGER(C_INT), INTENT(OUT) :: ierr
+      CALL xcloc_dsmxc_setTable32f(tableNumber, ngrd, table, ierr)
+      IF (ierr /= 0) THEN
+         WRITE(ERROR_UNIT,900) tableNumber
+         ierr = 1
+      ENDIF
+      CALL xcloc_dsmxc_haveAllTables(lhaveAllTables_)
+      IF (lhaveAllTables_ .AND. verbose_ > XCLOC_PRINT_WARNINGS) WRITE(OUTPUT_UNIT,905)
+  900 FORMAT('xcloc_setTable64f: Failed to set table number', I4)
+  905 FORMAT('xcloc_setTable64f: All tables set')
+      RETURN
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @param[in] signalToMigrate  XCLOC_MIGRATE_PHASE_XCS indicates that phase
+!>                                correlograms will be migrated.
+!>    @param[in] signalToMigrate  XCLOC_MIGRATE_XCS indicates that cross correlograms
+!>                                will be migrated.
 !>    @param[out] ierr            0 indicates success.
 !>    @ingroup xcloc_xcloc
       SUBROUTINE xcloc_setSignalToMigrate(signalToMigrate, ierr) &
@@ -147,15 +274,19 @@ MODULE XCLOC
 !                                                                                        !
 !========================================================================================!
 !                                                                                        !
-!>    @brief After setting the signals this computes the migration image.
+!>    @brief After setting the travel time tables and signals this will:
+!>           1. Compute the phase or cross-correlograms depnding on the signal migration
+!>              policy.
+!>           2. Either compute the envelope or RMS of the correlograms or leave the
+!>              correlograms unchanged.
+!>           3. Migrate the (processed) correlograms.
 !>    @param[out] ierr   0 indicates successs.
-!>    @ingroup xcloc_xcloc 
+!>    @ingroup xcloc_xcloc
       SUBROUTINE xcloc_compute(ierr) &
       BIND(C, NAME='xcloc_compute')
       INTEGER(C_INT), INTENT(OUT) :: ierr
-      DOUBLE PRECISION, CONTIGUOUS, POINTER, DIMENSION(:) :: xcPtr64f
-      REAL, CONTIGUOUS, POINTER, DIMENSION(:) :: xcPtr32f
-      INTEGER ldxc, nptsInXCs, nxcPairs
+      DOUBLE PRECISION, ALLOCATABLE, DIMENSION(:) :: xcs64f
+      REAL, ALLOCATABLE, DIMENSION(:) :: xcs32f
       lhaveImage_ = .FALSE.
       lhaveXCs_ = .FALSE.
       IF (.NOT.linit_) THEN
@@ -184,34 +315,44 @@ MODULE XCLOC
          ierr = 1
          RETURN
       ENDIF
-      lhaveXCs_ = .FALSE.
-      ! Get a pointer to the correlograms and set them on the next module.
+      lhaveXCs_ = .TRUE.
+      ! Get the correlograms, filter them, and set the filters xcs on the DSM module 
       IF (precision_ == XCLOC_SINGLE_PRECISION) THEN
-         NULLIFY(xcPtr32f)
-         CALL xcloc_fdxc_makeCorrelogramsPtr32f(ldxc, nptsInXCs, nxcPairs, xcPtr32f, ierr)
+         ALLOCATE(xcs32f(nxcs_*nptsInXCs_))
+         CALL xcloc_fdxc_getCorrelograms32f(nptsInXCs_, nxcs_, xcs32f, ierr)
          IF (ierr /= 0) THEN
             WRITE(ERROR_UNIT,870)
             ierr = 1
             RETURN
          ENDIF
-         CALL xcloc_dsmxc_setCorrelograms32f(ldxc, nptsInXCs, nxcPairs, xcPtr32f, ierr)
+         CALL xcloc_spxc_filterXCsInPlace32f(nptsInXCs_, nptsInXCs_, nxcs_, xcs32f, ierr)
+         IF (ierr /= 0) THEN
+            WRITE(ERROR_UNIT,875)
+            ierr = 1
+            RETURN
+         ENDIF
+         CALL xcloc_dsmxc_setCorrelograms32f(nptsInXCs_, nptsInXCs_, nxcs_, xcs32f, ierr)
       ELSE
-         NULLIFY(xcPtr64f)
-         CALL xcloc_fdxc_makeCorrelogramsPtr64f(ldxc, nptsInXCs, nxcPairs, xcPtr64f, ierr)
+         ALLOCATE(xcs64f(nxcs_*nptsInXCs_))
+         CALL xcloc_fdxc_getCorrelograms64f(nptsInXCs_, nxcs_, xcs64f, ierr)
          IF (ierr /= 0) THEN
             WRITE(ERROR_UNIT,870)
             ierr = 1
             RETURN
          ENDIF
-         CALL xcloc_dsmxc_setCorrelograms64f(ldxc, nptsInXCs, nxcPairs, xcPtr64f, ierr)
+         CALL xcloc_spxc_filterXCsInPlace64f(nptsInXCs_, nptsInXCs_, nxcs_, xcs64f, ierr)
+         IF (ierr /= 0) THEN
+            WRITE(ERROR_UNIT,875)
+            ierr = 1
+            RETURN
+         ENDIF
+         CALL xcloc_dsmxc_setCorrelograms64f(nptsInXCs_, nptsInXCs_, nxcs_, xcs64f, ierr)
       ENDIF
       IF (ierr /= 0) THEN
-         WRITE(ERROR_UNIT,875)
+         WRITE(ERROR_UNIT,880)
          ierr = 1
          RETURN
       ENDIF
-      ! Proces the signals.
-
       ! Migrate the signals.
       CALL xcloc_dsmxc_compute(ierr)
       IF (ierr /= 0) THEN
@@ -225,8 +366,8 @@ MODULE XCLOC
   860 FORMAT('xcloc_compute: Travel time tables not yet set')
   865 FORMAT('xcloc_compute: Failed to compute correlograms')
   870 FORMAT('xcloc_compute: Failed to get correlograms')
-  875 FORMAT('xcloc_compute: Failed to get correlograms')
-  880 FORMAT('xcloc_compute: Failed to process correlograms')
+  875 FORMAT('xcloc_compute: Failed to process correlograms')
+  880 FORMAT('xcloc_compute: Failed to get correlograms')
   885 FORMAT('xcloc_compute: Failed to compute image')
       RETURN
       END
@@ -306,6 +447,10 @@ MODULE XCLOC
       CALL xcloc_fdxc_finalize()
       CALL xcloc_spxc_finalize()
       CALL xcloc_dsmxc_finalize()
+      nxcs_ = 0
+      nptsInXCs_ = 0
+      ngrd_ = 0
+      signalMigrationType_ = XCLOC_MIGRATE_PHASE_XCS
       precision_ = XCLOC_SINGLE_PRECISION
       verbose_ = XCLOC_PRINT_WARNINGS
       lhaveSignals_ = .FALSE.

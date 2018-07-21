@@ -3,16 +3,10 @@
 #include "xcloc_config.h"
 #include "xcloc_finter.h"
 #include "xcloc_enum.h"
-#include "xcloc_xcfft.h"
-#include "xcloc_migrate.h"
 #include "xcloc_hdf5.h"
 #include "xcloc_xdmf.h"
-#include "xcloc_envelope.h"
-#include "xcloc_rmsFilter.h"
 #ifdef XCLOC_USE_MPI
-#include "xcloc_migrateMPI.h"
-#include "xcloc_xcfftMPI.h"
-//#include "xcloc_migrateMPI.h"
+
 #endif
 
 struct xclocParms_struct

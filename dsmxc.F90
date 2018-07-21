@@ -68,6 +68,7 @@ MODULE XCLOC_DSMXC
       PUBLIC :: xcloc_dsmxc_setTable32f
       PUBLIC :: xcloc_dsmxc_getImage64f
       PUBLIC :: xcloc_dsmxc_getImage32f
+      PUBLIC :: xcloc_dsmxc_getNumberOGridPointsInTable
       PUBLIC :: xcloc_dsmxc_getNumberOfTables
       PUBLIC :: xcloc_dsmxc_setCorrelograms64f
       PUBLIC :: xcloc_dsmxc_setCorrelograms32f
@@ -205,6 +206,17 @@ MODULE XCLOC_DSMXC
       BIND(C, NAME='xcloc_dsmxc_haveAllTables')
       LOGICAL(C_BOOL), INTENT(OUT) :: lhaveAllTables
       lhaveAllTables = lhaveAllTables_
+      RETURN
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @param[out] ngrd   Number of grid points in each table.
+!>    @ingroup dsmxc
+      SUBROUTINE xcloc_dsmxc_getNumberOGridPointsInTable(ngrd) &
+      BIND(C, NAME='xcloc_dsmxc_getNumberOGridPointsInTable')
+      INTEGER(C_INT), INTENT(OUT) :: ngrd
+      ngrd = ngrd_
       RETURN
       END
 !                                                                                        !
@@ -491,7 +503,7 @@ MODULE XCLOC_DSMXC
          WRITE(ERROR_UNIT,900) is
          it = 0
       ENDIF
-  900 FORMAT('xcloc_dsmxc_signal2TableIndex: Failed to find signal number', I4, &
+  900 FORMAT('xcloc_dsmxc_signalToTableIndex: Failed to find signal number', I4, &
              ' in table')
       RETURN
       END 
