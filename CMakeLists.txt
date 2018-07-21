@@ -63,10 +63,11 @@ SET(LIB_ALL ${LIB_ALL} -lpthread -ldl -lm)
 SET(SRC ${IO_SRC}
     firFilter.c fdxc.F90 ipps.F90 constants.F90
     memory.F90 spxc.F90
-    dsmxc.F90 utils.F90 xcloc.F90 sort.c)
+    dsmxc.F90 utils.F90 sort.c)
 IF (XCLOC_USE_MPI)
    SET(SRC ${SRC} fdxcMPI.F90 dsmxcMPI.F90)
 ENDIF()
+SET(SRC ${SRC} xcloc.F90)
 
 # Executables
 #ADD_EXECUTABLE(dales dales.c ${SRC})

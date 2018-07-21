@@ -14,6 +14,12 @@ enum xclocPrecision_enum
     XCLOC_DOUBLE_PRECISION = 1  /*!< Double precision. */
 };
 
+enum xclocMigrateXC_enum
+{
+    XCLOC_MIGRATE_PHASE_XCS = 0, /*!< Migrate phase correlograms. */
+    XCLOC_MIGRATE_XCS = 1        /*!< Migrate cross correlograms. */
+};
+
 enum xclocAccuracy_enum
 {
     XCLOC_HIGH_ACCURACY = 0,     /*!< High accuracy.  Expect the maximum

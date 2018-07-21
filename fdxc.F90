@@ -86,6 +86,7 @@ MODULE XCLOC_FDXC
       INTEGER(C_SIZE_T), PRIVATE, PARAMETER :: sizeof_double = 8
       INTEGER(C_SIZE_T), PRIVATE, PARAMETER :: sizeof_float_complex = 8
       INTEGER(C_SIZE_T), PRIVATE, PARAMETER :: sizeof_double_complex = 16
+
       !----------------------------------------------------------------------------------!
       !                            Public/Private Subroutines                            !
       !----------------------------------------------------------------------------------!
@@ -109,12 +110,17 @@ MODULE XCLOC_FDXC
       PUBLIC :: xcloc_fdxc_makeCorrelogramPtr64f
       PUBLIC :: xcloc_fdxc_makeCorrelogramPtr32f
 
+      ! FORTRAN ONLY
+      PUBLIC :: xcloc_fdxc_makeCorrelogramsPtr64f
+      PUBLIC :: xcloc_fdxc_makeCorrelogramsPtr32f
+
       PRIVATE :: xcloc_fdxc_setXCTableF
       PRIVATE :: xcloc_fdxc_setAccuracy
       PRIVATE :: xcloc_fdxc_computeFDCorrelations
       PRIVATE :: xcloc_fdxc_initializeFFTW
       PRIVATE :: xcloc_fdxc_forwardTransform
       PRIVATE :: xcloc_fdxc_inverseTransform
+
       CONTAINS
 !========================================================================================!
 !                                     Begin the Code                                     !
@@ -220,6 +226,7 @@ MODULE XCLOC_FDXC
 !>    @param[in] accuracy   XCLOC_LOW_ACCURACY will discard the last 2 bits.
 !>    @param[in] accuracy   XCLOC_EP_ACCURACY will use about 1/2 precision.
 !>    @param[out] ierr      0 indicates success.
+!>    @ingroup fdxc
       SUBROUTINE xcloc_fdxc_setAccuracy(accuracy, ierr)
       USE ISO_C_BINDING
       IMPLICIT NONE
@@ -252,6 +259,7 @@ MODULE XCLOC_FDXC
 !========================================================================================!
 !                                                                                        !
 !>    @brief Releases the memory in the module and reset the variables.
+!>    @ingroup fdxc
       SUBROUTINE xcloc_fdxc_finalize( ) & 
       BIND(C, NAME='xcloc_fdxc_finalize')
       IMPLICIT NONE
@@ -300,7 +308,7 @@ MODULE XCLOC_FDXC
 !>                        the indices, (2*(ixc-1)+1, 2*(ixc-1)+2), map to the 
 !>                        (i,j)'th signal pair comprising a correlation.
 !>    @param[out] ierr    0 indicates success 
-!>
+!>    @ingroup fdxc
       SUBROUTINE xcloc_fdxc_setXCTableF(nxcs, xcPairs, ierr)
       IMPLICIT NONE
       INTEGER(C_INT), VALUE, INTENT(IN) :: nxcs
@@ -344,6 +352,7 @@ MODULE XCLOC_FDXC
 !>    @param[in] x         Signals to set.  This is an [ldx x nsignal] matrix.
 !>                         with leading dimension ldx. 
 !>    @param[out] ierr     0 indicates success.
+!>    @ingroup fdxc
       SUBROUTINE xcloc_fdxc_setSignals64f(ldx, npts, nsignals, x, ierr)  &
       BIND(C, NAME='xcloc_fdxc_setSignals64f')
       USE ISO_C_BINDING
@@ -385,6 +394,7 @@ MODULE XCLOC_FDXC
 !>    @param[in] x         Signals to set.  This is an [ldx x nsignal] matrix.
 !>                         with leading dimension ldx. 
 !>    @param[out] ierr     0 indicates success.
+!>    @ingroup fdxc
       SUBROUTINE xcloc_fdxc_setSignals32f(ldx, npts, nsignals, x, ierr)  &
       BIND(C, NAME='xcloc_fdxc_setSignals32f')
       USE ISO_C_BINDING
@@ -422,6 +432,7 @@ MODULE XCLOC_FDXC
 !>    @brief Returns the number of correlograms to be computed.
 !>    @param[out] nxcs   Number of correlograms.
 !>    @param[out] ierr   0 indicates success.
+!>    @ingroup fdxc
       SUBROUTINE xcloc_fdxc_getNumberOfCorrelograms(nxcs, ierr) &
       BIND(C, NAME='xcloc_fdxc_getNumberOfCorrelograms')
       IMPLICIT NONE
@@ -441,6 +452,7 @@ MODULE XCLOC_FDXC
 !>    @brief Returns the number of input time domain signals.
 !>    @param[out] nsignals  Number of time domain input signals to correlate.
 !>    @param[out] ierr      0 indicates success. 
+!>    @ingroup fdxc
       SUBROUTINE xcloc_fdxc_getNumberOfSignals(nsignals, ierr) &
       BIND(C, NAME='xcloc_fdxc_getNumberOfSignals')
       IMPLICIT NONE
@@ -460,6 +472,7 @@ MODULE XCLOC_FDXC
 !>    @brief Returns the number of points in the time domain correlations.
 !>    @param[out] nptsInXCs  Number of points in the correlograms.
 !>    @param[out] ierr       0 indicates success.
+!>    @ingroup fdxc
       SUBROUTINE xcloc_fdxc_getCorrelogramLength(nptsInXCs, ierr) &
       BIND(C, NAME='xcloc_fdxc_getCorrelogramLength')
       IMPLICIT NONE
@@ -479,6 +492,7 @@ MODULE XCLOC_FDXC
 !>    @brief Gets the precision of the module.
 !>    @param[out] prec   Precision of module - e.g., XCLOC_SINGLE_PRECISION or 
 !>                       XCLOC_DOUBLE_PRECISION.
+!>    @ingroup fdxc
       SUBROUTINE xcloc_fdxc_getPrecision(prec) BIND(C, NAME='xcloc_fdxc_getPrecision')
       IMPLICIT NONE
       INTEGER(C_INT), INTENT(OUT) :: prec
@@ -489,6 +503,7 @@ MODULE XCLOC_FDXC
 !========================================================================================!
 !                                                                                        !
 !>    @brief Indicates that no signals are set.
+!>    @ingroup fdxc
       SUBROUTINE xcloc_fdxc_haveNoSignals( ) &
       BIND(C, NAME='xcloc_fdxc_haveNoSignals')
       IF (ALLOCATED(lhaveSignal_)) lhaveSignal_(:) = 0
@@ -503,7 +518,7 @@ MODULE XCLOC_FDXC
 !>    @param[out] xcs   Cross-correlograms.  This is an array of dimension [ldxc x nxcs]
 !>                      with leading dimension ldxc.
 !>    @param[out] ierr  0 indicates success.
-!>
+!>    @ingroup fdxc
       SUBROUTINE xcloc_fdxc_getCorrelograms64f(ldxc, nxcs, xcs, ierr)  &
       BIND(C, NAME='xcloc_fdxc_getCorrelograms64f')
       USE ISO_C_BINDING
@@ -541,7 +556,7 @@ MODULE XCLOC_FDXC
 !>    @param[out] xcs   Cross-correlograms.  This is an array of dimension [ldxc x nxcs]
 !>                      with leading dimension ldxc.
 !>    @param[out] ierr  0 indicates success.
-!>
+!>    @ingroup fdxc
       SUBROUTINE xcloc_fdxc_getCorrelograms32f(ldxc, nxcs, xcs, ierr)  &
       BIND(C, NAME='xcloc_fdxc_getCorrelograms32f')
       USE ISO_C_BINDING
@@ -574,26 +589,57 @@ MODULE XCLOC_FDXC
 !========================================================================================!
 !                                                                                        !
 !>    @brief Makes a pointer to the entire
-!     SUBROUTINE xcloc_fdxc_makeCorrelogramsPtr64f(ierr)
-!     INTEGER, INTENT(OUT) :: ierr
-!     INTEGER i1, i2, ixcs, j1, j2
-!     ierr = 0
-!     NULLIFY(xc64f)
-!     IF (precision_ /= XCLOC_DOUBLE_PRECISION) THEN 
-!        WRITE(ERROR_UNIT,900)
-!        ierr = 1
-!        RETURN
-!     ENDIF
-!     DO ixcs=1,nxcs_
-!        i1 = (ixcs - 1)*dataOffset_ + 1
-!        i2 = i1 + nptsInXCs_ - 1
-!        j1 = (ixcs - 1)*nptsInXCs_ + 1
-!        j2 = j1 + nptsInXCs_ - 1
-!        xc64f(j1:j2) => xcs64f_(i1:i2)
-!     ENDDO
-! 900 FORMAT('xcloc_fdxc_makeCorrelogramPtr64f: Precision must be single')
-!     RETURN
-!     END
+!>    @param[out] ldxc       Leading dimension of pointer.
+!>    @param[out] nptsInXCs  Number of points in each correlogram.
+!>    @param[out] nxcPairs   Number of correlograms.
+!>    @param[out] xcPtr      Pointer to the cross-correlograms.
+!>    @param[out] ierr       0 indicates success.
+!>    @ingroup fdxc
+      SUBROUTINE xcloc_fdxc_makeCorrelogramsPtr64f(ldxc, nptsInXCs, nxcPairs, xcPtr, ierr)
+      DOUBLE PRECISION, CONTIGUOUS, POINTER, DIMENSION(:), INTENT(OUT) :: xcPtr
+      INTEGER, INTENT(OUT) :: ldxc, nptsInXCs, nxcPairs, ierr
+      ierr = 0
+      IF (precision_ /= XCLOC_DOUBLE_PRECISION) THEN 
+         WRITE(ERROR_UNIT,900)
+         NULLIFY(xcPtr)
+         ierr = 1
+         RETURN
+      ENDIF
+      ldxc = dataOffset_
+      nptsInXCs = nptsInXCs_
+      nxcPairs = nxcs_
+      xcPtr(1:dataOffset_*nxcs_) = xcs64f_(1:dataOffset_*nxcs_)
+  900 FORMAT('xcloc_fdxc_makeCorrelogramPtr64f: Precision must be double')
+      RETURN
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Makes a pointer to the entire
+!>    @param[out] ldxc       Leading dimension of pointer.
+!>    @param[out] nptsInXCs  Number of points in each correlogram.
+!>    @param[out] nxcPairs   Number of correlograms.
+!>    @param[out] xcPtr      Pointer to the cross-correlograms.
+!>    @param[out] ierr       0 indicates success.
+!>    @ingroup fdxc
+      SUBROUTINE xcloc_fdxc_makeCorrelogramsPtr32f(ldxc, nptsInXCs, nxcPairs, xcPtr, ierr)
+      REAL, CONTIGUOUS, POINTER, DIMENSION(:), INTENT(OUT) :: xcPtr
+      INTEGER, INTENT(OUT) :: ldxc, nptsInXCs, nxcPairs, ierr
+      ierr = 0
+      IF (precision_ /= XCLOC_SINGLE_PRECISION) THEN
+         WRITE(ERROR_UNIT,900)
+         NULLIFY(xcPtr)
+         ierr = 1
+         RETURN
+      ENDIF
+      ldxc = dataOffset_
+      nptsInXCs = nptsInXCs_
+      nxcPairs = nxcs_
+      xcPtr(1:dataOffset_*nxcs_) = xcs32f_(1:dataOffset_*nxcs_)
+  900 FORMAT('xcloc_fdxc_makeCorrelogramPtr32f: Precision must be single')
+      RETURN
+      END
+
 !                                                                                        !
 !========================================================================================!
 !                                                                                        !
@@ -601,6 +647,7 @@ MODULE XCLOC_FDXC
 !>    @param[in] corrNumber  Correlation number to attach xc64f to.  This must be in
 !>                           the range [1, nxcs_].
 !>    @param[out] ierr       0 indicates success. 
+!>    @ingroup fdxc
       SUBROUTINE xcloc_fdxc_makeCorrelogramPtr64f(corrNumber, ierr)
       INTEGER, INTENT(IN) :: corrNumber
       INTEGER, INTENT(OUT) :: ierr
@@ -632,6 +679,7 @@ MODULE XCLOC_FDXC
 !>    @param[in] corrNumber  Correlation number to attach xc64f to.  This must be in
 !>                           the range [1, nxcs_].
 !>    @param[out] ierr       0 indicates success. 
+!>    @ingroup fdxc
       SUBROUTINE xcloc_fdxc_makeCorrelogramPtr32f(corrNumber, ierr)
       INTEGER, INTENT(IN) :: corrNumber
       INTEGER, INTENT(OUT) :: ierr
@@ -667,7 +715,7 @@ MODULE XCLOC_FDXC
 !>                           [lwork] however only the first nptsInXCs_ points are
 !>                           accessed.
 !>    @param[out] ierr       0 indicates success.
-!>
+!>    @ingroup fdxc
       SUBROUTINE xcloc_fdxc_getCorrelogram64fF(corrNumber, lwork, xc, ierr) &
       BIND(C, NAME='xcloc_fdxc_getCorrelogram64fF')
       USE ISO_C_BINDING
@@ -709,7 +757,7 @@ MODULE XCLOC_FDXC
 !>                           [lwork] however only the first nptsInXCs_ points are
 !>                           accessed.
 !>    @param[out] ierr       0 indicates success.
-!>
+!>    @ingroup fdxc
       SUBROUTINE xcloc_fdxc_getCorrelogram32fF(corrNumber, lwork, xc, ierr) &
       BIND(C, NAME='xcloc_fdxc_getCorrelogram32fF')
       USE ISO_C_BINDING
@@ -749,6 +797,7 @@ MODULE XCLOC_FDXC
 !>    @param[in] npts          Number of points in the signal.  This cannot exceed npts_.
 !>    @param[in] x             Signal to set.  This is an array of dimension [npts].
 !>    @param[out] ierr         0 indicates success.
+!>    @ingroup fdxc
       SUBROUTINE xcloc_fdxc_setSignal64fF(signalNumber, npts, x, ierr) &
       BIND(C, NAME='xcloc_fdxc_setSignal64fF')
       USE ISO_C_BINDING
@@ -789,6 +838,7 @@ MODULE XCLOC_FDXC
 !>    @param[in] npts          Number of points in the signal.  This cannot exceed npts_.
 !>    @param[in] x             Signal to set.  This is an array of dimension [npts].
 !>    @param[out] ierr         0 indicates success.
+!>    @ingroup fdxc
       SUBROUTINE xcloc_fdxc_setSignal32fF(signalNumber, npts, x, ierr) &
       BIND(C, NAME='xcloc_fdxc_setSignal32fF')
       USE ISO_C_BINDING
@@ -825,6 +875,7 @@ MODULE XCLOC_FDXC
 !                                                                                        !
 !>    @brief Computes the phase correlograms.
 !>    @param[out] ierr  0 indicates success.
+!>    @ingroup fdxc
       SUBROUTINE xcloc_fdxc_computePhaseCorrelograms(ierr) &
       BIND(C, NAME='xcloc_fdxc_computePhaseCorrelograms')
       USE ISO_C_BINDING
@@ -853,6 +904,7 @@ MODULE XCLOC_FDXC
 !                                                                                        !
 !>    @brief Computes the cross-correlograms.
 !>    @param[out] ierr  0 indicates success.
+!>    @ingroup fdxc
       SUBROUTINE xcloc_fdxc_computeCrossCorrelograms(ierr) &
       BIND(C, NAME='xcloc_fdxc_computeCrossCorrelograms')
       USE ISO_C_BINDING
@@ -882,6 +934,7 @@ MODULE XCLOC_FDXC
 !>    @brief Computes the (phase) correlations in the frequency domain.
 !>    @param[in] lphaseCorr  If true then compute the phase correlations.
 !>    @param[out] ierr       0 indicates success.
+!>    @ingroup fdxc
       SUBROUTINE xcloc_fdxc_computeFDCorrelations(lphaseCorr, ierr)
       IMPLICIT NONE
       INCLUDE 'mkl_vml.f90'
@@ -987,6 +1040,7 @@ MODULE XCLOC_FDXC
 !                                                                                        !
 !>    @brief Forward transforms the input signals.
 !>    @param[out] ierr  0 indicates success.
+!>    @ingroup fdxc
       SUBROUTINE xcloc_fdxc_forwardTransform(ierr) 
       IMPLICIT NONE
       INCLUDE 'fftw/fftw3.f03'
@@ -1011,6 +1065,7 @@ MODULE XCLOC_FDXC
 !                                                                                        !
 !>    @brief Brings the frequency domain correlations back to the time domain.
 !>    @param[out] ierr  0 indicates success.
+!>    @ingroup fdxc
       SUBROUTINE xcloc_fdxc_inverseTransform(ierr)
       IMPLICIT NONE
       INCLUDE 'fftw/fftw3.f03'
@@ -1082,6 +1137,7 @@ MODULE XCLOC_FDXC
 !                                                                                        !
 !>    @brief Initializes the FFTw descriptors. 
 !>    @result 0 indicates success.
+!>    @ingroup fdxc
       SUBROUTINE xcloc_fdxc_initializeFFTW(ierr)
       IMPLICIT NONE
       INCLUDE 'fftw/fftw3.f03'

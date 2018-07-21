@@ -86,6 +86,7 @@ MODULE XCLOC_SPXC
       INTEGER(C_INT), VALUE, INTENT(IN) :: n, ftype
       INTEGER(C_INT), INTENT(OUT) :: ierr
       ierr = 0
+      CALL xcloc_spxc_finalize()
       IF (ftype == XCLOC_SPXC_DONOT_FILTER) THEN
          ftype_ = ftype 
       ELSE

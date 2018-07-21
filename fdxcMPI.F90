@@ -105,7 +105,7 @@ MODULE XCLOC_FDXC_MPI
 !>    @param[in] accuracy  Controls the accuracy of the vector calculations in MKL.
 !>                         This is defined on the root process.
 !>    @param[out] ierr     0 indicates sucess.
-!>
+!>    @ingroup fdxcmpi
       SUBROUTINE xcloc_fdxcMPI_initialize(comm, root,                     &
                                           npts, nptsPad,                  &
                                           nxcs, xcPairs,                  &
@@ -324,7 +324,7 @@ MODULE XCLOC_FDXC_MPI
 !========================================================================================!
 !                                                                                        !
 !>    @brief Releases memory on the module.
-!>
+!>    @ingroup fdxcmpi
       SUBROUTINE xcloc_fdxcMPI_finalize()  &
       BIND(C, NAME='xcloc_fdxcMPI_finalize')
       INTEGER mpierr
@@ -353,6 +353,7 @@ MODULE XCLOC_FDXC_MPI
 !                                                                                        !
 !>    @brief Computes the cross-correlograms.
 !>    @param[out] ierr   0 indicates success.
+!>    @ingroup fdxcmpi
       SUBROUTINE xcloc_fdxcMPI_computeCrossCorrelograms(ierr) &
       BIND(C, NAME='xcloc_fdxcMPI_computeCrossCorrelograms')
       INTEGER(C_INT), INTENT(OUT) :: ierr
@@ -372,6 +373,7 @@ MODULE XCLOC_FDXC_MPI
 !                                                                                        !
 !>    @brief Computes the phase correlograms.
 !>    @param[out] ierr   0 indicates success.
+!>    @ingroup fdxcmpi
       SUBROUTINE xcloc_fdxcMPI_computePhaseCorrelograms(ierr) &
       BIND(C, NAME='xcloc_fdxcMPI_computePhaseCorrelograms')
       INTEGER(C_INT), INTENT(OUT) :: ierr
@@ -399,6 +401,7 @@ MODULE XCLOC_FDXC_MPI
 !>                        [ldxcIn x nxcsIn] with leading dimension ldxcIn.  This need
 !>                        only be defined on the root process.
 !>    @param[out] ierr    0 indicates succcess.
+!>    @ingroup fdxcmpi
       SUBROUTINE xcloc_fdxcMPI_gatherCorrelograms64f(ldxcIn, nxcsIn, root, xcs, ierr) &
       BIND(C, NAME='xcloc_fdxcMPI_gatherCorrelograms64f')
       INTEGER(C_INT), VALUE, INTENT(IN) :: ldxcin, nxcsIn, root
@@ -471,35 +474,39 @@ MODULE XCLOC_FDXC_MPI
 !>                         This is defined on the root process.
 !>    @param[in] nsignals  Number of total signals to set.  This must match
 !>                         nSignalsTotal_.  This is defined on the root process.
+!>    @param[in] root      Root process on that is sending the data.
 !>    @param[in] x         The signals to set.  This an [ldx x nsignals] matrix.
 !>                         This is defined on the root process.
 !>    @param[out] ierr     0 indicates success.
-      SUBROUTINE xcloc_fdxcMPI_setSignals64f(ldx, npts, nsignals, x, ierr) &
+!>    @ingroup fdxcmpi
+      SUBROUTINE xcloc_fdxcMPI_setSignals64f(ldx, npts, nsignals, root, x, ierr) &
       BIND(C, NAME='xcloc_fdxcMPI_setSignals64f')
-      INTEGER(C_INT), VALUE, INTENT(IN) :: ldx, npts, nsignals
+      INTEGER(C_INT), VALUE, INTENT(IN) :: ldx, npts, nsignals, root
       REAL(C_DOUBLE), INTENT(IN) :: x(ldx*nsignals)
       INTEGER(C_INT), INTENT(OUT) :: ierr
       DOUBLE PRECISION, ALLOCATABLE :: work(:)
       TYPE(MPI_Request), ALLOCATABLE :: send_request(:), recv_request(:)
-      INTEGER dest, i, i1, i2, ierrLoc, indx, ip, is, j1, j2, mpierr, nrecv, nsend
+      INTEGER dest, i, i1, i2, ierrLoc, indx, ip, is, j1, j2, mpierr, nrecv, nsend, source
       LOGICAL flag
       TYPE(MPI_Status) stat
       ierr = 0
       CALL xcloc_fdxc_haveNoSignals() ! Indicate that I have no signals set.
       IF (myid_ == MPI_UNDEFINED) RETURN ! I don't belong here
-      IF (myid_ == root_) THEN
+      IF (myid_ == root) THEN
          IF (ldx < npts .OR. npts /= npts_ .OR. nsignals /= nSignalsTotal_) THEN
             IF (ldx < npts) WRITE(ERROR_UNIT,900) ldx, npts
             IF (npts /= npts_) WRITE(ERROR_UNIT,901) npts_
             IF (nsignals /= nSignalsTotal_) WRITE(ERROR_UNIT,902) nSignalsTotal_
             ierr = 1
          ENDIF
+         source = root
       ENDIF
-      CALL MPI_Bcast(ierr, 1, MPI_INTEGER, root_, comm_, mpierr)
+      CALL MPI_Bcast(ierr,   1, MPI_INTEGER, root, comm_, mpierr)
+      CALL MPI_Bcast(source, 1, MPI_INTEGER, root, comm_, mpierr)
       IF (ierr /= 0) RETURN
       ierrLoc = 0
       ! Have the root send the signals 
-      IF (myid_ == root_) THEN
+      IF (myid_ == root) THEN
          ! Have the root send the input data to the other processes
          nsend = uniqueGlobalSignalIDPtr_(nprocs_+1) &
                - uniqueGlobalSignalIDPtr_(2) + 1
@@ -511,10 +518,9 @@ MODULE XCLOC_FDXC_MPI
             DO i=i1,i2
                dest = uniqueGlobalSignalIDs_(i)
                j1 = (dest - 1)*ldx + 1
-               call MPI_Isend(x(j1), npts_, MPI_DOUBLE_PRECISION, ip-1, root_, &
+               call MPI_Isend(x(j1), npts_, MPI_DOUBLE_PRECISION, ip-1, root, &
                               comm_, send_request(is), mpierr)
                is = is + 1
-               !print *, 'sending to:', ip, dest
             ENDDO
          ENDDO 
          IF (is /= nsend) THEN
@@ -541,7 +547,7 @@ MODULE XCLOC_FDXC_MPI
          ! Get the data from the root
          DO i=1,nsignalsLocal_
             indx = (i - 1)*npts_ + 1
-            CALL MPI_Irecv(work(indx), npts_, MPI_DOUBLE_PRECISION, root_, &
+            CALL MPI_Irecv(work(indx), npts_, MPI_DOUBLE_PRECISION, source, &
                            MPI_ANY_TAG, comm_, recv_request(i), mpierr)
          ENDDO
          ! As I receive things put them into the signal buffer
@@ -553,6 +559,127 @@ MODULE XCLOC_FDXC_MPI
                IF (flag) THEN
                   j1 = (i - 1)*npts_ + 1
                   CALL xcloc_fdxc_setSignal64fF(i, npts_, work(j1), ierr)
+                  IF (ierr /= 0) THEN
+                     WRITE(ERROR_UNIT,915) i, myid_
+                     ierrLoc = 1
+                  ENDIF
+                  !print *, local2GlobalSignal_(i), work(j1)
+                  nrecv = nrecv + 1
+               ENDIF
+            ENDDO
+         ENDDO
+         ! Free my workspace
+         DEALLOCATE(work)
+         DEALLOCATE(recv_request)
+      ENDIF
+      CALL MPI_Allreduce(ierrLoc, ierr, 1, MPI_INTEGER, MPI_SUM, comm_, mpierr) 
+      IF (ierr /= 0) THEN
+         WRITE(ERROR_UNIT,920)
+         RETURN
+      ENDIF
+  900 FORMAT('xcloc_fdxc_setSignals64f: Error ldx=', I6, '<', 'npts=', I6)
+  901 FORMAT('xcloc_fdxc_setSignals64f: Error expecting npts=', I6)
+  902 FORMAT('xcloc_fdxc_setSignals64f: Error expecting nsignals=', I6)
+  910 FORMAT('xcloc_fdxc_setSignals64f: Some signals may not be sent')
+  915 FORMAT('xcloc_fdxc_setSignals64f: Error setting signal:', I4, ' on process ', I4)
+  920 FORMAT('xcloc_fdxc_setSignals64f: Errors detected')
+      RETURN
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Sets the signals to cross-correlate.
+!>    @param[in] ldx       Leading dimension of x.  This cannot be less than npts.
+!>                         This is defined on the root process.
+!>    @param[in] npts      Number of points in the signals.  This must match npts_.
+!>                         This is defined on the root process.
+!>    @param[in] nsignals  Number of total signals to set.  This must match
+!>                         nSignalsTotal_.  This is defined on the root process.
+!>    @param[in] root      Root process on that is sending the data.
+!>    @param[in] x         The signals to set.  This an [ldx x nsignals] matrix.
+!>                         This is defined on the root process.
+!>    @param[out] ierr     0 indicates success.
+!>    @ingroup fdxcmpi
+      SUBROUTINE xcloc_fdxcMPI_setSignals32f(ldx, npts, nsignals, root, x, ierr) &
+      BIND(C, NAME='xcloc_fdxcMPI_setSignals32f')
+      INTEGER(C_INT), VALUE, INTENT(IN) :: ldx, npts, nsignals, root
+      REAL(C_FLOAT), INTENT(IN) :: x(ldx*nsignals)
+      INTEGER(C_INT), INTENT(OUT) :: ierr
+      REAL, ALLOCATABLE :: work(:)
+      TYPE(MPI_Request), ALLOCATABLE :: send_request(:), recv_request(:)
+      INTEGER dest, i, i1, i2, ierrLoc, indx, ip, is, j1, j2, mpierr, nrecv, nsend, source
+      LOGICAL flag
+      TYPE(MPI_Status) stat
+      ierr = 0
+      CALL xcloc_fdxc_haveNoSignals() ! Indicate that I have no signals set.
+      IF (myid_ == MPI_UNDEFINED) RETURN ! I don't belong here
+      IF (myid_ == root) THEN
+         IF (ldx < npts .OR. npts /= npts_ .OR. nsignals /= nSignalsTotal_) THEN
+            IF (ldx < npts) WRITE(ERROR_UNIT,900) ldx, npts
+            IF (npts /= npts_) WRITE(ERROR_UNIT,901) npts_
+            IF (nsignals /= nSignalsTotal_) WRITE(ERROR_UNIT,902) nSignalsTotal_
+            ierr = 1
+         ENDIF
+         source = root
+      ENDIF
+      CALL MPI_Bcast(ierr,   1, MPI_INTEGER, root, comm_, mpierr)
+      CALL MPI_Bcast(source, 1, MPI_INTEGER, root, comm_, mpierr)
+      IF (ierr /= 0) RETURN
+      ierrLoc = 0
+      ! Have the root send the signals 
+      IF (myid_ == root) THEN
+         ! Have the root send the input data to the other processes
+         nsend = uniqueGlobalSignalIDPtr_(nprocs_+1) &
+               - uniqueGlobalSignalIDPtr_(2) + 1
+         ALLOCATE(send_request(MAX(1, nsend))); send_request(:) = MPI_REQUEST_NULL 
+         is = 1
+         DO ip=2,nprocs_
+            i1 = uniqueGlobalSignalIDPtr_(ip)
+            i2 = uniqueGlobalSignalIDPtr_(ip+1) - 1
+            DO i=i1,i2
+               dest = uniqueGlobalSignalIDs_(i)
+               j1 = (dest - 1)*ldx + 1
+               call MPI_Isend(x(j1), npts_, MPI_REAL, ip-1, root, &
+                              comm_, send_request(is), mpierr)
+               is = is + 1
+            ENDDO
+         ENDDO 
+         IF (is /= nsend) THEN
+            WRITE(ERROR_UNIT,910)
+            ierrLoc = 1
+         ENDIF
+         ! Set what I have to set
+         i1 = uniqueGlobalSignalIDPtr_(myid_+1)
+         i2 = uniqueGlobalSignalIDPtr_(myid_+2) - 1
+         DO i=i1,i2
+            is = local2GlobalSignal_(i)
+            j1 = (is - 1)*ldx + 1
+            j2 = j1 + npts_ - 1
+            CALL xcloc_fdxc_setSignal32fF(i, npts_, x(j1:j2), ierr)
+            IF (ierr /= 0) THEN
+               WRITE(ERROR_UNIT,915) i, myid_
+               ierrLoc = 1
+            ENDIF 
+         ENDDO
+         DEALLOCATE(send_request)
+      ELSE
+         ALLOCATE(work(npts_*nSignalsLocal_)); work(:) = 0.d0
+         ALLOCATE(recv_request(MAX(1, nSignalsLocal_))); recv_request(:) = MPI_REQUEST_NULL
+         ! Get the data from the root
+         DO i=1,nsignalsLocal_
+            indx = (i - 1)*npts_ + 1
+            CALL MPI_Irecv(work(indx), npts_, MPI_REAL, source,       &
+                           MPI_ANY_TAG, comm_, recv_request(i), mpierr)
+         ENDDO
+         ! As I receive things put them into the signal buffer
+         nrecv = 0
+         DO WHILE (nrecv < nSignalsLocal_)
+            DO i=1,nSignalsLocal_
+               IF (recv_request(i) == MPI_REQUEST_NULL) CYCLE
+               CALL MPI_Test(recv_request(i), flag, stat, mpierr) 
+               IF (flag) THEN
+                  j1 = (i - 1)*npts_ + 1
+                  CALL xcloc_fdxc_setSignal32fF(i, npts_, work(j1), ierr)
                   IF (ierr /= 0) THEN
                      WRITE(ERROR_UNIT,915) i, myid_
                      ierrLoc = 1

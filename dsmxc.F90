@@ -198,6 +198,18 @@ MODULE XCLOC_DSMXC
 !                                                                                        !
 !========================================================================================!
 !                                                                                        !
+!>    @brief Convenience utility to determine if all the tables have been set.
+!>    @param[out] lhaveAllTables  If true then all tables have been set.
+!>    @ingroup dsmxc
+      SUBROUTINE xcloc_dsmxc_haveAllTables(lhaveAllTables) &
+      BIND(C, NAME='xcloc_dsmxc_haveAllTables')
+      LOGICAL(C_BOOL), INTENT(OUT) :: lhaveAllTables
+      lhaveAllTables = lhaveAllTables_
+      RETURN
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
 !>    @brief Returns the number of travel time tables on the module.
 !>    @param[out] ntables  The number of travel time tables.
 !>    @ingroup dsmxc

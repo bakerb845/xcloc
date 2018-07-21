@@ -11,6 +11,7 @@ MODULE XCLOC_MEMORY
       !==================================================================================!
       !                                      Begin the Code                              !
       !==================================================================================!
+      !> @ingroup memory
       INTEGER(C_INT) FUNCTION xcloc_memory_padLength(alignment, sizeof_dataType, n) &
       RESULT(padLength) &
       BIND(C, NAME='xcloc_meomry_padLength')

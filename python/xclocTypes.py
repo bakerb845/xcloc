@@ -35,3 +35,8 @@ class xclocTypes:
     XCLOC_PRINT_INFO,     # Print errors, warnings, and general information.
     XCLOC_PRINT_DEBUG     # Print everything.
     ) = map(int, range(-1,4))
+
+    (
+    XCLOC_MIGRATE_PHASE_XCS,  # Migrate phase correlograms.
+    XCLOC_MIGRATE_XCS         # Migrate cross correlograms.
+    ) = map(int, range(2))

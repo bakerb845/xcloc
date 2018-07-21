@@ -52,8 +52,20 @@ class xcloc:
         ##################################################################################
         #                                     XCLOC                                      #
         ##################################################################################
-        xcloc_lib.xcloc_initializeF.argtypes = None 
-        xcloc_lib.xcloc_finalizeF.argtypes = None
+        xcloc_lib.xcloc_initialize.argtypes = [c_int, # npts
+                                               c_int, # nptsPad
+                                               c_int, # nxcs
+                                               c_int, # signal2migrate
+                                               c_double, # dt
+                                               c_int, # ngrd
+                                               c_int, # nfcoeffs
+                                               c_int, # ftype
+                                               POINTER(c_int), # xcPairs
+                                               c_int, # verbose
+                                               c_int, # prec
+                                               c_int, # accuracy
+                                               POINTER(c_int)]
+        xcloc_lib.xcloc_finalize.argtypes = None
 
         # Hook up the modules
         self.utils = utils(xcloc_lib)
@@ -62,10 +74,18 @@ class xcloc:
         self.spxc = spxc(xcloc_lib)
         self.lib = xcloc_lib
 
+    def finalize(self):
+        """!
+        @brief Releases memory on the xcloc module.
+        @ingroup pyxcloc
+        """
+        self.lib.xcloc_finalize()
+
     def __exit__(self):
         self.fdxc.finalize()
         self.dsmxc.finalize()
         self.spxc.finalize()
+        self.finalize()
         return
 
 ####################################################################################################

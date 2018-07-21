@@ -141,11 +141,11 @@ void xcloc_spxc_finalize(void);
 #ifdef XCLOC_USE_MPI
 #include <mpi.h>
 /*----------------------------------------------------------------------------*/
-/*                        Frequency Domain Cross-Correlation                  */
+/*                 Parallel Frequency Domain Cross-Correlation                */
 /*----------------------------------------------------------------------------*/
 /* Initialize parallel frequency domain cross correlation. */
 void xcloc_fdxcMPI_initialize(const MPI_Fint comm, //const MPI_Comm comm,
-                              const int master, 
+                              const int root, 
                               const int npts,
                               const int nptsPad,
                               const int nxcs,
@@ -158,10 +158,12 @@ void xcloc_fdxcMPI_initialize(const MPI_Fint comm, //const MPI_Comm comm,
 void xcloc_fdxcMPI_setSignals64f(const int ldx,
                                  const int npts,
                                  const int nsignals,
+                                 const int root,
                                  const double x[], int *ierr);
 void xcloc_fdxcMPI_setSignals32f(const int ldx,
                                  const int npts,
                                  const int nsignals,
+                                 const int root,
                                  const float x[], int *ierr);
 /* Gathers the correlogram onto the root process. */
 void xcloc_fdxcMPI_gatherCorrelograms64f(const int ldxc, const int nxcs,
@@ -174,11 +176,23 @@ void xcloc_fdxcMPI_gatherCorrelograms32f(const int ldxc, const int nxcs,
 void xcloc_fdxcMPI_computeCrossCorrelograms(int *ierr);
 /* Compute the phase-correlograms. */
 void xcloc_fdxcMPI_computePhaseCorrelograms(int *ierr);
-
 /* Finalize the module. */
 void xcloc_fdxcMPI_finalize(void);
-
-#endif
+/*----------------------------------------------------------------------------*/
+/*                      Parallel DSM of Correlograms                          */
+/*----------------------------------------------------------------------------*/
+/* Initialize parallel DSM. */
+void xcloc_dsmxcMPI_initialize(const MPI_Fint comm, //const MPI_Comm comm,
+                               const int root,
+                               const int ngrd, const int nxcPairs,
+                               const int nptsInXCs, 
+                               const double dt,
+                               const int xcPairs[],
+                               const int verbose,
+                               int *ierr);
+/* Set a table. */
+//void xcloc_dsmxcMPI_setTable64f(const int tableNumber, 
+#endif /* MPI */
 
 #ifdef __cplusplus
 }
