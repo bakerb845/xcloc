@@ -333,6 +333,12 @@ class xcloc:
         return ierr
    
     def getImage(self, dtype=float64):
+        """!
+        @brief Gets the DSM image.
+        @retval An array containing the DSM image.
+        @retval None indicates a failure.
+        @ingroup pyxcloc_xcloc
+        """
         fname = '%s::%s'%(self.__class__.__name__, self.getImage.__name__)
         if (not self.lhaveImage):
             print("%s: DSM image not yet computed"%fname)
