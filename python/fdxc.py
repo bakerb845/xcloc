@@ -77,7 +77,7 @@ class fdxc:
 
     def initialize(self, npts, nsignals, nptsPad=None,
                    xcPairs=None,
-                   verbose=0,
+                   verbose=xctypes.XCLOC_PRINT_WARNINGS,
                    precision=xctypes.XCLOC_SINGLE_PRECISION,
                    accuracy=xctypes.XCLOC_HIGH_ACCURACY):
         """!
@@ -123,7 +123,7 @@ class fdxc:
         if (xcPairs is None):
             xcPairs = self.utils.computeDefaultXCTable(nsignals)
             xcPairs = xcPairs + 1
-        if (amin(xcPairs) == 0):
+        if (amin(xcPairs) == 0): 
             print("%s: xcPairs must be Fortran indexed"%fname)
             return -1
         nxcs = xcPairs.shape[0]
@@ -249,6 +249,7 @@ class fdxc:
                 print("%s: Failed to call setSignals64f"%fname)
         else:
             print("%s: Precision must be float32 or float64"%fname)
+            return -1
         ierr = ierr.value
         return ierr
 

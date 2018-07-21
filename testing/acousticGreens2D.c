@@ -127,7 +127,7 @@ int acousticGreens2D_computeGreensLineSource(
     double complex *stfF = NULL;
     double *omega = NULL;
     int i, ierr, irec, nomega;
-    const bool lverb = false; 
+    //const bool lverb = false; 
     // Set space
     nomega = npts/2 + 1; // Number of fft samples
     omega = (double *) calloc((size_t) (nomega+8), sizeof(double));
@@ -166,7 +166,8 @@ int acousticGreens2D_computeGreensLineSource(
     // Evaluate Greens functions for the different receivers 
     for (irec=0; irec<nrec; irec++)
     {
-        ierr = acousticGreens2D_computeLineSourceFD(lverb, vel, rho, Q,
+        ierr = acousticGreens2D_computeLineSourceFD(//lverb,
+                                                    vel, rho, Q,
                                                     xs,
                                                     &xr[3*irec],
                                                     nomega, omega,
@@ -221,7 +222,7 @@ int acousticGreens2D_computeGreensLineSource(
  *
  */
 int acousticGreens2D_computeLineSourceFD(
-    const bool lverb,
+    //const bool lverb,
     const double vel,
     const double rho,
     const double Q,
@@ -241,9 +242,12 @@ int acousticGreens2D_computeLineSourceFD(
     r = pow(xs[0] - xr[0], 2) + pow(xs[1] - xr[1], 2);
     r = sqrt(r);
     coeff = DCMPLX(0.0, -1.0/(4.0*rho*vel*vel))*expipi4;
+    #pragma omp simd
     for (i=0; i<nomega; i++)
     {
-        xscal = sqrt(2.0*vel/(M_PI*omega[i]*r));
+        xscal = 0.0;
+        if (fabs(omega[i]) > 0.0){xscal = sqrt(2.0*vel/(M_PI*omega[i]*r));}
+/*
         if (omega[i] == 0.0)
         {
             if (lverb)
@@ -253,6 +257,7 @@ int acousticGreens2D_computeLineSourceFD(
             }
             xscal = 0.0;
         }
+*/
         omegar = omega[i]*r;
         carg  = DCMPLX(-omegar/(2.0*vel*Q), -omegar/vel);
         G[i] = coeff*(xscal*cexp(carg));
@@ -260,7 +265,10 @@ int acousticGreens2D_computeLineSourceFD(
     // Convolve source time function
     if (stf != NULL)
     {
-        for (i=0; i<nomega; i++){G[i] = stf[i]*G[i];}
+        const Ipp64fc* pSrc = (const Ipp64fc *) stf;
+        Ipp64fc *pSrcDst = (Ipp64fc *) G;
+        ippsMul_64fc_I(pSrc, pSrcDst, nomega);
+        //for (i=0; i<nomega; i++){G[i] = stf[i]*G[i];}
     }
     return EXIT_SUCCESS;
 }

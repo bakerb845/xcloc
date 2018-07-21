@@ -25,7 +25,7 @@ MODULE XCLOC
       !> @ingroup xcloc
       INTEGER, PRIVATE, SAVE :: ngrd_ = 0
       !> Signal to migrate.
-      INTEGER, PRIVATE, SAVE :: signalMigrationType_ = XCLOC_MIGRATE_PHASE_XCS
+      INTEGER, PRIVATE, SAVE :: xcTypeToMigrate_ = XCLOC_MIGRATE_PHASE_XCS
       !> Controls verbosity.
       INTEGER, PRIVATE, SAVE :: verbose_ = XCLOC_PRINT_WARNINGS
       !> The precision of the module.
@@ -43,12 +43,15 @@ MODULE XCLOC
 
       PUBLIC :: xcloc_initialize
       PUBLIC :: xcloc_finalize
+      PUBLIC :: xcloc_getImage64f
+      PUBLIC :: xcloc_getImage32f
+      PUBLIC :: xcloc_getNumberOfGridPointsInImage
       PUBLIC :: xcloc_signalToTableIndex
       PUBLIC :: xcloc_setTable64f
       PUBLIC :: xcloc_setTable32f
       PUBLIC :: xcloc_setSignals64f
       PUBLIC :: xcloc_setSignals32f
-      PUBLIC :: xcloc_setSignalToMigrate
+      PUBLIC :: xcloc_setXCTypeToMigrate
       PUBLIC :: xcloc_setXCFilter
       PUBLIC :: xcloc_getPrecision
       PUBLIC :: xcloc_compute
@@ -61,9 +64,10 @@ MODULE XCLOC
 !>    @param[in] nptsPad   A tuning parameter to mitigate DFT lengths that could
 !>                         potentially be large semi-prime numbers.
 !>    @param[in] nxcs      Number of cross-correlograms.
-!>    @param[in] s2m       Signal type to migrate.  This can be XCLOC_MIGRATE_PHASE_XCS
-!>                         to migrate phase correlograms or XCLOC_MIGRATE_XCS
-!>                         to migrate cross-correlograms.
+!>    @param[in] s2m       Cross-correlogram signal type to migrate.
+!>                         This can be XCLOC_MIGRATE_PHASE_XCS to migrate phase
+!>                         correlograms or XCLOC_MIGRATE_XCS to migrate
+!>                         cross-correlograms.
 !>    @param[in] dt        Sampling period (seconds) of signals.
 !>    @param[in] ngrd      Number of points in migration grid.
 !>    @param[in] nfcoeffs  The number of filter coefficients.  If the processing is
@@ -94,7 +98,7 @@ MODULE XCLOC
       INTEGER nptsInXCs
       ierr = 0
       CALL xcloc_finalize()
-      CALL xcloc_setSignalToMigrate(s2m, ierr)
+      CALL xcloc_setXCTypeToMigrate(s2m, ierr)
       IF (ierr /= 0) THEN
          WRITE(ERROR_UNIT,895)
          CALL xcloc_finalize()
@@ -136,6 +140,7 @@ MODULE XCLOC
       ! Set some basic info
       precision_ = prec
       verbose_ = verbose
+      linit_ = .TRUE.
   895 FORMAT('xcloc_initialize: Failed to set signal migration type')
   900 FORMAT('xcloc_initialize: Failed to initialize fdxc')
   901 FORMAT('xcloc_initialize: Failed to get length of correlograms')
@@ -248,27 +253,28 @@ MODULE XCLOC
 !                                                                                        !
 !========================================================================================!
 !                                                                                        !
-!>    @param[in] signalToMigrate  XCLOC_MIGRATE_PHASE_XCS indicates that phase
+!>    @brief Sets the cross-correlogram signal type to migrate.
+!>    @param[in] xcTypeToMigrate  XCLOC_MIGRATE_PHASE_XCS indicates that phase
 !>                                correlograms will be migrated.
-!>    @param[in] signalToMigrate  XCLOC_MIGRATE_XCS indicates that cross correlograms
+!>    @param[in] xcTypeToMigrate  XCLOC_MIGRATE_XCS indicates that cross correlograms
 !>                                will be migrated.
 !>    @param[out] ierr            0 indicates success.
 !>    @ingroup xcloc_xcloc
-      SUBROUTINE xcloc_setSignalToMigrate(signalToMigrate, ierr) &
-      BIND(C, NAME='xcloc_setSignalToMigrate')
-      INTEGER(C_INT), VALUE, INTENT(IN) :: signalToMigrate
+      SUBROUTINE xcloc_setXCTypeToMigrate(xcTypeToMigrate, ierr) &
+      BIND(C, NAME='xcloc_setXCTypeToMigrate')
+      INTEGER(C_INT), VALUE, INTENT(IN) :: xcTypeToMigrate
       INTEGER(C_INT), INTENT(OUT) :: ierr
       LOGICAL lisValid
       ierr = 0
-      signalMigrationType_ = XCLOC_MIGRATE_PHASE_XCS
-      lisValid = xcloc_constants_isValidSignalToMigrate(signalToMigrate)
+      xcTypeToMigrate_ = XCLOC_MIGRATE_PHASE_XCS
+      lisValid = xcloc_constants_isValidSignalToMigrate(xcTypeToMigrate)
       IF (.NOT.lisValid) THEN
          WRITE(ERROR_UNIT,900)
          ierr = 1
          RETURN
       ENDIF
-      signalMigrationType_ = signalToMigrate
-  900 FORMAT('xcloc_setSignalToMigrate: Invalid type of signal to migrate')
+      xcTypeToMigrate_ = xcTypeToMigrate
+  900 FORMAT('xcloc_setXCTypeToMigrate: Invalid type of xc signal type to migrate')
       RETURN
       END
 !                                                                                        !
@@ -287,6 +293,8 @@ MODULE XCLOC
       INTEGER(C_INT), INTENT(OUT) :: ierr
       DOUBLE PRECISION, ALLOCATABLE, DIMENSION(:) :: xcs64f
       REAL, ALLOCATABLE, DIMENSION(:) :: xcs32f
+      DOUBLE PRECISION timer_start, timer_end, timer_module_start, timer_module_end
+      CALL CPU_TIME(timer_start)
       lhaveImage_ = .FALSE.
       lhaveXCs_ = .FALSE.
       IF (.NOT.linit_) THEN
@@ -305,7 +313,8 @@ MODULE XCLOC
          RETURN
       ENDIF
       ! Compute the correlograms.
-      IF (signalMigrationType_ == XCLOC_MIGRATE_PHASE_XCS) THEN
+      CALL CPU_TIME(timer_module_start)
+      IF (xcTypeToMigrate_ == XCLOC_MIGRATE_PHASE_XCS) THEN
          CALL xcloc_fdxc_computePhaseCorrelograms(ierr)
       ELSE
          CALL xcloc_fdxc_computeCrossCorrelograms(ierr)
@@ -315,7 +324,11 @@ MODULE XCLOC
          ierr = 1
          RETURN
       ENDIF
+      CALL CPU_TIME(timer_module_end)
       lhaveXCs_ = .TRUE.
+      IF (verbose_ > XCLOC_PRINT_WARNINGS) &
+      WRITE(OUTPUT_UNIT,905) timer_module_end - timer_module_start
+      CALL CPU_TIME(timer_module_start)
       ! Get the correlograms, filter them, and set the filters xcs on the DSM module 
       IF (precision_ == XCLOC_SINGLE_PRECISION) THEN
          ALLOCATE(xcs32f(nxcs_*nptsInXCs_))
@@ -353,6 +366,10 @@ MODULE XCLOC
          ierr = 1
          RETURN
       ENDIF
+      CALL CPU_TIME(timer_module_end)
+      IF (verbose_ > XCLOC_PRINT_WARNINGS) &
+      WRITE(OUTPUT_UNIT,910) timer_module_end - timer_module_start
+      CALL CPU_TIME(timer_module_start)
       ! Migrate the signals.
       CALL xcloc_dsmxc_compute(ierr)
       IF (ierr /= 0) THEN
@@ -361,6 +378,12 @@ MODULE XCLOC
          RETURN
       ENDIF 
       lhaveImage_ = .TRUE.
+      IF (verbose_ > XCLOC_PRINT_WARNINGS) THEN
+         CALL CPU_TIME(timer_module_end)
+         timer_end = timer_module_end
+         WRITE(OUTPUT_UNIT,915) timer_module_end - timer_module_start
+         WRITE(OUTPUT_UNIT,920) timer_end - timer_start
+      ENDIF
   850 FORMAT('xcloc_compute: Module not initialized')
   855 FORMAT('xcloc_compute: Signals not yet set')
   860 FORMAT('xcloc_compute: Travel time tables not yet set')
@@ -369,6 +392,10 @@ MODULE XCLOC
   875 FORMAT('xcloc_compute: Failed to process correlograms')
   880 FORMAT('xcloc_compute: Failed to get correlograms')
   885 FORMAT('xcloc_compute: Failed to compute image')
+  905 FORMAT('xcloc_compute: Correlogram computation time=', F8.4, 's')
+  910 FORMAT('xcloc_compute: Correlogram processing time=', F8.4, 's')
+  915 FORMAT('xcloc_compute: Correlogram migration time=', F8.4, 's')
+  920 FORMAT('xcloc_compute: Total xcloc computation time=', F8.4, 's')
       RETURN
       END
 !                                                                                        !
@@ -440,6 +467,81 @@ MODULE XCLOC
 !                                                                                        !
 !========================================================================================!
 !                                                                                        !
+!>    @brief Gets the number of grid points in the DSM image.
+!>    @param[out] ngrd   The number of grid points in the image.
+!>    @param[out] ierr   0 indicates success.
+!>    @ingroup xcloc_xcloc
+      SUBROUTINE xcloc_getNumberOfGridPointsInImage(ngrd, ierr) &
+      BIND(C, NAME='xcloc_getNumberOfGridPointsInImage')
+      INTEGER(C_INT), INTENT(OUT) :: ngrd, ierr
+      ierr = 0
+      CALL xcloc_dsmxc_getNumberOGridPointsInTable(ngrd)
+      IF (ngrd < 1) THEN
+         WRITE(ERROR_UNIT,900)
+         ierr = 1
+      ENDIF
+  900 FORMAT('xcloc_getNumberOfGridPointsInImage: No grid points in image')
+      RETURN
+      END 
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Gets the diffraction stack migration image of the correlograms.
+!>    @param[in] nwork   Size of image.
+!>    @param[out] image  This contains the DSM image.  This is an array of dimension
+!>                       [nwork] but only the first ngrd_ points are accessed. 
+!>    @param[out] ierr   0 indicates success.
+!>    @ingroup xcloc_xcloc 
+      SUBROUTINE xcloc_getImage64f(nwork, image, ierr) &
+      BIND(C, NAME='xcloc_getImage64f')
+      INTEGER(C_INT), VALUE, INTENT(IN) :: nwork
+      REAL(C_DOUBLE), INTENT(OUT) :: image(nwork)
+      INTEGER(C_INT), INTENT(OUT) :: ierr
+      IF (.NOT.lhaveImage_) THEN
+         WRITE(ERROR_UNIT,900)
+         ierr = 1
+         RETURN
+      ENDIF
+      CALL xcloc_dsmxc_getImage64f(nwork, image, ierr)
+      IF (ierr /= 0) THEN
+         WRITE(ERROR_UNIT,905)
+         ierr = 1
+      ENDIF
+  900 FORMAT('xcloc_getImage64f: dsm image not yet computed')
+  905 FORMAT('xcloc_getImage64f: Failed to get dsm image')
+      RETURN
+      END 
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Gets the diffraction stack migration image of the correlograms.
+!>    @param[in] nwork   Size of image.
+!>    @param[out] image  This contains the DSM image.  This is an array of dimension
+!>                       [nwork] but only the first ngrd_ points are accessed. 
+!>    @param[out] ierr   0 indicates success.
+!>    @ingroup xcloc_xcloc 
+      SUBROUTINE xcloc_getImage32f(nwork, image, ierr) &
+      BIND(C, NAME='xcloc_getImage32f')
+      INTEGER(C_INT), VALUE, INTENT(IN) :: nwork
+      REAL(C_FLOAT), INTENT(OUT) :: image(nwork)
+      INTEGER(C_INT), INTENT(OUT) :: ierr
+      IF (.NOT.lhaveImage_) THEN
+         WRITE(ERROR_UNIT,900)
+         ierr = 1
+         RETURN
+      ENDIF
+      CALL xcloc_dsmxc_getImage32f(nwork, image, ierr)
+      IF (ierr /= 0) THEN
+         WRITE(ERROR_UNIT,905)
+         ierr = 1
+      ENDIF
+  900 FORMAT('xcloc_getImage32f: dsm image not yet computed')
+  905 FORMAT('xcloc_getImage32f: Failed to get dsm image')
+      RETURN
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
 !>    @brief Releases memory on the xcloc module.
 !>    @ingroup xcloc_xcloc
       SUBROUTINE xcloc_finalize() &
@@ -450,7 +552,7 @@ MODULE XCLOC
       nxcs_ = 0
       nptsInXCs_ = 0
       ngrd_ = 0
-      signalMigrationType_ = XCLOC_MIGRATE_PHASE_XCS
+      xcTypeToMigrate_ = XCLOC_MIGRATE_PHASE_XCS
       precision_ = XCLOC_SINGLE_PRECISION
       verbose_ = XCLOC_PRINT_WARNINGS
       lhaveSignals_ = .FALSE.

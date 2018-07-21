@@ -27,7 +27,7 @@ int acousticGreens2D_computeGreensLineSource(
     const double *__restrict__ stf,
     double *__restrict__ G);
 int acousticGreens2D_computeLineSourceFD(
-    const bool lverb,
+    //const bool lverb,
     const double vel,
     const double rho,
     const double Q,
