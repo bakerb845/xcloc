@@ -74,7 +74,7 @@ int test_serial_dsmLocation(void)
     double dx = (x1 - x0)/(double) (nx - 1); // should be less than 2m
     double dy = (y1 - y0)/(double) (ny - 1); // should be less than 2m
     double dz = 0.0;
-    int i, ierr, it;
+    int i, ierr, is, it;
     // Set the receiver location to the center of the model
     const int nsrc = 2; 
     const double srcScale[2] = {1, 1.1};
@@ -180,6 +180,26 @@ fclose(fl);
     float *image = (float *) calloc((size_t) ngrd, sizeof(float));
     xcloc_dsmxc_getImage32f(ngrd, image, &ierr);
     CHKERR(ierr, "failed to get image");
+    float maxValue;
+    int maxIndex;
+    xcloc_dsmxc_getImageMax(&maxIndex, &maxValue, &ierr);
+    CHKERR(ierr, "failed to get image max");
+    maxIndex = maxIndex - 1; // Fortran to C
+    bool lfound = false;
+    for (is=0; is<nsrc; is++) 
+    {
+        int ixs = (int) ((xs[3*is+0] - x0)/dx + 0.5); 
+        int iys = (int) ((xs[3*is+1] - y0)/dy + 0.5);
+        if (iys*nx + ixs == maxIndex){lfound = true;}
+        fprintf(stdout, "%s: (maxIndex,trueIndex)=(%d,%d) has value %f\n",
+                __func__, maxIndex, iys*nx + ixs, image[iys*nx+ixs]);
+    }
+    if (!lfound)
+    {
+        fprintf(stderr, "%s: Failed to find a source in image\n", __func__);
+        return EXIT_FAILURE;
+    }
+/*
 printf("src1: %f %f\n", xs[0], xs[1]);
 printf("src2: %f %f\n", xs[3], xs[4]);
 FILE *ftemp = fopen("dsm2d.txt", "w");
@@ -192,6 +212,7 @@ for (int iy=0; iy<ny; iy++)
  fprintf(ftemp, "\n");
 }
 fclose(ftemp);
+*/
     free(image);
     // Free memory
     xcloc_fdxc_finalize();

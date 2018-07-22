@@ -51,6 +51,8 @@ MODULE XCLOC_DSMXC
       INTEGER, PRIVATE, SAVE :: verbose_ = XCLOC_PRINT_WARNINGS
       !> Flag indicating that all tables are set.
       LOGICAL, PRIVATE, SAVE :: lhaveAllTables_ = .FALSE.
+      !> Flag indicating that the image has been computed.
+      LOGICAL, PRIVATE, SAVE :: lhaveImage_ = .FALSE.
       !> A tuning parameter that can improve performance by emphasizing cache coherency.
       INTEGER, PRIVATE, SAVE :: blockSize_ = XCLOC_DEFAULT_BLOCKSIZE 
       !> The data alignment.
@@ -193,6 +195,7 @@ MODULE XCLOC_DSMXC
       dataOffset_ = 0 
       verbose_ = XCLOC_PRINT_WARNINGS
       lhaveAllTables_ = .FALSE.
+      lhaveImage_ = .FALSE.
       blockSize_ = XCLOC_DEFAULT_BLOCKSIZE
       RETURN
       END
@@ -234,6 +237,31 @@ MODULE XCLOC_DSMXC
 !                                                                                        !
 !========================================================================================!
 !                                                                                        !
+!>    @brief Gets the maximum value of the image.  
+!>    @param[out] maxIndex  The index of the maximum.  This is Fortran indexed.
+!>    @param[out] maxValue  Maximum value corresponding the maxIndex.
+!>    @param[out] ierr      0 indicates success.
+!>    @ingroup dsmxc
+      SUBROUTINE xcloc_dsmxc_getImageMax(maxIndex, maxValue, ierr) &
+      BIND(C, NAME='xcloc_dsmxc_getImageMax')
+      REAL(C_FLOAT), INTENT(OUT) :: maxValue
+      INTEGER(C_INT), INTENT(OUT) :: maxIndex, ierr
+      ierr = 0
+      maxIndex = 1
+      maxValue = 0.0
+      IF (.NOT.lhaveImage_) THEN
+         WRITE(ERROR_UNIT,900)
+         ierr = 1
+         RETURN
+      ENDIF
+      maxIndex = MAXLOC(image32f_(1:ngrd_), 1)
+      maxValue = image32f_(maxIndex)      
+  900 FORMAT('xcloc_dsmxc_getImageMax: Image not yet computed')
+      RETURN
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
 !>    @brief Gets a pointer to the migration image.
 !>    @param[out] imagePtr  A pointer to the image. 
 !>    @param[out] ierr      0 indicates success.
@@ -242,13 +270,12 @@ MODULE XCLOC_DSMXC
       REAL(C_FLOAT), CONTIGUOUS, POINTER, DIMENSION(:), INTENT(OUT) :: imagePtr
       INTEGER(C_INT), INTENT(OUT) :: ierr
       ierr = 0
-      IF (ngrd_ < 1) THEN
+      IF (.NOT.lhaveImage_) THEN
          WRITE(ERROR_UNIT,900)
-         NULLIFY(imagePtr)
-         ierr = 1
+         ierr = 1 
       ENDIF
       imagePtr(1:ngrd_) => image32f_(1:ngrd_)
-  900 FORMAT('xcloc_dsmxc_getImagePtr: ngrd_ is zero - check initialization')
+  900 FORMAT('xcloc_dsmxc_getImagPtr: Image not yet computed')
       RETURN
       END
 !                                                                                        !
@@ -267,13 +294,19 @@ MODULE XCLOC_DSMXC
       REAL(C_DOUBLE), INTENT(OUT) :: image(nwork)
       INTEGER(C_INT), INTENT(OUT) :: ierr
       ierr = 0
+      IF (.NOT.lhaveImage_) THEN
+         WRITE(ERROR_UNIT,900)
+         ierr = 1 
+         RETURN
+      ENDIF
       IF (nwork < ngrd_) THEN
-         WRITE(ERROR_UNIT,900) nwork, ngrd_
+         WRITE(ERROR_UNIT,905) nwork, ngrd_
          ierr = 1
          RETURN
       ENDIF
       image(1:ngrd_) = DBLE(image32f_(1:ngrd_))
-  900 FORMAT('xcloc_dsmxc_getImage64f: nwork=', I6, ' must be at least ngrd_=', I6)
+  900 FORMAT('xcloc_dsmxc_getImage64f: Image not yet computed')
+  905 FORMAT('xcloc_dsmxc_getImage64f: nwork=', I6, ' must be at least ngrd_=', I6)
       RETURN
       END
 !>    Gets the diffraction stack migration image of the correlograms from the module.
@@ -288,13 +321,19 @@ MODULE XCLOC_DSMXC
       REAL(C_FLOAT), INTENT(OUT) :: image(nwork)
       INTEGER(C_INT), INTENT(OUT) :: ierr
       ierr = 0
+      IF (.NOT.lhaveImage_) THEN
+         WRITE(ERROR_UNIT,900)
+         ierr = 1
+         RETURN
+      ENDIF
       IF (nwork < ngrd_) THEN
-         WRITE(ERROR_UNIT,900) nwork, ngrd_
+         WRITE(ERROR_UNIT,905) nwork, ngrd_
          ierr = 1
          RETURN
       ENDIF
       image(1:ngrd_) = image32f_(1:ngrd_)
-  900 FORMAT('xcloc_dsmxc_getImage32f: nwork=', I6, ' must be at least ngrd_=', I6)
+  900 FORMAT('xcloc_dsmxc_getImage32f: Image not yet computed')
+  905 FORMAT('xcloc_dsmxc_getImage32f: nwork=', I6, ' must be at least ngrd_=', I6)
       RETURN
       END
 !                                                                                        !
@@ -630,6 +669,7 @@ MODULE XCLOC_DSMXC
       REAL(C_FLOAT), CONTIGUOUS, POINTER :: xcPtr32f(:)
       ! This would be problematic if all tables aren't set
       ierr = 0
+      lhaveImage_ = .FALSE.
       IF (.NOT.lhaveAllTables_) WRITE(OUTPUT_UNIT,905)
   905 FORMAT('xcloc_dsmxc_compute: Only a subset of tables were set')
       ! Compute
@@ -671,6 +711,7 @@ MODULE XCLOC_DSMXC
          ENDDO
          NULLIFY(imagePtr32f)
       ENDDO
+      lhaveImage_ = .TRUE.
       RETURN
       END
 !                                                                                        !

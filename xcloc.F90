@@ -1,5 +1,5 @@
 !> @defgroup xcloc xcloc
-!> @brief The xcloc serial library.
+!> @brief The serial xcloc library.
 !> @author Ben Baker 
 !> @copyright Ben Baker distributed under the MIT license.
 
@@ -58,7 +58,7 @@ MODULE XCLOC
       CONTAINS
 !========================================================================================!
 !                                     Begin the Code                                     !
-!========================================================================================! 
+!========================================================================================!
 !>    @brief Initializes xcloc.
 !>    @param[in] npts      Number of points in input signals.
 !>    @param[in] nptsPad   A tuning parameter to mitigate DFT lengths that could
@@ -483,6 +483,35 @@ MODULE XCLOC
   900 FORMAT('xcloc_getNumberOfGridPointsInImage: No grid points in image')
       RETURN
       END 
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Gets the maximum value of the image.
+!>    @param[out] maxIndex  The index of the maximum.  This is Fortran indexed.
+!>    @param[out] maxValue  Maximum value corresponding the maxIndex.
+!>    @param[out] ierr      0 indicates success.
+!>    @ingroup xcloc_xcloc 
+      SUBROUTINE xcloc_getImageMax(maxIndex, maxValue, ierr) &
+      BIND(C, NAME='xcloc_getImageMax')
+      REAL(C_FLOAT), INTENT(OUT) :: maxValue
+      INTEGER(C_INT), INTENT(OUT) :: maxIndex, ierr
+      ierr = 0
+      maxIndex = 1
+      maxValue = 0.0
+      IF (.NOT.lhaveImage_) THEN
+         WRITE(ERROR_UNIT,900)
+         ierr = 1
+         RETURN
+      ENDIF
+      CALL xcloc_dsmxc_getImageMax(maxIndex, maxValue, ierr)
+      IF (ierr /= 0) THEN
+         WRITE(ERROR_UNIT,905)
+         ierr = 1
+      ENDIF 
+  900 FORMAT('xcloc_getImageMax: Image not yet computed')
+  905 FORMAT('xcloc_getImageMax: Failed to get max of image')
+      RETURN
+      END
 !                                                                                        !
 !========================================================================================!
 !                                                                                        !

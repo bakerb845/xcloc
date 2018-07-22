@@ -46,6 +46,8 @@ void xcloc_dsmxc_getImage64f(const int nwork,
 void xcloc_dsmxc_getImage32f(const int nwork, 
                              float image[],
                              int *ierr);
+/* Get maximum of image. */
+void xcloc_dsmxc_getImageMax(int *maxIndex, float *maxValue, int *ierr);
 /* Maps from the signal in the xcPairs table to the */
 void xcloc_dsmxc_signalToTableIndex(const int is, int *it, int *ierr);
 /* Sets a travel time table. */
