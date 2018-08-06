@@ -41,6 +41,13 @@ int main(int argc, char *argv[])
             fprintf(stderr, "%s: Failed serial dsm test!\n", __func__);
             goto BCAST_ERROR_1;
         }
+        fprintf(stdout, "%s: Performing serial xcloc tests...\n", __func__);
+        ierr = test_serial_xcloc();
+        if (ierr != EXIT_SUCCESS)
+        {
+            fprintf(stderr, "%s: FAiled serial xcloc test!\n", __func__);
+            goto BCAST_ERROR_1;
+        } 
     }
 BCAST_ERROR_1:;
 #ifdef XCLOC_USE_MPI

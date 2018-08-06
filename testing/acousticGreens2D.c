@@ -19,6 +19,83 @@
 #endif
 
 /*!
+ * @brief Driver routine for computing Greens functions that have been
+ *        convolved with a Ricker wavelet.  If multiple sources are
+ *        present then they will be stacked into the signal.
+ * @param[in] nsrc      Number of sources.
+ * @param[in] nrec      Number of receivers.
+ * @param[in] nptsSig   Number of points in signal.
+ * @param[in] fcent     Center frequency (Hz) of Ricker wavelet.
+ * @param[in] dt        Sampling period.
+ * @param[in] lnorm     If true then normalize the Ricker wavelet by the
+ *                      square root of the energy in the signal.
+ * @param[in] lshift    If true then shift the Ricker wavelet to the start
+ *                      of the trace.
+ * @param[in] vel       Model velocity (m/s).
+ * @param[in] rho       Model mensity (kg/m**3).
+ * @param[in] Q         Quality factor of model.
+ * @param[in] srcScale  Magnitude of each source.  This is an array of
+ *                      dimension [nsrc].
+ * @param[in] xs        Source locations (m).  This is a [nsrc x 3] matrix
+ *                      stroed in row major format.  Each row is a (x,y,z)
+ *                      triplet.
+ * @param[in] xr        Receiver locations (m).  This is a [nrec x 3] matrix
+ *                      stored in row major format.  Each row is a (x,y,z)
+ *                      triplet.
+ * @param[out] obsOut   Synthetic seismograms.  This is a [nrec x nptsSig]
+ *                      matrix stored in row major order.
+ * @result 0 indicates success.
+ */
+int acousticGreens2D_computeGreensFunctions(
+    const int nsrc, const int nrec, const int nptsSig,
+    const double fcent, const double dt,
+    const bool lnorm, const bool lshift,
+    const double vel, const double rho,
+    const double Q,
+    const double srcScale[],
+    const double xs[],
+    const double xr[],
+    double **obsOut)
+{
+    double *obs, *obsTemp, *stf;
+    int ierr, isrc, k;
+    // Compute the Green's functions using a Ricker wavelet
+    fprintf(stdout, "%s: Computing Ricker wavelet...\n", __func__);
+    stf = (double *) calloc((size_t) nptsSig, sizeof(double));
+    ierr = acousticGreens2D_computeRickerWavelet(nptsSig, dt, fcent,
+                                                 lnorm, lshift, stf);
+    if (ierr != 0)
+    {
+        fprintf(stderr, "%s: Failed to compute ricker wavelet\n", __func__);
+        return EXIT_FAILURE;
+    }
+    fprintf(stdout, "%s: Computing synthetics...\n", __func__);
+    obsTemp = (double *) calloc((size_t) (nptsSig*nrec), sizeof(double));
+    obs  = (double *) calloc((size_t) (nptsSig*nrec), sizeof(double));
+    for (isrc=0; isrc<nsrc; isrc++)
+    {
+        ierr = acousticGreens2D_computeGreensLineSource(nrec, vel, rho, Q,
+                                                        nptsSig, dt,
+                                                        &xs[3*isrc], xr,
+                                                        stf, obsTemp);
+        if (ierr != 0)
+        {
+            fprintf(stderr, "%s: Error computing line source greens fns\n",
+                    __func__);
+            return -1;
+        }
+        for (k=0; k<nptsSig*nrec; k++)
+        {
+            obs[k] = obs[k] + srcScale[isrc]*obsTemp[k];
+        }
+        //ippsAddProductC_64f(obsTemp, srcScale[isrc], obs, nptsSig*nrec);
+    }
+    free(stf);
+    free(obsTemp);
+    *obsOut = obs;
+    return EXIT_SUCCESS;
+}
+/*!
  * @brief Computes a ricker wavelet.
  *
  * @param[in] npts      Number of points in signal. 
@@ -271,4 +348,44 @@ int acousticGreens2D_computeLineSourceFD(
         //for (i=0; i<nomega; i++){G[i] = stf[i]*G[i];}
     }
     return EXIT_SUCCESS;
+}
+/*!
+ * @brief Randomly places receivers in a 3D model for use by the 
+ *        acoustic2D Green's functions calculators.
+ * @param[in] nrec  Number of receivers.
+ * @param[in] x0    Origin of model in x (m).
+ * @param[in] x1    End of model in x (m).
+ * @param[in] y0    Origin of model in y (m).
+ * @param[in] y1    End of model in y (m).
+ * @param[in] z0    Origin of model in z (m).
+ * @param[in] z1    End of model in z (m).
+ * @param[out] xr   The randomly placed receiver positions.  This is 
+ *                  a matrix of dimension [nrec x 3] in row major format
+ *                  where each row is an (x,y,z) triplet.
+ * @result 0 indicates success.
+ */
+int acousticGreens2D_computeRandomReceiverLocations(
+    const int nrec,
+    const double x0, const double y0, const double z0,
+    const double x1, const double y1, const double z1,
+    double *xr)
+{
+    double dx, dy, dz;
+    int irec;
+    dx = 0.0;
+    dy = 0.0;
+    dz = 0.0;
+    if (fabs(x1 - x0) > 1.e-8){dx = fabs(x1 - x0);}
+    if (fabs(y1 - y0) > 1.e-8){dy = fabs(y1 - y0);}
+    if (fabs(z1 - z0) > 1.e-8){dz = fabs(z1 - z0);}
+    for (irec=0; irec<nrec; irec++)
+    {
+        xr[3*irec+0] = x0;
+        xr[3*irec+1] = y0;
+        xr[3*irec+2] = z0;
+        xr[3*irec+0] = ((double) rand()/RAND_MAX)*dx;
+        xr[3*irec+1] = ((double) rand()/RAND_MAX)*dy;
+        xr[3*irec+2] = ((double) rand()/RAND_MAX)*dz;
+    }
+    return 0;
 }

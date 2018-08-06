@@ -17,12 +17,12 @@ int computeTravelTimeTable(const int nx, const int ny, const int nz,
                            const double dx, const double dy, const double dz, 
                            double xr, double yr, double zr, 
                            double ttable[]);
+/*
 static
 int computeRandomReceiverLocations(const int nrec,
                                    const double x0, const double y0, const double z0, 
                                    const double x1, const double y1, const double z1, 
                                    double *xr);
-
 static
 int compute2DGreensFunctions(const int nsrc, const int nrec, const int nptsSig,
                              const double fcent, const double dt, 
@@ -34,6 +34,8 @@ int compute2DGreensFunctions(const int nsrc, const int nrec, const int nptsSig,
                              const double xs[],
                              const double xr[],
                              double **obsOut);
+*/
+
 #ifndef CHKERR
 #define CHKERR(ierr, msg) \
 { \
@@ -52,7 +54,7 @@ int test_serial_dsmLocation(void)
     double fcent = 400.0;  // Dominant resolution is vmin/fcent ~ 5.0m (for plotting)
     bool lnorm = false;     // Don't normalize ricker wavelet (max will be 1)
     bool lshift = true;     // Make wavelet start at time 0 
-    const double pct = 8.0;  // 8 pct taper
+    //const double pct = 8.0;  // 8 pct taper
     double x0 = 0.0;    // Model origin in x is 0 km 
     double x1 = 1000.0; // Model extent in x is 1 km
     double y0 = 0.0;    // Model origin in y is 0 km
@@ -86,20 +88,21 @@ int test_serial_dsmLocation(void)
                     z0};
     double *xr = NULL;
     double *obs = NULL;
-    xr = (double *) calloc((size_t) (3*nrec), sizeof(double));
-    ierr = computeRandomReceiverLocations(nrec,
-                                          x0, y0, z0,
-                                          x1, y1, z1,
-                                          xr);
-    CHKERR(ierr, "failed making receiver locations");
     // Scatter the receivers
-    ierr = compute2DGreensFunctions(nsrc, nrec, nptsSig,
-                                    fcent, dt, 
-                                    lnorm, lshift,
-                                    vel, rho,
-                                    Q, pct,
-                                    srcScale, xs, xr,
-                                    &obs);
+    xr = (double *) calloc((size_t) (3*nrec), sizeof(double));
+    ierr = acousticGreens2D_computeRandomReceiverLocations(nrec,
+                                                           x0, y0, z0,
+                                                           x1, y1, z1,
+                                                           xr);
+    CHKERR(ierr, "failed making receiver locations");
+    // Compute the greens functions
+    ierr = acousticGreens2D_computeGreensFunctions(nsrc, nrec, nptsSig,
+                                                   fcent, dt,
+                                                   lnorm, lshift,
+                                                   vel, rho,
+                                                   Q,
+                                                   srcScale, xs, xr,
+                                                   &obs);
     CHKERR(ierr, "failed computing acoustic greens fns");
     //------------------------Compute the correlograms -----------------------//
     fprintf(stdout, "%s: Computing correlograms...\n", __func__); 
@@ -309,6 +312,7 @@ double gaussianCorrelogram(const int nptsInXC,
     return 0;
 }
 
+/*
 int computeRandomReceiverLocations(const int nrec,
                                    const double x0, const double y0, const double z0,
                                    const double x1, const double y1, const double z1,
@@ -383,3 +387,4 @@ int compute2DGreensFunctions(const int nsrc, const int nrec, const int nptsSig,
     *obsOut = obs;
     return EXIT_SUCCESS;
 }
+*/

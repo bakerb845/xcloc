@@ -81,6 +81,7 @@ SET(TEST_SRC
     testing/serialTest.c
     testing/serialLocationTest.c
     testing/acousticGreens2D.c
+    testing/xclocTest.c
     testing/iscl_hack.c)
 IF (XCLOC_USE_MPI)
    SET(TEST_SRC ${TEST_SRC} testing/parallelTest.c)
