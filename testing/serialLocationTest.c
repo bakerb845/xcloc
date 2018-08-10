@@ -10,6 +10,7 @@
 #define M_PI 3.14159265358979323846
 #endif
 
+/*
 static
 int computeTravelTimeTable(const int nx, const int ny, const int nz, 
                            const double vel,
@@ -17,6 +18,7 @@ int computeTravelTimeTable(const int nx, const int ny, const int nz,
                            const double dx, const double dy, const double dz, 
                            double xr, double yr, double zr, 
                            double ttable[]);
+*/
 /*
 static
 int computeRandomReceiverLocations(const int nrec,
@@ -169,8 +171,10 @@ fclose(fl);
     double *ttable = (double *) calloc((size_t) ngrd, sizeof(double));
     for (i=0; i<nrec; i++)
     {
-        computeTravelTimeTable(nx, ny, nz, vel, x0, y0, z0, dx, dy, dz,
-                               xr[3*i], xr[3*i+1], xr[3*i+2], ttable);
+        acousticGreens2D_computeTravelTimeTable(nx, ny, nz,
+                                                vel, x0, y0, z0, dx, dy, dz,
+                                                xr[3*i], xr[3*i+1], xr[3*i+2],
+                                                ttable);
         xcloc_dsmxc_signalToTableIndex(i+1, &it, &ierr);
         xcloc_dsmxc_setTable64f(it, ngrd, ttable, &ierr);
     } 
@@ -230,6 +234,7 @@ fclose(ftemp);
     return EXIT_SUCCESS;
 }
 
+/*
 int computeTravelTimeTable(const int nx, const int ny, const int nz,
                            const double vel,
                            const double x0, const double y0, const double z0,
@@ -261,6 +266,7 @@ int computeTravelTimeTable(const int nx, const int ny, const int nz,
     }
     return 0;
 }
+*/
 
 double computeTravelTimesToReceivers(const int nrec,
                                      const double vel,

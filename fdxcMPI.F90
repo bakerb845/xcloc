@@ -33,7 +33,7 @@ MODULE XCLOC_FDXC_MPI
       INTEGER, PRIVATE, SAVE :: root_ = 0
       !> Number of processes on the communicator.
       INTEGER, PRIVATE, SAVE :: nprocs_ = 0
-      !> My rank on the process.
+      !> My rank on the communicator.
       INTEGER, PRIVATE, SAVE :: myid_ = MPI_UNDEFINED
       !> A list of each processes list of unique signals global signal IDs.
       INTEGER, PRIVATE, ALLOCATABLE, SAVE :: uniqueGlobalSignalIDs_(:)

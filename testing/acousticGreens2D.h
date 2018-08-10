@@ -51,6 +51,13 @@ int acousticGreens2D_computeLineSourceFD(
     const double *__restrict__ omega,
     const double complex *__restrict__ stf,
     double complex *__restrict__ G);
+int acousticGreens2D_computeTravelTimeTable(
+    const int nx, const int ny, const int nz, 
+    const double vel,
+    const double x0, const double y0, const double z0, 
+    const double dx, const double dy, const double dz, 
+    double xr, double yr, double zr, 
+    double ttable[]);
 
 #ifdef __cplusplus
 }

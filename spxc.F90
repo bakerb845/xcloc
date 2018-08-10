@@ -594,7 +594,7 @@ MODULE XCLOC_SPXC
 !========================================================================================!
 !                              Private functions                                         !
 !========================================================================================!
-!>    @brief computes the sinc(x) = sin(x)/(pi*x)
+!>    @brief Computes \f$ sinc(x) = \frac{\sin(x)}{\pi x} \f$.
 !>    @param[in] n    Length of vector x.
 !>    @param[in] x    Dependent variable at which to compute sinc.
 !>    @param[out] sc  sinc(x).

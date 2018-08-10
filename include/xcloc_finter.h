@@ -9,6 +9,53 @@ extern "C"
 {
 #endif
 
+
+/*----------------------------------------------------------------------------*/
+/*                                    xcloc                                   */
+/*----------------------------------------------------------------------------*/
+/* Initializes xcloc */
+void xcloc_initialize(const int npts, const int nptsPad, const int nxcs,
+                      const enum xclocMigrateXC_enum s2m,
+                      const double dt, const int ngrd,
+                      const int nfcoeffs,
+                      const enum xclocXCFilterType_enum ftype,
+                      const int xcPairs[],
+                      const enum xclocXCVerbose_enum verbose,
+                      const enum xclocPrecision_enum precision,
+                      const enum xclocAccuracy_enum accuracy,
+                      int *ierr);
+/* Finalizes the module. */
+void xcloc_finalize(void);
+/* Gets the travel time table corresponding to the signal index. */
+void xcloc_signalToTableIndex(const int is, int *it, int *ierr);
+/* Sets the travel time table. */
+void xcloc_setTable64f(const int tableNumber, const int ngrd,
+                       const double table[], int *ierr);
+void xcloc_setTable32f(const int tableNumber, const int ngrd,
+                       const float table[], int *ierr);
+/* Sets the signals to correlate. */
+void xcloc_setSignals64f(const int ldx, const int npts, const int nsignals,
+                         const double x[], int *ierr);
+void xcloc_setSignals32f(const int ldx, const int npts, const int nsignals,
+                         const float x[], int *ierr);
+/* Gets the migrated image. */
+void xcloc_getImage64f(const int nwork, const double image[], int *ierr);
+void xcloc_getImage32f(const int nwork, const float image[], int *ierr);
+/* Convenience utility to get the max of the image. */
+void xcloc_getImageMax(int *imageMax, float *maxValue, int *ierr);
+/* Sets the filter to apply to the correlograms. */
+void xcloc_setXCFilter(const int nfcoeffs,
+                       const enum xclocXCFilterType_enum ftype,
+                       int *ierr);
+/* Sets the type of correlogram to migrate. */
+void xcloc_setXCTypeToMigrate(const  enum xclocMigrateXC_enum,
+                              int *ierr);
+/* Performs cross-correlations and computes the xcloc image. */
+void xcloc_compute(int *ierr);
+/* Gets the number of grid points in the image. */
+void xcloc_getNumberOfGridPointsInImage(const int ngrd, int *ierr);
+
+
 /*----------------------------------------------------------------------------*/
 /*                            Convenience Utilities                           */
 /*----------------------------------------------------------------------------*/

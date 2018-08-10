@@ -389,3 +389,56 @@ int acousticGreens2D_computeRandomReceiverLocations(
     }
     return 0;
 }
+
+/*!
+ * @brief Computes the reciprocity travel time field in homogeneous medium.
+ * @param[in] nx       Number of x grid points.
+ * @param[in] ny       Number of y grid points.
+ * @param[in] nz       Number of z grid points.
+ * @param[in] vel      Constant velocity of model (m/s).
+ * @param[in] x0       x origin (m).
+ * @param[in] y0       y origin (m).
+ * @param[in] z0       z origin (m).
+ * @param[in] dx       x grid spacing (m).
+ * @param[in] dy       y grid spacing (m).
+ * @param[in] dz       z grid spacing (m).
+ * @param[in] xr       Receiver position in x (m).
+ * @param[in] yr       Receiver position in y (m).
+ * @param[in] zr       Receiver position in z (m).
+ * @param[out] ttable  Travel times (s) from the receiver at (xr,yr,zr) to
+ *                     all poitns in the medium.  This is an array of
+ *                     dimension [nz x ny x nx] with leading dimension nx.
+ * @result 0 indicates success.
+ */
+int acousticGreens2D_computeTravelTimeTable(
+    const int nx, const int ny, const int nz,
+    const double vel,
+    const double x0, const double y0, const double z0,
+    const double dx, const double dy, const double dz,
+    double xr, double yr, double zr,
+    double ttable[])
+{
+    double diff_x, diff_y, diff_z, dist2, slow, x, y, z;
+    int igrd, ix, iy, iz;
+    slow = 1.0/vel;
+    for (iz=0; iz<nz; iz++)
+    {
+        for (iy=0; iy<ny; iy++)
+        {
+            #pragma omp simd
+            for (ix=0; ix<nx; ix++)
+            {
+                x = x0 + (double) ix*dx;
+                y = y0 + (double) iy*dy;
+                z = z0 + (double) iz*dz;
+                diff_x = xr - x;
+                diff_y = yr - y;
+                diff_z = zr - z;
+                dist2 = diff_x*diff_x + diff_y*diff_y + diff_z*diff_z;
+                igrd = iz*nx*ny + iy*nx + ix;
+                ttable[igrd] = sqrt(dist2)*slow;
+            }
+        }
+    }
+    return 0;
+}

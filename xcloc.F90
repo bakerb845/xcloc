@@ -274,7 +274,7 @@ MODULE XCLOC
          RETURN
       ENDIF
       xcTypeToMigrate_ = xcTypeToMigrate
-  900 FORMAT('xcloc_setXCTypeToMigrate: Invalid type of xc signal type to migrate')
+  900 FORMAT('xcloc_setXCTypeToMigrate: Invalid type of xc signal to migrate')
       RETURN
       END
 !                                                                                        !

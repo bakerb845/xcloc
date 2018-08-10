@@ -8,6 +8,21 @@ MODULE XCLOC_IPPS
   INTEGER, PARAMETER :: ipp64f = 19
   INTEGER, PARAMETER :: ippStsNoErr = 0
   INTERFACE
+      !> @brief Gets the max of a float array.
+      !> @param[in] pSrc    Source array of which to compute max.
+      !> @param[in] n       Length of arrays.
+      !> @param[out] pMax   Max value of array.
+      !> @param[out] pIndx  Index at which the maximum was found.
+      !> @ingroup ipps
+      INTEGER(C_INT) FUNCTION ippsMaxIndx_32f(pSrc, n, pMax, pIndx) &
+      BIND(C, NAME='ippsMaxIndx_32f')
+      USE ISO_C_BINDING
+      IMPLICIT NONE
+      INTEGER(C_INT), VALUE, INTENT(IN) :: n
+      REAL(C_FLOAT), INTENT(IN) :: pSrc(n)
+      REAL(C_FLOAT), INTENT(OUT) :: pMax
+      INTEGER(C_INT), INTENT(OUT) :: pIndx
+      END FUNCTION
       !> @brief Converts a double array to a float array.
       !> @param[out] pSrc  Double precision source array.
       !> @param[in] pDst   Float precision copy of pSrc.
