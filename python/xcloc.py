@@ -86,6 +86,9 @@ class xcloc:
                                                   c_int, # nsignals
                                                   POINTER(c_double), # signals
                                                   POINTER(c_int)]
+        xcloc_lib.xcloc_getImageMax.argtypes = [POINTER(c_int), # Max index
+                                                POINTER(c_float), # Max value
+                                                POINTER(c_int)]
         xcloc_lib.xcloc_setSignals32f.argtypes = [c_int, # ldx
                                                   c_int, # npts
                                                   c_int, # nsignals
@@ -362,6 +365,30 @@ class xcloc:
             print("%s: Failed to get image"%fname)
             return None
         return grd
+
+    def getImageMax(self):
+        """!
+         @brief Gets the maximum value and index of the DSM image.
+                The max index is most likely to correspond to the event
+                location.
+         @retval The max index (C numbered) and max value of the DSM image.
+         @retval None, None indicates a failure.
+         @ingroup pyxcloc_xcloc
+        """
+        fname = '%s::%s'%(self.__class__.__name__, self.getImageMax.__name__)
+        if (not self.lhaveImage):
+            print("%s: DSM image not yet computed"%fname)
+            return None, None
+        maxIndex = c_int(1)
+        maxValue = c_float(1)
+        ierr = c_int(1)
+        self.lib.xcloc_getImageMax(maxIndex, maxValue, ierr)
+        if (ierr.value != 0):
+            print("%s: Failed to get max value and index of DSM image"%fname)
+            return None, None
+        imax = maxIndex.value - 1 # Fortran to C
+        vmax = maxValue.value
+        return imax, vmax
 
     def finalize(self):
         """!
