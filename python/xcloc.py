@@ -10,6 +10,7 @@ from ctypes import byref
 from ctypes import POINTER
 from numpy import zeros
 from numpy import array
+from numpy import unique
 from numpy import amax
 from numpy import amin
 from numpy import reshape
@@ -122,7 +123,8 @@ class xcloc:
         self.finalize()
         return
 
-    def initialize(self, dt, npts, nsignals, ngrd,
+    def initialize(self, dt, npts, ngrd,
+                   nsignals=None,
                    nptsPad=None,
                    xcPairs=None,
                    nfCoeff = 301,
@@ -169,6 +171,8 @@ class xcloc:
         if (npts < 1): 
             print("%s: npts=%d must be positive"%(fname, npts))
             return -1
+        if (not (xcPairs is None)):
+            nsignals = len(unique(xcPairs.flatten()))
         if (nsignals < 2): 
             print("%s: nsignals=%d must exceed 2"%(fname, nsignals))
             return -1
