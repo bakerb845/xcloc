@@ -26,6 +26,12 @@ int fft_rfftfreqs64f_work_hack(const int n, const double dt,
     isclReturnNullPointerError("freqs", freqs);
     isclReturnArrayTooSmallError("lenf", lenf, n/2+1);
 */
+    if (lenf < n/2+1)
+    {
+        fprintf(stderr, "%s: lenf=%d must be at least %d\n",
+                __func__, lenf, n/2+1);
+        return -1;
+    }
     if (dt <= 0.0)
     {
         fprintf(stderr, "%s: invalid sample spacing=%e!\n", __func__, dt);

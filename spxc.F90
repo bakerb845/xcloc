@@ -1,5 +1,6 @@
 !> @defgroup spxc Cross Correlogram Signals Processing
 !> @ingroup xcloc
+!> @ingroup xcloc_mpi
 !> @brief Performs some signals processing on the cross-correlograms.
 !> @author Ben Baker
 !> @copyright Ben Baker distributed under the MIT license.
@@ -10,51 +11,75 @@ MODULE XCLOC_SPXC
       USE XCLOC_UTILS
       USE XCLOC_IPPS
       IMPLICIT NONE
-
+      !> @ingroup spxc
       !> Sparse real Hilbert transform coefficients.
       REAL(C_DOUBLE), PRIVATE, ALLOCATABLE, SAVE :: sparseHfiltR64f_(:)
+      !> @ingroup spxc
       !> Sparse imaginary Hilbert transform coefficients.
       REAL(C_DOUBLE), PRIVATE, ALLOCATABLE, SAVE :: sparseHfiltI64f_(:)
+      !> @ingroup spxc
       !> Sparse real Hilbert transform coefficients for single precision.
       REAL(C_FLOAT), PRIVATE, ALLOCATABLE, SAVE :: sparseHfiltR32f_(:)
+      !> @ingroup spxc
       !> Sparse imaginary Hilbert transform coefficients for single precision.
       REAL(C_FLOAT), PRIVATE, ALLOCATABLE, SAVE :: sparseHfiltI32f_(:)
+      !> @ingroup spxc
       !> Real Hilbert transformer coefficients.
       REAL(C_DOUBLE), PRIVATE, ALLOCATABLE, SAVE :: hfiltR64f_(:)
+      !> @ingroup spxc
       !> Imaginary Hilbert transformer coefficients.
       REAL(C_DOUBLE), PRIVATE, ALLOCATABLE, SAVE :: hfiltI64f_(:)
+      !> @ingroup spxc
       !> Real Hilbert transformer coefficients for single precision.
       REAL(C_FLOAT), PRIVATE, ALLOCATABLE, SAVE :: hfiltR32f_(:)
+      !> @ingroup spxc
       !> Imaginary Hilbert transformer coefficients for single precision.
       REAL(C_FLOAT), PRIVATE, ALLOCATABLE, SAVE :: hfiltI32f_(:)
+      !> @ingroup spxc
       !> FIR averaging filter coefficients.
       REAL(C_DOUBLE), PRIVATE, ALLOCATABLE, SAVE :: rms64f_(:)
+      !> @ingroup spxc
       !> FIR averaging filter for single precision. 
       REAL(C_FLOAT), PRIVATE, ALLOCATABLE, SAVE :: rms32f_(:)
+      !> @ingroup spxc
       !> Non-zero indices (C indexed) of real FIR coefficients.
       INTEGER(C_INT), PRIVATE, ALLOCATABLE, SAVE :: nzReIndices_(:)
+      !> @ingroup spxc
       !> Non-zero indices (C indexed) of imaginary FIR coefficients.
       INTEGER(C_INT), PRIVATE, ALLOCATABLE, SAVE :: nzImIndices_(:)
       !!> Accuracy.
       !INTEGER(C_INT), PRIVATE, SAVE :: accuracy_ = XCLOC_HIGH_ACCURACY
+      !> @ingroup spxc
       !> Filtering type.
       INTEGER(C_INT), PRIVATE, SAVE :: ftype_ = XCLOC_SPXC_DONOT_FILTER
+      !> @ingroup spxc
       !> Number of filter coefficients.
       INTEGER(C_INT), PRIVATE, SAVE :: nCoeffs_ = 0
+      !> @ingroup spxc
       !> Number of real FIR coefficients (including zeros).
       INTEGER(C_INT), PRIVATE, SAVE :: nReCoeffs_ = 0
+      !> @ingroup spxc
       !> Number of imaginary FIR coefficients (including zeros).
       INTEGER(C_INT), PRIVATE, SAVE :: nImCoeffs_ = 0
+      !> @ingroup spxc
       !> Filter order.
       INTEGER(C_INT), PRIVATE, SAVE :: nOrder_ = 0
+      !> @ingroup spxc
       !> Number of non-zero real coefficients.
       INTEGER(C_INT), PRIVATE, SAVE :: nnzReCoeffs_ = 0
+      !> @ingroup spxc
       !> Number of non-zero imaginary coefficients.
       INTEGER(C_INT), PRIVATE, SAVE :: nnzImCoeffs_ = 0
+      !> @ingroup spxc
       !> If true then this is a Type III FIR filter and is sparse.
       LOGICAL, PRIVATE, SAVE :: lisTypeIII_ = .TRUE.
+      !> @ingroup spxc
       !> \f$ \pi \f$
       DOUBLE PRECISION, PARAMETER, PRIVATE :: pi = 3.14159265358979323846d0
+
+      !----------------------------------------------------------------------------------!
+      !                             Public/Private Subroutines                           !
+      !----------------------------------------------------------------------------------!
       PUBLIC :: xcloc_spxc_initialize
       PUBLIC :: xcloc_spxc_finalize
       PUBLIC :: xcloc_spxc_filterXCsInPlace64f
@@ -156,6 +181,7 @@ MODULE XCLOC_SPXC
 !>    @param[out] xcsFilt   Filtered correlograms.  This is an [ldxc x nxcs] matrix in
 !>                          column major format.
 !>    @param[out] ierr      0 indicates success.
+!>    @ingroup spxc
       SUBROUTINE xcloc_spxc_filterXCsOutOfPlace64f(ldxc, nptsInXCs, nxcs, &
                                                    xcs, xcsFilt, ierr)    &
       BIND(C, NAME='xcloc_spxc_filterXCsOutOfPlace64f')
@@ -182,6 +208,7 @@ MODULE XCLOC_SPXC
 !>    @param[out] xcsFilt   Filtered correlograms.  This is an [ldxc x nxcs] matrix in
 !>                          column major format.
 !>    @param[out] ierr      0 indicates success.
+!>    @ingroup spxc
       SUBROUTINE xcloc_spxc_filterXCsOutOfPlace32f(ldxc, nptsInXCs, nxcs, &
                                                    xcs, xcsFilt, ierr)    &
       BIND(C, NAME='xcloc_spxc_filterXCsOutOfPlace32f')
@@ -210,6 +237,7 @@ MODULE XCLOC_SPXC
 !>                          column major format.
 !>    @param[in,out] xcs    On exit these are the filtered correlograms.
 !>    @param[out] ierr      0 indicates success.
+!>    @ingroup spxc
       SUBROUTINE xcloc_spxc_filterXCsInPlace64f(ldxc, nptsInXCs, nxcs, &
                                                 xcs, ierr)             &
       BIND(C, NAME='xcloc_spxc_filterXCsInPlace64f')
@@ -258,6 +286,7 @@ MODULE XCLOC_SPXC
 !>                          column major format.
 !>    @param[in,out] xcs    On exit these are the filtered correlograms.
 !>    @param[out] ierr      0 indicates success.
+!>    @ingroup spxc
       SUBROUTINE xcloc_spxc_filterXCsInPlace32f(ldxc, nptsInXCs, nxcs, &
                                                 xcs, ierr)             &
       BIND(C, NAME='xcloc_spxc_filterXCsInPlace32f')
@@ -301,6 +330,7 @@ MODULE XCLOC_SPXC
 !========================================================================================!
 !                                                                                        !
 !>    @brief Releases memory and resets variables on the XC signals processing module.
+!>    @ingroup spxc
       SUBROUTINE xcloc_spxc_finalize( ) &
       BIND(C, NAME='xcloc_spxc_finalize')
       IF (ALLOCATED(rms64f_)) DEALLOCATE(rms64f_)
@@ -330,6 +360,7 @@ MODULE XCLOC_SPXC
 !                                                                                        !
 !>    @brief Designs the averaging coefficients for the RMS filter.
 !>    @param[out] ierr  0 indicates success.
+!>    @ingroup spxc
       SUBROUTINE xcloc_spxc_rmsFilter_design(ierr)
       INTEGER, INTENT(OUT) :: ierr
       ierr = 0
@@ -344,6 +375,7 @@ MODULE XCLOC_SPXC
 !                                                                                        !
 !>    @brief Designs the FIR Hilbert transformer.
 !>    @param[out] ierr 0 indicates success.
+!>    @ingroup spxc
       SUBROUTINE xcloc_spxc_envelope_design(ierr)
       INTEGER, INTENT(OUT) :: ierr
       DOUBLE PRECISION, ALLOCATABLE :: kaiser(:), sinct(:), t(:)
@@ -452,6 +484,7 @@ MODULE XCLOC_SPXC
 !>    @param[in,out] x     On exit the input is replaced by the the upper envelope of
 !>                         the data.
 !>    @param[out] ierr     0 indicates success.
+!>    @ingroup spxc
       SUBROUTINE xcloc_spxc_envelope_apply64f(lds, npts, nsignals, x, ierr)
       USE ISO_C_BINDING
       INTEGER, INTENT(IN) :: nsignals, lds, npts
@@ -492,6 +525,7 @@ MODULE XCLOC_SPXC
 !>    @param[in,out] x     On exit the input is replaced by the the upper envelope of
 !>                         the data.
 !>    @param[out] ierr     0 indicates success.
+!>    @ingroup spxc
       SUBROUTINE xcloc_spxc_envelope_apply32f(lds, npts, nsignals, x, ierr)
       USE ISO_C_BINDING
       INTEGER, INTENT(IN) :: nsignals, lds, npts
@@ -535,6 +569,7 @@ MODULE XCLOC_SPXC
 !>                         [lds x nsignals].
 !>    @param[in,out] x     On exit the input is replaced by the the RMS filtered data.
 !>    @param[out] ierr     0 indicates success.
+!>    @ingroup spxc
       SUBROUTINE xcloc_spxc_rmsFilter_apply64f(lds, npts, nsignals, x, ierr)
       USE ISO_C_BINDING
       INTEGER, INTENT(IN) :: nsignals, lds, npts
@@ -569,6 +604,7 @@ MODULE XCLOC_SPXC
 !>                         [lds x nsignals].
 !>    @param[in,out] x     On exit the input is replaced by the the RMS filtered data.
 !>    @param[out] ierr     0 indicates success.
+!>    @ingroup spxc
       SUBROUTINE xcloc_spxc_rmsFilter_apply32f(lds, npts, nsignals, x, ierr)
       USE ISO_C_BINDING
       INTEGER, INTENT(IN) :: nsignals, lds, npts
@@ -599,10 +635,11 @@ MODULE XCLOC_SPXC
 !========================================================================================!
 !                              Private functions                                         !
 !========================================================================================!
-!>    @brief Computes \f$ sinc(x) = \frac{\sin(x)}{\pi x} \f$.
+!>    @brief Computes \f$ \mathrm{sinc}(x) = \frac{\sin(x)}{\pi x} \f$.
 !>    @param[in] n    Length of vector x.
 !>    @param[in] x    Dependent variable at which to compute sinc.
 !>    @param[out] sc  sinc(x).
+!>    @ingroup spxc
       SUBROUTINE SINC(n, x, sc)
       INTEGER, INTENT(IN) :: n
       DOUBLE PRECISION, INTENT(IN) :: x(n)

@@ -89,7 +89,7 @@ MODULE XCLOC_MPI
       REAL(C_DOUBLE), VALUE, INTENT(IN) :: dt
       INTEGER(C_INT), INTENT(IN) :: xcPairs(2*nxcs)
       INTEGER(C_INT), INTENT(OUT) :: ierr
-      INTEGER mpierr
+      INTEGER mpierr, nsignals
       ierr = 0
       root_ = root
       CALL MPI_COMM_RANK(comm, myid_,   mpierr) 
@@ -97,13 +97,23 @@ MODULE XCLOC_MPI
       IF (myid_ == root_) THEN
          root_ = root
          IF (npts < 1 .OR. nptsPad < npts .OR. nxcs < 1 .OR. &
-             ngrd < 1 .OR. dt <= 0.d0) THEN
+             ngrd < 1 .OR. dt <= 0.d0 .OR. nsignals < 2) THEN
             IF (npts < 1) WRITE(ERROR_UNIT,905) npts 
+            IF (nsignals < 2) WRITE(ERROR_UNIT,906)
             IF (nptsPad < npts) WRITE(ERROR_UNIT,907) nptsPad, npts
             IF (nxcs < 1) WRITE(ERROR_UNIT,908) nxcs
             IF (ngrd < 1) WRITE(ERROR_UNIT,909) ngrd
             IF (dt <= 0.d0) WRITE(ERROR_UNIT,910) dt
             ierr = 1 
+         ENDIF
+         IF (MINVAL(xcPairs(1:2*nxcs)) < 1) THEN
+            WRITE(ERROR_UNIT,904)
+            ierr = 1
+         ENDIF
+         nsignals = MAXVAL(xcPairs(1:2*nxcs))
+         IF (nsignals < 2) THEN
+            WRITE(ERROR_UNIT,906) nsignals
+            ierr = 1
          ENDIF
          IF (.NOT.xcloc_constants_isValidSignalToMigrate(s2m)) THEN
             WRITE(ERROR_UNIT,911)
@@ -128,10 +138,10 @@ MODULE XCLOC_MPI
             ELSE
                IF (MOD(nfcoeffs, 2) /= 1) THEN
                   nfcoeffs_ = nfcoeffs_ + 1
-                  WRITE(OUTPUT_UNIT,916) nfcoeffs_ 
+                  WRITE(OUTPUT_UNIT,916) nfcoeffs_
                ENDIF
             ENDIF
-         ENDIF 
+         ENDIF
          IF (dsmGroupSize > nprocs_ .OR. MOD(nprocs_, dsmGroupSize) /= 0) THEN
             WRITE(ERROR_UNIT,917) dsmGroupSize, nprocs_
             ierr = 1
@@ -159,8 +169,9 @@ MODULE XCLOC_MPI
       CALL MPI_BCAST(verbose_,         1, MPI_INTEGER, root_, comm_, mpierr)
       CALL MPI_BCAST(dt_, 1, MPI_DOUBLE_PRECISION, root_, comm_, mpierr)
 
+  904 FORMAT("xclocMPI_initialize: Minimum signal index must be positive")
   905 FORMAT("xclocMPI_initialize: npts=", I8, " must be positive")
-! 906 FORMAT("xclocMPI_initialize: nsignals=", I8, " must be at least 2")
+  906 FORMAT("xclocMPI_initialize: nsignals=", I8, " must be at least 2")
   907 FORMAT("xclocMPI_initialize: nptsPad=", I8, " must be greater than npts=", I8)
   908 FORMAT("xclocMPI_initialize: No correlation pairs=", I8)
   909 FORMAT("xclocMPI_initialize: No grid points=", I8)

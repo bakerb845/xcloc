@@ -9,8 +9,10 @@ jobs:
           name: Print the Current Time
           command: date
       - run:
-          name: See what exists
+          name: List the directory
           command: pwd
+      - run:
+          name: Build the code - TODO add cmake
           command: ls
           #command: git clone https://github.com/bakerb845/xcloc.git
           #command: ls
