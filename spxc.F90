@@ -87,6 +87,11 @@ MODULE XCLOC_SPXC
       INTEGER(C_INT), INTENT(OUT) :: ierr
       ierr = 0
       CALL xcloc_spxc_finalize()
+      IF (.NOT. xcloc_constants_isValidFilteringType(ftype)) THEN
+         WRITE(ERROR_UNIT,905) ftype
+         ierr = 1
+         RETURN
+      ENDIF
       IF (ftype == XCLOC_SPXC_DONOT_FILTER) THEN
          ftype_ = ftype 
       ELSE

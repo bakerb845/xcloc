@@ -2,13 +2,13 @@ version: 2
 jobs:
   build:
     docker:
-      - image: debian:stretch
+      - image: bakerb845/mkl-iscl-build
     steps:
       - checkout
       - run:
-          name: Greeting
-          command: echo Hello, world.
-      - run:
           name: Print the Current Time
           command: date
-
+      - run:
+          name: Get code and descend into working directory
+          command: git clone https://github.com/bakerb845/xcloc.git
+          command: cd xcloc

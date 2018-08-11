@@ -77,6 +77,8 @@ MODULE XCLOC_DSMXC
       PUBLIC :: xcloc_dsmxc_setCorrelogram64fF 
       PUBLIC :: xcloc_dsmxc_setCorrelogram32fF
       PUBLIC :: xcloc_dsmxc_signalToTableIndex
+      PUBLIC :: xcloc_dsmxc_haveAllTables
+      PUBLIC :: xcloc_dsmxc_getImageMax
       ! Public but for Fortran only
       PUBLIC :: xcloc_dsmxc_getImagePtr
 

@@ -24,6 +24,11 @@ MODULE XCLOC_MPI
       INTEGER(C_INT), PRIVATE, SAVE :: root_ = 0
       !> Number of processes on communicator.
       INTEGER(C_INT), PRIVATE, SAVE :: nprocs_ = 0
+      !> @ingroup xcloc_mpi
+      INTEGER(C_INT), PRIVATE, SAVE :: ftype_ = XCLOC_SPXC_DONOT_FILTER
+      !> @ingroup xcloc_mpi
+      !> Number of filtering taps.
+      INTEGER(C_INT), PRIVATE, SAVE :: nfcoeffs_ = 0
       !> Accuracy of MKL computations.
       INTEGER, PRIVATE, SAVE :: accuracy_ = XCLOC_HIGH_ACCURACY
       !> Signal to migrate.
@@ -43,6 +48,7 @@ MODULE XCLOC_MPI
 
 
       PUBLIC :: xclocMPI_initialize
+      PUBLIC :: xclocMPI_finalize
       CONTAINS
 !========================================================================================!
 !                                     Begin the Code                                     !
@@ -103,11 +109,35 @@ MODULE XCLOC_MPI
             WRITE(ERROR_UNIT,911)
             ierr = 1
          ENDIF
+         IF (.NOT.xcloc_constants_isValidPrecision(prec)) THEN
+            WRITE(ERROR_UNIT,912)
+            ierr = 1
+         ENDIF
+         IF (.NOT.xcloc_constants_isValidAccuracy(accuracy)) THEN
+            WRITE(ERROR_UNIT,913)
+            ierr = 1
+         ENDIF
+         nfcoeffs_ = nfcoeffs
+         IF (.NOT.xcloc_constants_isValidFilteringType(ftype)) THEN
+            WRITE(ERROR_UNIT,914)
+            ierr = 1
+         ELSE
+            IF (nfcoeffs < 1) THEN
+               WRITE(ERROR_UNIT,915)
+               ierr = 1
+            ELSE
+               IF (MOD(nfcoeffs, 2) /= 1) THEN
+                  nfcoeffs_ = nfcoeffs_ + 1
+                  WRITE(OUTPUT_UNIT,916) nfcoeffs_ 
+               ENDIF
+            ENDIF
+         ENDIF 
          IF (dsmGroupSize > nprocs_ .OR. MOD(nprocs_, dsmGroupSize) /= 0) THEN
-            WRITE(ERROR_UNIT,912) dsmGroupSize, nprocs_
+            WRITE(ERROR_UNIT,917) dsmGroupSize, nprocs_
             ierr = 1
          ENDIF
          IF (ierr /= 0) GOTO 500
+         ftype_ = ftype
          xcTypeToMigrate_ = s2m
          dt_ = dt
          accuracy_ = accuracy
@@ -121,7 +151,8 @@ MODULE XCLOC_MPI
       ! Copy the communicator
       CALL MPI_COMM_DUP_WITH_INFO(comm, MPI_INFO_NULL, comm_, mpierr)
       lfreeComm_ = .TRUE.
-
+      CALL MPI_BCAST(ftype_,           1, MPI_INTEGER, root_, comm_, mpierr)
+      CALL MPI_BCAST(nfcoeffs_,        1, MPI_INTEGER, root_, comm_, mpierr)
       CALL MPI_BCAST(accuracy_,        1, MPI_INTEGER, root_, comm_, mpierr)
       CALL MPI_BCAST(precision_,       1, MPI_INTEGER, root_, comm_, mpierr)
       CALL MPI_BCAST(xcTypeToMigrate_, 1, MPI_INTEGER, root_, comm_, mpierr)
@@ -129,13 +160,18 @@ MODULE XCLOC_MPI
       CALL MPI_BCAST(dt_, 1, MPI_DOUBLE_PRECISION, root_, comm_, mpierr)
 
   905 FORMAT("xclocMPI_initialize: npts=", I8, " must be positive")
-  906 FORMAT("xclocMPI_initialize: nsignals=", I8, " must be at least 2")
+! 906 FORMAT("xclocMPI_initialize: nsignals=", I8, " must be at least 2")
   907 FORMAT("xclocMPI_initialize: nptsPad=", I8, " must be greater than npts=", I8)
   908 FORMAT("xclocMPI_initialize: No correlation pairs=", I8)
   909 FORMAT("xclocMPI_initialize: No grid points=", I8)
   910 FORMAT("xclocMPI_initialize: Sampling period=", E12.4, " must be positive")
   911 FORMAT("xclocMPI_initialize: Invalid type of xc signal to migrate")
-  912 FORMAT("xclocMPI_initialize: dsmGroupSize=", I4, &
+  912 FORMAT("xclocMPI_initialize: Invalid precision")
+  913 FORMAT("xclocMPI_initialize: Invalid accuracy")
+  914 FORMAT("xclocMPI_initialize: Filtering type=", I4, " is invalid")
+  915 FORMAT("xclocMPI_initialize: Number of filter taps=", I4, "must be positive")
+  916 FORMAT("xclocMPI_initialize: Number of taps should be odd; setting to=", I4)
+  917 FORMAT("xclocMPI_initialize: dsmGroupSize=", I4, &
              " cannot exceed and must equally divide nprocs_=", I4)
       RETURN
       END
@@ -151,6 +187,9 @@ MODULE XCLOC_MPI
       accuracy_ = XCLOC_HIGH_ACCURACY
       precision_ = XCLOC_SINGLE_PRECISION 
       verbose_ = XCLOC_PRINT_ERRORS 
+      ftype_ = XCLOC_SPXC_DONOT_FILTER
+      nfcoeffs_ = 0
+      dt_ = 0.d0
       IF (lfreeComm_) CALL MPI_COMM_FREE(comm_, mpierr)
       lfreeComm_ = .FALSE.
       linit_ = .FALSE.

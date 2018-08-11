@@ -4,9 +4,16 @@
 !> @author Ben Baker
 !> @copyright Ben Baker distributed under the MIT license.
 MODULE XCLOC_IPPS
-  INTEGER, PARAMETER :: ipp32f = 13
-  INTEGER, PARAMETER :: ipp64f = 19
-  INTEGER, PARAMETER :: ippStsNoErr = 0
+  USE ISO_C_BINDING
+  !> @ingroup ipps
+  !> Defines an IPP successful return.
+  INTEGER, PUBLIC, PARAMETER :: ippStsNoErr = 0
+  !> @ingroup ipps
+  !> Defines a float for IPP.
+  INTEGER, PRIVATE, PARAMETER :: ipp32f = 13
+  !> @ingroup ipps
+  !> Defines a double for IPP.
+  INTEGER, PRIVATE, PARAMETER :: ipp64f = 19
   INTERFACE
       !> @brief Gets the max of a float array.
       !> @param[in] pSrc    Source array of which to compute max.
@@ -42,7 +49,7 @@ MODULE XCLOC_IPPS
       !> @param[in] len    Length of arrays.
       !> @ingroup ipps
       INTEGER(C_INT) FUNCTION ippsConvert_32f64f(pSrc, pDst, len) &
-      BIND(C, NAME='ippsConvert_64f32f')
+      BIND(C, NAME='ippsConvert_32f64f')
       USE ISO_C_BINDING
       IMPLICIT NONE
       INTEGER(C_INT), VALUE, INTENT(IN) :: len 

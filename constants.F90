@@ -1,5 +1,6 @@
 !> @defgroup constants Constants
 !> @ingroup xcloc
+!> @ingroup xcloc_mpi
 !> @brief Holds constants for Fortran modules.
 !> @author Ben Baker
 !> @copyright Ben Baker distributed under the MIT license.
@@ -73,6 +74,7 @@ MODULE XCLOC_CONSTANTS
       PUBLIC :: xcloc_constants_isValidAccuracy
       PUBLIC :: xcloc_constants_isValidSignalToMigrate
       PUBLIC :: xcloc_constants_isValidNumbering
+      PUBLIC :: xcloc_constants_isValidFilteringType
       CONTAINS
 !========================================================================================!
 !                                         Begin the Code                                 !
@@ -146,6 +148,28 @@ MODULE XCLOC_CONSTANTS
       ENDIF
   900 FORMAT("xcloc_constants_isValidSignalToMigrate: s2m=", I4, " must be =", I2, &
              "or =", I2) 
+      RETURN
+      END
+!>    @brief Determines if the filtering type is supported.
+!>    @param[in] ftype
+!>    @result True if the type of filtering is supported.
+!>    @result False if the  type of filtering is not suported.
+!>    @ingroup constants
+      LOGICAL(C_BOOL) FUNCTION xcloc_constants_isValidFilteringType(ftype) &
+      RESULT(isValid) BIND(C, NAME='xcloc_constants_isValidFilteringType')
+      INTEGER(C_INT), VALUE, INTENT(IN) :: ftype
+      isValid = .TRUE.
+      IF (ftype /= XCLOC_SPXC_DONOT_FILTER .AND. &
+          ftype /= XCLOC_SPXC_ENVELOPE_FILTER .AND. &
+          ftype /= XCLOC_SPXC_RMS_FILTER) THEN
+         WRITE(ERROR_UNIT,900) ftype, XCLOC_SPXC_DONOT_FILTER, &
+                               XCLOC_SPXC_ENVELOPE_FILTER, XCLOC_RMS_FILTER
+         isValid = .FALSE.
+      ENDIF
+  900 FORMAT("xcloc_constants_isValidFilteringType: ftype=", I4, &
+             " must be envelope=", I2, &
+             " or rms=", I2, &
+             " or none=", I2)
       RETURN
       END
 END MODULE
