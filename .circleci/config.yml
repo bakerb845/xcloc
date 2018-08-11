@@ -9,6 +9,8 @@ jobs:
           name: Print the Current Time
           command: date
       - run:
-          name: Get code and descend into working directory
-          command: git clone https://github.com/bakerb845/xcloc.git
-          command: cd xcloc
+          name: See what exists
+          command: pwd
+          command: ls
+          #command: git clone https://github.com/bakerb845/xcloc.git
+          #command: ls
