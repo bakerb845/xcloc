@@ -1,4 +1,4 @@
-!> @defgroup xcloc_mpi xcloc
+!> @defgroup xcloc_mpi xclocMPI
 !> @breif The parallel xcloc libary.
 !> @author Ben Baker
 !> @copyright Ben Baker distributed under the MIT license.
@@ -19,28 +19,56 @@ MODULE XCLOC_MPI
 #else
       TYPE(MPI_Comm), PRIVATE, SAVE :: comm_
 #endif
+      !> @ingroup xcloc_mpi
       !> Root ID on communicator.
       INTEGER(C_INT), PRIVATE, SAVE :: root_ = 0
       !> Number of processes on communicator.
       INTEGER(C_INT), PRIVATE, SAVE :: nprocs_ = 0
+      !> Accuracy of MKL computations.
+      INTEGER, PRIVATE, SAVE :: accuracy_ = XCLOC_HIGH_ACCURACY
+      !> Signal to migrate.
+      INTEGER, PRIVATE, SAVE :: xcTypeToMigrate_ = XCLOC_MIGRATE_PHASE_XCS
+      !> Controls verbosity.
+      INTEGER, PRIVATE, SAVE :: verbose_ = XCLOC_PRINT_WARNINGS
+      !> The precision of the module.
+      INTEGER, PRIVATE, SAVE :: precision_ = XCLOC_SINGLE_PRECISION
       !> My rank on the communicator.
       INTEGER, PRIVATE, SAVE :: myid_ = MPI_UNDEFINED
       !> Sampling period (seconds) of signals.
       REAL(C_DOUBLE), PRIVATE, SAVE :: dt_ = 0.d0
-      !> Signal to migrate.
-      INTEGER, PRIVATE, SAVE :: xcTypeToMigrate_ = XCLOC_MIGRATE_PHASE_XCS
       !> Flag indicating that communicator has to be destroyed.
       LOGICAL, PRIVATE, SAVE :: lfreeComm_ = .FALSE.
       !> Flag indicating that the module is initialized.
       LOGICAL, PRIVATE, SAVE :: linit_ = .FALSE.
 
+
+      PUBLIC :: xclocMPI_initialize
       CONTAINS
 !========================================================================================!
 !                                     Begin the Code                                     !
 !========================================================================================!
 !>    @brief Initializes the MPI-based xcloc module.
+!>    @param[in] comm          The MPI communicator.  
+!>    @param[in] root          The root process ID on the MPI communicator.
+!>                             This will likely be 0.
+!>    @param[in] dsmGroupSize  asdf
+!>    @param[in] npts          Number of points in the input signals.  This is defined
+!>                             on the root process.
+!>    @param[in] nptsPad       A tuning parameter.  If 2*npts - 1 is a semi-prime
+!>                             number then the DFT will be inefficient.  nptsPad 
+!>                             will post-pad the input signals with nptsPad - npts
+!>                             zeros to mitigate this.  This is defined on the root
+!>                             process.
+!>    @param[in] nxcs          The number of cross-correlograms.  
+!>    @param[in] verbose       Controls the verbosity.  This is defined on the root
+!>                             process.
+!>    @param[in] prec          Defines the precision as float or double.  This is
+!>                             defined on the root process.
+!>    @param[in] accuracy      Controls the accuracy of the vectorized MKL calculations.
+!>    @param[out] ierr         0 indicates success.
 !>    @ingroup xcloc_mpi
       SUBROUTINE xclocMPI_initialize(comm, root,                     &
+                                     dsmGroupSize,                   &
                                      npts, nptsPad, nxcs,            &
                                      s2m, dt, ngrd,                  &
                                      nfcoeffs, ftype,                &
@@ -49,7 +77,8 @@ MODULE XCLOC_MPI
       BIND(C, NAME='xclocMPI_initialize')
       IMPLICIT NONE
       TYPE(MPI_Comm), VALUE, INTENT(IN) :: comm
-      INTEGER(C_INT), VALUE, INTENT(IN) :: root, npts, nptsPad, nxcs, ngrd, nfcoeffs, &
+      INTEGER(C_INT), VALUE, INTENT(IN) :: root, npts, dsmGroupSize,            &
+                                           nptsPad, nxcs, ngrd, nfcoeffs,       &
                                            ftype, s2m, verbose, prec, accuracy
       REAL(C_DOUBLE), VALUE, INTENT(IN) :: dt
       INTEGER(C_INT), INTENT(IN) :: xcPairs(2*nxcs)
@@ -69,13 +98,21 @@ MODULE XCLOC_MPI
             IF (ngrd < 1) WRITE(ERROR_UNIT,909) ngrd
             IF (dt <= 0.d0) WRITE(ERROR_UNIT,910) dt
             ierr = 1 
-         ENDIF 
+         ENDIF
          IF (.NOT.xcloc_constants_isValidSignalToMigrate(s2m)) THEN
             WRITE(ERROR_UNIT,911)
             ierr = 1
          ENDIF
+         IF (dsmGroupSize > nprocs_ .OR. MOD(nprocs_, dsmGroupSize) /= 0) THEN
+            WRITE(ERROR_UNIT,912) dsmGroupSize, nprocs_
+            ierr = 1
+         ENDIF
+         IF (ierr /= 0) GOTO 500
          xcTypeToMigrate_ = s2m
          dt_ = dt
+         accuracy_ = accuracy
+         precision_ = prec
+         verbose_ = verbose
          IF (ierr /= 0) GOTO 500
       ENDIF
   500 CONTINUE
@@ -85,7 +122,10 @@ MODULE XCLOC_MPI
       CALL MPI_COMM_DUP_WITH_INFO(comm, MPI_INFO_NULL, comm_, mpierr)
       lfreeComm_ = .TRUE.
 
+      CALL MPI_BCAST(accuracy_,        1, MPI_INTEGER, root_, comm_, mpierr)
+      CALL MPI_BCAST(precision_,       1, MPI_INTEGER, root_, comm_, mpierr)
       CALL MPI_BCAST(xcTypeToMigrate_, 1, MPI_INTEGER, root_, comm_, mpierr)
+      CALL MPI_BCAST(verbose_,         1, MPI_INTEGER, root_, comm_, mpierr)
       CALL MPI_BCAST(dt_, 1, MPI_DOUBLE_PRECISION, root_, comm_, mpierr)
 
   905 FORMAT("xclocMPI_initialize: npts=", I8, " must be positive")
@@ -95,6 +135,25 @@ MODULE XCLOC_MPI
   909 FORMAT("xclocMPI_initialize: No grid points=", I8)
   910 FORMAT("xclocMPI_initialize: Sampling period=", E12.4, " must be positive")
   911 FORMAT("xclocMPI_initialize: Invalid type of xc signal to migrate")
+  912 FORMAT("xclocMPI_initialize: dsmGroupSize=", I4, &
+             " cannot exceed and must equally divide nprocs_=", I4)
+      RETURN
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Releases memory on the module.
+!>    @ingroup xcloc_mpi
+      SUBROUTINE xclocMPI_finalize() &
+      BIND(C, NAME='xclocMPI_finalize')
+      INTEGER mpierr
+
+      accuracy_ = XCLOC_HIGH_ACCURACY
+      precision_ = XCLOC_SINGLE_PRECISION 
+      verbose_ = XCLOC_PRINT_ERRORS 
+      IF (lfreeComm_) CALL MPI_COMM_FREE(comm_, mpierr)
+      lfreeComm_ = .FALSE.
+      linit_ = .FALSE.
       RETURN
       END
 !                                                                                        !

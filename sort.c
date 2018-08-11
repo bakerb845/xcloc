@@ -5,8 +5,8 @@ static int cmp_int_ascending(const void *x, const void *y)
 {
     const int xx = *(const int *) x;
     const int yy = *(const int *) y;
-    if (xx < yy) return -1; 
-    if (xx > yy) return  1;  
+    if (xx < yy) return -1;
+    if (xx > yy) return  1;
     return 0;
 }
 /*!

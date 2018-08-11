@@ -23,21 +23,34 @@ MODULE XCLOC
       !> The number of cross-correlations pairs.
       INTEGER, PRIVATE, SAVE :: nxcs_ = 0 
       !> @ingroup xcloc
+      !> The number of grid points in the DSM image and travel time fields.
       INTEGER, PRIVATE, SAVE :: ngrd_ = 0
-      !> Signal to migrate.
+      !> @ingroup xcloc
+      !> The type of correlogram to migrate.  This can be phase corelograms
+      !> or cross-correlograms. 
       INTEGER, PRIVATE, SAVE :: xcTypeToMigrate_ = XCLOC_MIGRATE_PHASE_XCS
+      !> @ingroup xcloc
+      !> Controls the accuracy of the MKL computations.
+      INTEGER, PRIVATE, SAVE :: accuracy_ = XCLOC_HIGH_ACCURACY
+      !> @ingroup xcloc
       !> Controls verbosity.
       INTEGER, PRIVATE, SAVE :: verbose_ = XCLOC_PRINT_WARNINGS
+      !> @ingroup xcloc
       !> The precision of the module.
       INTEGER, PRIVATE, SAVE :: precision_ = XCLOC_SINGLE_PRECISION
+      !> @ingroup xcloc
       !> A flag indicating whether or not xcloc has been initialized.
       LOGICAL, PRIVATE, SAVE :: linit_ = .FALSE.
+      !> @ingroup xcloc
       !> Determines whether or not the signals have been set.
       LOGICAL, PRIVATE, SAVE :: lhaveSignals_ = .FALSE.
+      !> @ingroup xcloc
       !> A flag determining if the travel time tables have been set.
       LOGICAL(C_BOOL), PRIVATE, SAVE :: lhaveAllTables_ = .FALSE.
+      !> @ingroup xcloc
       !> A flag determining if the migration image is computed.
       LOGICAL, PRIVATE, SAVE :: lhaveImage_ = .FALSE.
+      !> @ingroup xcloc
       !> A flag indicating the cross-correlograms are computed.
       LOGICAL, PRIVATE, SAVE :: lhaveXCs_ = .FALSE.
 
@@ -138,6 +151,7 @@ MODULE XCLOC
       CALL xcloc_fdxc_getCorrelogramLength(nptsInXCs_, ierr)
       CALL xcloc_dsmxc_getNumberOGridPointsInTable(ngrd_)
       ! Set some basic info
+      accuracy_ = accuracy
       precision_ = prec
       verbose_ = verbose
       linit_ = .TRUE.
@@ -582,6 +596,7 @@ MODULE XCLOC
       nptsInXCs_ = 0
       ngrd_ = 0
       xcTypeToMigrate_ = XCLOC_MIGRATE_PHASE_XCS
+      accuracy_ = XCLOC_HIGH_ACCURACY
       precision_ = XCLOC_SINGLE_PRECISION
       verbose_ = XCLOC_PRINT_WARNINGS
       lhaveSignals_ = .FALSE.

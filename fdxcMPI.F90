@@ -1,5 +1,5 @@
 !> @defgroup fdxcmpi Parallel Computation of Correlograms 
-!> @ingroup xcloc
+!> @ingroup xcloc_mpi
 !> @brief Computes the cross-correlograms via the Fourier transform with MPI.
 !> @author Ben Baker
 !> @copyright Ben Baker distributed under the MIT license.
@@ -29,56 +29,80 @@ MODULE XCLOC_FDXC_MPI
 !     REAL, POINTER, DIMENSION(:), PRIVATE, SAVE :: inputSignalsRMA32f_
 !     !> Pointer to the data on the window.
 !     TYPE(C_PTR), SAVE :: dataPtr_ = C_NULL_PTR
+      !> @ingroup fdxcmpi
       !> Root process ID.
       INTEGER, PRIVATE, SAVE :: root_ = 0
+      !> @ingroup fdxcmpi
       !> Number of processes on the communicator.
       INTEGER, PRIVATE, SAVE :: nprocs_ = 0
+      !> @ingroup fdxcmpi
       !> My rank on the communicator.
       INTEGER, PRIVATE, SAVE :: myid_ = MPI_UNDEFINED
+      !> @ingroup fdxcmpi
       !> A list of each processes list of unique signals global signal IDs.
       INTEGER, PRIVATE, ALLOCATABLE, SAVE :: uniqueGlobalSignalIDs_(:)
+      !> @ingroup fdxcmpi
       !> This maps from the ip'th process to the start index of uniqueGlobalSignalIDs_.
       !> This has dimension [nprocs_ + 1].
       INTEGER, PRIVATE, ALLOCATABLE, SAVE :: uniqueGlobalSignalIDPtr_(:)
+      !> @ingroup fdxcmpi
       !> This is the number of cross-correlation the ip'th process must perform.
       INTEGER, PRIVATE, ALLOCATABLE, SAVE :: nXCsPerProcess_(:)
+      !> @ingroup fdxcmpi
       !> This maps from the isLoc'th local signal number to the global signal number.
       !> This has dimension [nsignalsLocal_].
       INTEGER, ALLOCATABLE, PRIVATE, SAVE :: local2GlobalSignal_(:)
+      !> @ingroup fdxcmpi
       !> Length of input signals.
       INTEGER, PRIVATE, SAVE :: npts_ = 0
+      !> @ingroup fdxcmpi
       !> The leading dimension of the input signals RMA buffer.
       INTEGER, PRIVATE, SAVE :: lds_ = 0 
+      !> @ingroup fdxcmpi
       !> The length of the signals to transform.  This can mitigate the pathologic
       !> case where the signal transform lengths are large (semi)prime numbers which
       !> make the DFT very expensive.
       INTEGER, PRIVATE, SAVE :: nptsPad_ = 0
+      !> @ingroup fdxcmpi
       !> Length of the time domain cross-correloagrams.
       INTEGER, PRIVATE, SAVE :: nptsInXCs_ = 0
+      !> @ingroup fdxcmpi
       !> Total number of input signals to correlate.
       INTEGER, PRIVATE, SAVE :: nSignalsTotal_ = 0
+      !> @ingroup fdxcmpi
       !> The number of input signals specific to a process.
       INTEGER, PRIVATE, SAVE :: nSignalsLocal_ = 0 
+      !> @ingroup fdxcmpi
       !> Total number of cross-correlations
       INTEGER, PRIVATE, SAVE :: nXCsTotal_ = 0
       !> Number of cross-correlations that I must perform.
       INTEGER, PRIVATE, SAVE :: nXCsLocal_ = 0
+      !> @ingroup fdxcmpi
       !> Controls verbosity.
       INTEGER, PRIVATE, SAVE :: verbose_ = XCLOC_PRINT_WARNINGS
+      !> @ingroup fdxcmpi
       !> Accuracy of the MKL computations.
       INTEGER, PRIVATE, SAVE :: accuracy_ = XCLOC_HIGH_ACCURACY
+      !> @ingroup fdxcmpi
       !> Precision of module.
       INTEGER, PRIVATE, SAVE :: precision_ = XCLOC_SINGLE_PRECISION
+      !> @ingroup fdxcmpi
       !> If true then this process will be computing cross-correlations. 
       LOGICAL, PRIVATE, SAVE :: ldoXC_ = .FALSE.
+      !> @ingroup fdxcmpi
       !> If true then free the communicator.
       LOGICAL, PRIVATE, SAVE :: lfreeComm_ = .FALSE.
-      !> If true then free the input signal RMA window
-!     LOGICAL, PRIVATE, SAVE :: lfreeSignalRMA_ = .FALSE. 
+      !> @ingropu fdxcmpi
       !> If true then free the cross-correlation RMA window
       INTEGER(KIND=8), PRIVATE, PARAMETER :: alignPage_ = 64
-      !LOGICAL, PRIVATE, SAVE :: lfree
+
       PUBLIC :: xcloc_fdxcMPI_initialize
+      PUBLIC :: xcloc_fdxcMPI_finalize
+      PUBLIC :: xcloc_fdxcMPI_computeCrossCorrelograms
+      PUBLIC :: xcloc_fdxcMPI_computePhaseCorrelograms
+      PUBLIC :: xcloc_fdxcMPI_gatherCorrelograms64f
+      PUBLIC :: xcloc_fdxcMPI_setSignals64f
+      PUBLIC :: xcloc_fdxcMPI_setSignals32f
       CONTAINS
 !========================================================================================!
 !                                      Begin the Code                                    !
@@ -336,13 +360,17 @@ MODULE XCLOC_FDXC_MPI
       IF (ALLOCATED(local2GlobalSignal_)) DEALLOCATE(local2GlobalSignal_)
       lfreeComm_ = .FALSE.
       ldoXC_ = .FALSE.
+      lds_ = 0
       nsignalsLocal_ = 0
       nsignalsTotal_ = 0
+      nprocs_ = 0
       npts_ = 0
       nptsPad_ = 0
       nptsInXCs_ = 0
       nXCsLocal_ = 0
+      nXCsTotal_ = 0
       myid_ = MPI_UNDEFINED
+      root_ = 0
       accuracy_ = XCLOC_HIGH_ACCURACY
       precision_ = XCLOC_SINGLE_PRECISION
       verbose_ = XCLOC_PRINT_WARNINGS

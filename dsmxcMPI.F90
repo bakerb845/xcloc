@@ -66,7 +66,7 @@ MODULE XCLOC_DSMXC_MPI
 !>                          must be defined on the root process.
 !>    @param[in] xcPairs    This is a [2 x ncxPairs] matrix stored in column major format
 !>                          that defines the signal indices comprising a correlation
-!>                          pairs.  This is defined on the root process. 
+!>                          pair.  This is defined on the root process. 
 !>    @param[in] verbose    Controls the verbosity. 
 !>    @param[out] ierr      0 indicates success.
 !>    @ingroup dsmxcMPI
