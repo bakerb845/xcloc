@@ -45,7 +45,7 @@ int main(int argc, char *argv[])
         ierr = test_serial_xcloc();
         if (ierr != EXIT_SUCCESS)
         {
-            fprintf(stderr, "%s: FAiled serial xcloc test!\n", __func__);
+            fprintf(stderr, "%s: Failed serial xcloc test!\n", __func__);
             goto BCAST_ERROR_1;
         } 
     }
@@ -56,7 +56,24 @@ BCAST_ERROR_1:;
     if (ierr !=0 ){goto END;}
 #ifdef XCLOC_USE_MPI
     // Start the parallel tests
-    ierr = test_parallel_fdxc(comm, root);
+    if (myid == root)
+    {
+        fprintf(stdout, "%s: Performing parallel fdxc test\n", __func__);
+    }
+    int ierrLoc;
+    ierrLoc = test_parallel_fdxc(comm, root);
+    if (ierrLoc != 0){ierrLoc = 1;}
+    MPI_Allreduce(&ierrLoc, &ierr, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD);
+    if (ierr != 0)
+    {
+        if (myid == root)
+        {
+            fprintf(stderr, "%s: Failed parallel fdxc test!\n", __func__);
+        }
+        goto END;
+    }
+    fprintf(stdout, "%s: Performing parallel xcloc test\n", __func__);
+    
 #endif
 END:;
     mkl_finalize();

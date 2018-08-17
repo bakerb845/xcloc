@@ -4,6 +4,7 @@
 #include <math.h>
 #include <ipps.h>
 #include "xcloc_finter.h"
+#include "test_suite.h"
 #include "acousticGreens2D.h"
 
 #ifndef M_PI

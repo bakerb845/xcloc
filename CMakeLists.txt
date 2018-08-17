@@ -81,7 +81,7 @@ SET(TEST_SRC
     testing/xclocTest.c
     testing/iscl_hack.c)
 IF (XCLOC_USE_MPI)
-   SET(TEST_SRC ${TEST_SRC} testing/parallelTest.c)
+   SET(TEST_SRC ${TEST_SRC} testing/parallelTest.c testing/parxclocTest.c)
 ENDIF()
 ADD_EXECUTABLE(xcf_tests ${TEST_SRC})
 #ADD_EXECUTABLE(xcfft unit_tests/check_xcfft.c ${UNIT_TESTS_SRC} ${SRC})

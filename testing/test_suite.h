@@ -23,6 +23,7 @@ double *xcfft_createRandomSignals(int *seed, const int nsignals, const int npts,
 
 #ifdef XCLOC_USE_MPI
 int test_parallel_fdxc(const MPI_Comm comm, const int root);
+int test_parallel_xcloc(const MPI_Comm comm, const int root);
 #endif
 
 #ifdef __cplusplus
