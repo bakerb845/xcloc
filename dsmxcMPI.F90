@@ -13,7 +13,7 @@ MODULE XCLOC_DSMXC_MPI
       USE XCLOC_UTILS
       IMPLICIT NONE
 #if defined(__INTEL_COMPILER)
-      TYPE(MPI_Comm), PRIVATE, SAVE :: comm_ = MPI_COMM_WORLD
+      TYPE(MPI_Comm), PRIVATE, SAVE :: comm_ = MPI_COMM_NULL !MPI_COMM_WORLD
 #else
       TYPE(MPI_Comm), PRIVATE, SAVE :: comm_
 #endif

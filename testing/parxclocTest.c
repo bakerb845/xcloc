@@ -75,26 +75,26 @@ int test_parallel_xcloc(const MPI_Comm comm, const int root)
     double *obs = NULL;
     float *image = NULL;
     bool lfound;
-    int dsmGroupSize;
+    int nxcdsmGroups = 1;
     ierr = EXIT_SUCCESS;
     MPI_Fint fcomm = MPI_Comm_c2f(comm); // why is this necessary openMPI?
     MPI_Comm_rank(comm, &myid);
     MPI_Comm_size(comm, &nprocs);
     if (myid == root)
     {
-        // Make some rules for the 
-        dsmGroupSize = 1;
+        // Define the number of xc/dsm groups
+        nxcdsmGroups = 1;
         if (nprocs >= 4)
         {
-            dsmGroupSize = 2;
+            nxcdsmGroups = 2;
         }
         else if (nprocs == 6)
         {
-            dsmGroupSize = 3;
+            nxcdsmGroups = 3;
         }
         else if (nprocs == 8)
         {
-            dsmGroupSize = 4;
+            nxcdsmGroups = 4;
         }
         // Scatter the receivers
         xr = (double *) calloc((size_t) (3*nrec), sizeof(double));
@@ -154,7 +154,7 @@ ERROR1:;
     }
     int nptsPad = npts;
     xclocMPI_initialize(fcomm, root, 
-                        dsmGroupSize,
+                        nxcdsmGroups,
                         npts, nptsPad, nxcs,
                         s2m, dt, ngrd,
                         nfcoeffs, ftype,

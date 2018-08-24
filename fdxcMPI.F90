@@ -17,7 +17,7 @@ MODULE XCLOC_FDXC_MPI
       IMPLICIT NONE
       !> MPI communicator.
 #if defined(__INTEL_COMPILER)
-      TYPE(MPI_Comm), PRIVATE, SAVE :: comm_ = MPI_COMM_WORLD
+      TYPE(MPI_Comm), PRIVATE, SAVE :: comm_ = MPI_COMM_NULL !MPI_COMM_WORLD
 #else
       TYPE(MPI_Comm), PRIVATE, SAVE :: comm_
 #endif
