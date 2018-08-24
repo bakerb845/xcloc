@@ -1,5 +1,5 @@
 !> @defgroup dsmxcMPI Parallel Diffraction Stack Migration of Correlograms
-!> @ingroup xcloc 
+!> @ingroup xcloc_mpi
 !> @brief Computes the diffraction stack migration images in parallel with MPI.
 !> @author Ben Baker
 !> @copyright Ben Baker distributed under the MIT license.

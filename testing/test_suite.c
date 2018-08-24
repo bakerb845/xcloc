@@ -72,8 +72,13 @@ BCAST_ERROR_1:;
         }
         goto END;
     }
-    fprintf(stdout, "%s: Performing parallel xcloc test\n", __func__);
-    
+    if (myid == root)
+    {
+        fprintf(stdout, "%s: Performing parallel xcloc test\n", __func__);
+    }
+    ierrLoc = test_parallel_xcloc(MPI_COMM_WORLD, root);
+    if (ierrLoc != 0){ierrLoc = 1;}
+    MPI_Allreduce(&ierrLoc, &ierr, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD); 
 #endif
 END:;
     mkl_finalize();

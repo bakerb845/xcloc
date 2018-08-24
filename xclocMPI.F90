@@ -1,5 +1,5 @@
 !> @defgroup xcloc_mpi xclocMPI
-!> @breif The parallel xcloc libary.
+!> @brief The parallel xcloc libary.
 !> @author Ben Baker
 !> @copyright Ben Baker distributed under the MIT license.
 
@@ -97,9 +97,8 @@ MODULE XCLOC_MPI
       IF (myid_ == root_) THEN
          root_ = root
          IF (npts < 1 .OR. nptsPad < npts .OR. nxcs < 1 .OR. &
-             ngrd < 1 .OR. dt <= 0.d0 .OR. nsignals < 2) THEN
+             ngrd < 1 .OR. dt <= 0.d0) THEN
             IF (npts < 1) WRITE(ERROR_UNIT,905) npts 
-            IF (nsignals < 2) WRITE(ERROR_UNIT,906)
             IF (nptsPad < npts) WRITE(ERROR_UNIT,907) nptsPad, npts
             IF (nxcs < 1) WRITE(ERROR_UNIT,908) nxcs
             IF (ngrd < 1) WRITE(ERROR_UNIT,909) ngrd
@@ -161,6 +160,8 @@ MODULE XCLOC_MPI
       ! Copy the communicator
       CALL MPI_COMM_DUP_WITH_INFO(comm, MPI_INFO_NULL, comm_, mpierr)
       lfreeComm_ = .TRUE.
+      ! Split the communicator
+
       CALL MPI_BCAST(ftype_,           1, MPI_INTEGER, root_, comm_, mpierr)
       CALL MPI_BCAST(nfcoeffs_,        1, MPI_INTEGER, root_, comm_, mpierr)
       CALL MPI_BCAST(accuracy_,        1, MPI_INTEGER, root_, comm_, mpierr)

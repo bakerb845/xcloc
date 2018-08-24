@@ -1,5 +1,6 @@
 !> @defgroup utils Utilities
 !> @ingroup xcloc
+!> @ingroup xcloc_mpi
 !> @brief Generic utilities to simplify using the library.
 !> @author Ben Baker
 !> @copyright Ben Baker distributed under the MIT license.
@@ -40,7 +41,7 @@ MODULE XCLOC_UTILS
 !>                             This has dimension [nwork] but only the first 2*nxcs 
 !>                             indices will be set.
 !>    @param[out] ierr         0 indicates success.
-!>
+!>    @ingroup utils 
       SUBROUTINE xcloc_utils_computeDefaultXCTable(ldoAutoCorrs, nsignals, &
                                                    nwork, numbering,       &
                                                    nxcs, xcPairs, ierr)    &
@@ -116,7 +117,7 @@ MODULE XCLOC_UTILS
 !>                         myTasks(taskPtr(p+1):taskPtr:p+2)-1).
 !>    @param[out] myTasks  This is a map from the it'th task to the process ID.
 !>    @param[out] ierr     0 indicates success.
-!>
+!>    @ingroup utils
       SUBROUTINE xcloc_utils_partitionTasks(ntasks, nprocs,          &
                                             taskPtr, myTasks, ierr)  &
       BIND(C, NAME='xcloc_utils_partitionTasks')
@@ -181,6 +182,7 @@ MODULE XCLOC_UTILS
 !>    @param[out] listUnique  The unique elements of list in ascending order. 
 !>                            This should have dimension of at  
 !>    @param[out] ierr        0 indicates success.
+!>    @ingroup utils
       SUBROUTINE xcloc_utils_unique32s(n, list, nUnique, listUnique, ierr)
       INTEGER, VALUE, INTENT(IN ) :: n
       INTEGER, INTENT(IN) :: list(n)
@@ -236,6 +238,7 @@ MODULE XCLOC_UTILS
 !>    @param[in] values  Array of items sorted in increasing order.
 !>    @param[out] indx   Index in array values that matches key.
 !>    @param[out] ierr   0 indicates success.
+!>    @ingroup utils
       SUBROUTINE xcloc_utils_bsearch32i(n, key, values, indx, ierr)
       INTEGER, VALUE, INTENT(IN) :: key, n
       INTEGER, INTENT(IN) :: values(n)

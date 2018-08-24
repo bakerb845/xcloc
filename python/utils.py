@@ -49,7 +49,7 @@ class utils:
                                   signal (column 2).  The signal indices are
                                   C numbered.  
         @retval xcPairs           If None then an error occurred.
-        @ingroup utils
+        @ingroup pyutils
         """
         fname = '%s::%s'%(self.__class__.__name__, self.computeDefaultXCTable.__name__)
         ierr = c_int(1)

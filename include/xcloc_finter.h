@@ -190,6 +190,29 @@ void xcloc_spxc_finalize(void);
 #ifdef XCLOC_USE_MPI
 #include <mpi.h>
 /*----------------------------------------------------------------------------*/
+/*                              Parallel xcloc                                */
+/*----------------------------------------------------------------------------*/
+/* Initializes the parallel xcloc */
+void xclocMPI_initialize(const MPI_Fint comm, //const MPI_Comm comm,
+                         const int root,
+                         const int dsmGroupSize,
+                         const int npts,
+                         const int nptsPad,
+                         const int nxcs,
+                         const enum xclocMigrateXC_enum s2m,
+                         const double dt,
+                         const int ngrd,
+                         const int nfCoeffs,
+                         const enum xclocXCFilterType_enum ftype,
+                         const int xcPairs[],
+                         const enum xclocXCVerbose_enum verbose,
+                         const enum xclocPrecision_enum precision,
+                         const enum xclocAccuracy_enum accuracy,
+                         int *ierr);
+/* Releases memory on the parallel xcloc module */
+void xclocMPI_finalize(void);
+                        
+/*----------------------------------------------------------------------------*/
 /*                 Parallel Frequency Domain Cross-Correlation                */
 /*----------------------------------------------------------------------------*/
 /* Initialize parallel frequency domain cross correlation. */

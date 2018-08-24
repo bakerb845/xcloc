@@ -62,7 +62,7 @@ SET(SRC ${IO_SRC}
     memory.F90 spxc.F90
     dsmxc.F90 utils.F90 sort.c)
 IF (XCLOC_USE_MPI)
-   SET(SRC ${SRC} fdxcMPI.F90 dsmxcMPI.F90 xclocMPI.F90)
+   SET(SRC ${SRC} utilsMPI.F90 fdxcMPI.F90 dsmxcMPI.F90 xclocMPI.F90)
 ENDIF()
 SET(SRC ${SRC} xcloc.F90)
 

@@ -794,6 +794,8 @@ INPUT                  = ./xcloc.wiki/Home.md \
                          ./memory.F90 \
                          ./spxc.F90 \
                          ./firFilter.c \
+                         ./utils.F90 \
+                         ./utilsMPI.F90 \
                          ./xcloc.F90 \
                          ./xclocMPI.F90 \
                          ./h5io.c \
