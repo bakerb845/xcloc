@@ -26,6 +26,8 @@ MODULE XCLOC_MPI
       TYPE(MPI_Comm), PRIVATE, SAVE :: xcdsmIntraComm_ = MPI_COMM_NULL
 #else
       TYPE(MPI_Comm), PRIVATE, SAVE :: comm_
+      TYPE(MPI_Comm), PRIVATE, SAVE :: xcdsmInterComm_
+      TYPE(MPI_Comm), PRIVATE, SAVE :: xcdsmIntraComm_
 #endif
       !> @ingroup xcloc_mpi
       !> Root ID on communicator.
