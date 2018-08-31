@@ -19,6 +19,8 @@ static int cmp_int_ascending(const void *x, const void *y)
  * @param[out] indx   On successful exit this is the index in vaues that
  *                    matches the key.
  * @param[out] ierr   0 indicates success.
+ * @param[out] ierr   1 indicates the element was not found.
+ * @param[out] ierr   2 indicates an invalid argument.
  * @author Ben Baker
  * @copyright ISTI distributed under the Apache 2 license.
  */
@@ -31,10 +33,10 @@ void xcloc_sort_bsearch32i(const int key, const int values[],
     *indx = 0;
     if (np < 1)
     {
-        *ierr = 1;
+        *ierr = 2;
         return;
     }
-    // out of bounds and edge case
+    // Out of bounds and edge case
     if (key < values[0])
     {
         *ierr = 1;
@@ -45,7 +47,7 @@ void xcloc_sort_bsearch32i(const int key, const int values[],
         *ierr = 1;
         return;
     }
-    // look for it
+    // Look for it
     item = (int *) bsearch((const void *) &key, (const void *) values,
                             np, sizeof(int),
                             cmp_int_ascending);

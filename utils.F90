@@ -100,7 +100,7 @@ MODULE XCLOC_UTILS
       IF (numbering == XCLOC_C_NUMBERING) xcPairs(:) = xcPairs(:) - 1
   900 FORMAT('xcloc_utils_computeDefaultXCTable: No signals')
   901 FORMAT('xcloc_utils_computeDefaultXCTable: At least 2 signals required')
-  905 FORMAT('xcloc_utils_computeDefaultXCTable: Error - nwork must be >=', I5)
+  905 FORMAT('xcloc_utils_computeDefaultXCTable: Error - nwork must be >= ', I0)
       RETURN
       END
 !                                                                                        !
@@ -167,8 +167,8 @@ MODULE XCLOC_UTILS
          WRITE(ERROR_UNIT,905) isum, ntasks 
          ierr = 1
       ENDIF
-  900 FORMAT('xcloc_utils_partitionTasks: Failed to initialize element', I4) 
-  905 FORMAT('xcloc_utils_partitionTasks: Counted', I4, ' ntasks; need ', I6, ' tasks')
+  900 FORMAT('xcloc_utils_partitionTasks: Failed to initialize element ', I0)
+  905 FORMAT('xcloc_utils_partitionTasks: Counted ', I0, ' ntasks; need ', I0, ' tasks')
       RETURN
       END
 !                                                                                        !
@@ -179,7 +179,6 @@ MODULE XCLOC_UTILS
 !>    @param[in] list         List of numbers of which to find unique values.
 !>    @param[out] nUnique     Number of unique elements in list.
 !>    @param[out] listUnique  The unique elements of list in ascending order. 
-!>                            This should have dimension of at  
 !>    @param[out] ierr        0 indicates success.
 !>    @ingroup utils
       SUBROUTINE xcloc_utils_unique32s(n, list, nUnique, listUnique, ierr)
@@ -232,16 +231,22 @@ MODULE XCLOC_UTILS
 !========================================================================================!
 !                                                                                        !
 !>    @brief Searches an array sorted in increasing order for a key.
-!>    @param[in] n       Number of elements in values.
-!>    @param[in] key     Item to search for in values.
-!>    @param[in] values  Array of items sorted in increasing order.
-!>    @param[out] indx   Index in array values that matches key.
-!>    @param[out] ierr   0 indicates success.
+!>    @param[in] n           Number of elements in values.
+!>    @param[in] key         Item to search for in values.
+!>    @param[in] values      Array of items sorted in increasing order.
+!>    @param[out] indx       Index in array values that matches key.
+!>    @param[out] ierr       0 indicates success.
+!>    @param[in] lshowError  This is an optional argument.  If TRUE and the element is
+!>                           not present then a warning will be written to ERROR_UNIT.
+!>                           Otherwise, no error will be written.
+!>                           The default is TRUE.
 !>    @ingroup utils
-      SUBROUTINE xcloc_utils_bsearch32i(n, key, values, indx, ierr)
+      SUBROUTINE xcloc_utils_bsearch32i(n, key, values, indx, ierr, lshowError)
       INTEGER, VALUE, INTENT(IN) :: key, n
       INTEGER, INTENT(IN) :: values(n)
       INTEGER, INTENT(OUT) :: indx, ierr
+      LOGICAL, VALUE, OPTIONAL, INTENT(IN) :: lshowError
+      LOGICAL lprint
       INTERFACE
          SUBROUTINE xcloc_sort_bsearch32i(key, values, n, indx, ierr) &
          BIND(C, NAME='xcloc_sort_bsearch32i')
@@ -254,12 +259,14 @@ MODULE XCLOC_UTILS
       ierr = 0
       CALL xcloc_sort_bsearch32i(key, values, n, indx, ierr)
       IF (ierr /= 0) THEN
-         WRITE(ERROR_UNIT,900) key
+         lprint = .FALSE.
+         IF (PRESENT(lshowError)) lprint = lshowError
+         IF (lprint) WRITE(ERROR_UNIT,900) key
          ierr = 1
       ELSE
          indx = indx + 1 ! C to F indexing
       ENDIF 
-  900 FORMAT('xcloc_utils_bsearch32i: Could not find key=', I6, ' in values')
+  900 FORMAT('xcloc_utils_bsearch32i: Could not find key ', I0, ' in values')
       RETURN
       END
 END MODULE

@@ -84,7 +84,7 @@ int test_parallel_xcloc(const MPI_Comm comm, const int root)
     {
         // Define the number of xc/dsm groups
         nxcdsmGroups = 1;
-        if (nprocs >= 4)
+        if (nprocs == 4)
         {
             nxcdsmGroups = 2;
         }

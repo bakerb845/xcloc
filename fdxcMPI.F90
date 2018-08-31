@@ -188,8 +188,8 @@ MODULE XCLOC_FDXC_MPI
             lds_ = xcloc_memory_padLength(alignPage_, SIZEOF(1.d0), nptsPad_)
          ENDIF
          ! Need to partition the work
-         ALLOCATE(myXCs(nXCsTotal_))
          ALLOCATE(myXCPtr(nprocs_+1))
+         ALLOCATE(myXCs(nXCsTotal_))
          CALL xcloc_utils_partitionTasks(nXCsTotal_, nprocs_, myXCPtr, myXCs, ierr)
          IF (ierr /= 0) THEN
             WRITE(ERROR_UNIT,920)
@@ -331,16 +331,16 @@ MODULE XCLOC_FDXC_MPI
       IF (ALLOCATED(signalList))  DEALLOCATE(signalList)
       IF (ALLOCATED(xcPairsWork)) DEALLOCATE(xcPairsWork)
       ! Format statements
-  905 FORMAT("xcloc_fdxcMPI_initialize: npts=", I8, " must be positive")
-  906 FORMAT("xcloc_fdxcMPI_initialize: nsignals=", I8, " must be at least 2")
-  907 FORMAT("xcloc_fdxcMPI_initialize: nptsPad=", I8, " must be greater than npts=", I8)
-  908 FORMAT("xcloc_fdxcMPI_initialize: No correlation pairs=", I8)
-  910 FORMAT('xcloc_fdxcMPI_initialize: Process', I4, ' has ', I6, ' correlations')
-  911 FORMAT('xcloc_fdxcMPI_initialize: Have ', I6, ' xcs but need ', I6, ' xcs')
-  912 FORMAT('xcloc_fdxcMPI_initialize: Local to global signal map is wrong on rank', I4)
-  913 FORMAT('xcloc_fdxcMPI_initialize: bsearch failure on rank:', I4, ' check l2g map')
-  914 FORMAT('xcloc_fdxcMPI_initialize: failed to generate xcPairsLocal on rank', I4)
-  915 FORMAT('xcloc_fdxcMPI_initialize: fdxc initialization failed on rank', I4)
+  905 FORMAT("xcloc_fdxcMPI_initialize: npts=", I0, " must be positive")
+  906 FORMAT("xcloc_fdxcMPI_initialize: nsignals=", I0, " must be at least 2")
+  907 FORMAT("xcloc_fdxcMPI_initialize: nptsPad=", I0, " must be greater than npts=", I0)
+  908 FORMAT("xcloc_fdxcMPI_initialize: No correlation pairs=", I0)
+  910 FORMAT('xcloc_fdxcMPI_initialize: Process ', I0, ' has ', I0, ' correlations')
+  911 FORMAT('xcloc_fdxcMPI_initialize: Have ', I0, ' xcs but need ', I0, ' xcs')
+  912 FORMAT('xcloc_fdxcMPI_initialize: Local to global signal map is wrong on rank ', I0)
+  913 FORMAT('xcloc_fdxcMPI_initialize: bsearch failure on rank: ', I0, ' check l2g map')
+  914 FORMAT('xcloc_fdxcMPI_initialize: failed to generate xcPairsLocal on rank ', I0)
+  915 FORMAT('xcloc_fdxcMPI_initialize: fdxc initialization failed on rank ', I0)
   920 FORMAT('xcloc_fdxcMPI_initialize: Failed to partition XCs')
       RETURN
       END
@@ -393,7 +393,7 @@ MODULE XCLOC_FDXC_MPI
          ierr = 1 
       ENDIF
       CALL MPI_Allreduce(ierrLoc, ierr, 1, MPI_INTEGER, MPI_SUM, comm_, mpierr)
-  900 FORMAT('xcloc_fdxcMPI_computeCrossCorrelograms: Error computing xcs on rank', I4) 
+  900 FORMAT('xcloc_fdxcMPI_computeCrossCorrelograms: Error computing xcs on rank ', I0)
       RETURN
       END
 !                                                                                        !
@@ -413,7 +413,7 @@ MODULE XCLOC_FDXC_MPI
          ierrLoc = 1
       ENDIF
       CALL MPI_Allreduce(ierrLoc, ierr, 1, MPI_INTEGER, MPI_SUM, comm_, mpierr)
-  900 FORMAT('xcloc_fdxcMPI_computePhaseCorrelograms: Error computing pxcs on rank', I4)
+  900 FORMAT('xcloc_fdxcMPI_computePhaseCorrelograms: Error computing pxcs on rank ', I0)
       RETURN
       END
 !                                                                                        !
@@ -486,10 +486,10 @@ MODULE XCLOC_FDXC_MPI
       IF (ALLOCATED(work))      DEALLOCATE(work)
       IF (ALLOCATED(recvCount)) DEALLOCATE(recvCount) 
       IF (ALLOCATED(displs))    DEALLOCATE(displs)
-  895 FORMAT('xcloc_fdxcMPI_gatherCorrelograms64f: Invalid root', I6)
-  900 FORMAT('xcloc_fdxcMPI_gatherCorrelograms64f: ldxcIn must be at least', I6)
-  905 FORMAT('xcloc_fdxcMPI_gatherCorrelograms64f: nxcsIn must be at least', I6)
-  910 FORMAT("xcloc_fdxcMPI_gatherCorrelograms64f: Failed to get data on rank", I4)
+  895 FORMAT('xcloc_fdxcMPI_gatherCorrelograms64f: Invalid root=', I0)
+  900 FORMAT('xcloc_fdxcMPI_gatherCorrelograms64f: ldxcIn must be at least ', I0)
+  905 FORMAT('xcloc_fdxcMPI_gatherCorrelograms64f: nxcsIn must be at least ', I0)
+  910 FORMAT("xcloc_fdxcMPI_gatherCorrelograms64f: Failed to get data on rank ", I0)
       RETURN
       END
 !                                                                                        !
@@ -605,11 +605,11 @@ MODULE XCLOC_FDXC_MPI
          WRITE(ERROR_UNIT,920)
          RETURN
       ENDIF
-  900 FORMAT('xcloc_fdxc_setSignals64f: Error ldx=', I6, '<', 'npts=', I6)
-  901 FORMAT('xcloc_fdxc_setSignals64f: Error expecting npts=', I6)
-  902 FORMAT('xcloc_fdxc_setSignals64f: Error expecting nsignals=', I6)
+  900 FORMAT('xcloc_fdxc_setSignals64f: Error ldx=', I0, ' < ', 'npts=', I0)
+  901 FORMAT('xcloc_fdxc_setSignals64f: Error expecting npts=', I0)
+  902 FORMAT('xcloc_fdxc_setSignals64f: Error expecting nsignals=', I0)
   910 FORMAT('xcloc_fdxc_setSignals64f: Some signals may not be sent')
-  915 FORMAT('xcloc_fdxc_setSignals64f: Error setting signal:', I4, ' on process ', I4)
+  915 FORMAT('xcloc_fdxc_setSignals64f: Error setting signal ', I0, ' on process ', I0)
   920 FORMAT('xcloc_fdxc_setSignals64f: Errors detected')
       RETURN
       END

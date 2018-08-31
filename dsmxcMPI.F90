@@ -13,32 +13,46 @@ MODULE XCLOC_DSMXC_MPI
       USE XCLOC_UTILS
       IMPLICIT NONE
 #if defined(__INTEL_COMPILER)
+      !> @ingroup dsmxcMPI
+      !> The MPI communicator for the module.
       TYPE(MPI_Comm), PRIVATE, SAVE :: comm_ = MPI_COMM_NULL !MPI_COMM_WORLD
 #else
       TYPE(MPI_Comm), PRIVATE, SAVE :: comm_
 #endif
+      !> @ingroup dsmxcMPI
       !> The sampling period of the correlograms.
       DOUBLE PRECISION, PRIVATE, SAVE :: dt_ = 0.d0
+      !> @ingroup dsmxcMPI
       !> Root process ID.
       INTEGER, PRIVATE, SAVE :: root_ = 0
+      !> @ingroup dsmxcMPI
       !> Number of processes on the communicator.
       INTEGER, PRIVATE, SAVE :: nprocs_ = 0
+      !> @ingroup dsmxcMPI
       !> My rank on the process.
       INTEGER, PRIVATE, SAVE :: myid_ = MPI_UNDEFINED
+      !> @ingroup dsmxcMPI
       !> Total number of grid points in domain.
       INTEGER, PRIVATE, SAVE :: ngrdTotal_ = 0
+      !> @ingroup dsmxcMPI
       !> Number of grid points specific to this process.
       INTEGER, PRIVATE, SAVE :: ngrdLocal_ = 0
+      !> @ingroup dsmxcMPI
       !> Number of points in correlograms.
       INTEGER, PRIVATE, SAVE :: nptsInXCs_ = 0
+      !> @ingroup dsmxcMPI
       !> The number of tables.
       INTEGER, PRIVATE, SAVE :: ntables_ = 0
+      !> @ingroup dsmxcMPI
       !> The number of cross-correlatin pairs.
       INTEGER, PRIVATE, SAVE :: nxcPairs_ = 0
+      !> @ingroup dsmxcMPI
       !> Verbosity on the module.
       INTEGER, PRIVATE, SAVE :: verbose_ = XCLOC_PRINT_WARNINGS
+      !> @ingroup dsmxcMPI
       !> Number of grid points belonging to each process.
       INTEGER, PRIVATE, DIMENSION(:), ALLOCATABLE, SAVE :: nGridPtsPerProcess_
+      !> @ingroup dsmxcMPI
       !> If true then free the communicator.
       LOGICAL, PRIVATE, SAVE :: lfreeComm_ = .FALSE.
 

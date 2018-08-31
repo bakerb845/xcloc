@@ -31,45 +31,81 @@ MODULE XCLOC_MPI
       TYPE(MPI_Comm), PRIVATE, SAVE :: xcdsmIntraComm_
 #endif
       !> @ingroup xcloc_mpi
+      !> Maps from the idsmxc'th group to the start index of l2gSignal_.  This has
+      !> dimension [nxcdsmGroups_].
+      INTEGER, PRIVATE, ALLOCATABLE, SAVE :: l2gSignalPtr_(:)
+      !> @ingroup xcloc_mpi
+      !> Maps from the idsmxc'th group's local signal to the global signal index.
+      !> This has dimension [l2gSignalPtr_(nxcdsmGroups_+1)-1].
+      INTEGER, PRIVATE, ALLOCATABLE, SAVE :: l2gSignal_(:)
+      !> @ingroup xcloc_mpi
+      !> Maps from the is'th signal to the start index of signal2Group_.  This has
+      !> dimension [nsignalsTotal_+1].
+      INTEGER, PRIVATE, ALLOCATABLE, SAVE :: signalToGroupPtr_(:) 
+      !> Maps from the a signal to the DSM/XC group to which this signal belongs.
+      !> This has dimension [signalToGroupPtr_(nsignalsTotal_+1)-1].
+      INTEGER, PRIVATE, ALLOCATABLE, SAVE :: signalToGroup_(:)
+      !> @ingroup xcloc_mpi
       !> Root ID on communicator.
-      INTEGER(C_INT), PRIVATE, SAVE :: root_ = 0
+      INTEGER, PRIVATE, SAVE :: root_ = 0
       !> @ingroup xcloc_mpi
       !> Number of processes on global communicator.  This is equal to:
       !> nxcdsmGroups_ x xcGroupSize_.
-      INTEGER(C_INT), PRIVATE, SAVE :: nprocs_ = 0
+      INTEGER, PRIVATE, SAVE :: nprocs_ = 0
       !> @ingroup xcloc_mpi
       !> Defines a process' rank on the xcdsm-intra communicator.
-      INTEGER(C_INT), PRIVATE, SAVE :: xcdsmIntraCommID_ = 0
-integer(c_int), private, save :: xcdsmInterCommID_ = 0
+      INTEGER, PRIVATE, SAVE :: xcdsmIntraCommID_ = 0
+      !> @ingroup xcloc_mpi
+      !> Defines a process' rank on the xcdsm-inter communicator.
+      INTEGER, PRIVATE, SAVE :: xcdsmInterCommID_ = 0
+      !> @ingroup xcloc_mpi
+      !> Total number of cross-correlograms.
+      INTEGER, PRIVATE, SAVE :: nXCsTotal_ = 0
       !> @ingroup xcloc_mpi
       !> Number of XC/DSM groups.
-      INTEGER(C_INT), PRIVATE, SAVE :: nxcdsmGroups_ = 0
+      INTEGER, PRIVATE, SAVE :: nxcdsmGroups_ = 0
       !> @ingroup xcloc_mpi
       !> Number of processes in each cross-correloation group.
-      INTEGER(C_INT), PRIVATE, SAVE :: xcGroupSize_ = 0
+      INTEGER, PRIVATE, SAVE :: xcGroupSize_ = 0
       !> @ingroup xcloc_mpi
       !> Determines the filter to be applied to the correlograms prior to migrating.
-      INTEGER(C_INT), PRIVATE, SAVE :: ftype_ = XCLOC_SPXC_DONOT_FILTER
+      INTEGER, PRIVATE, SAVE :: ftype_ = XCLOC_SPXC_DONOT_FILTER
       !> @ingroup xcloc_mpi
       !> Number of filtering taps.
-      INTEGER(C_INT), PRIVATE, SAVE :: nfcoeffs_ = 0
+      INTEGER, PRIVATE, SAVE :: nfcoeffs_ = 0
+      !> @ingroup xcloc_mpi
+      !> Total number of travel time tables.
+      INTEGER, PRIVATE, SAVE :: nTablesTotal_ = 0
+      !> @ingroup xcloc_mpi
+      !> Total number of signals.
+      INTEGER, PRIVATE, SAVE :: nsignalsTotal_ = 0
+
+      !> @ingroup xcloc_mpi
       !> Accuracy of MKL computations.
       INTEGER, PRIVATE, SAVE :: accuracy_ = XCLOC_HIGH_ACCURACY
+      !> @ingroup xcloc_mpi
       !> Signal to migrate.
       INTEGER, PRIVATE, SAVE :: xcTypeToMigrate_ = XCLOC_MIGRATE_PHASE_XCS
+      !> @ingroup xcloc_mpi
       !> Controls verbosity.
       INTEGER, PRIVATE, SAVE :: verbose_ = XCLOC_PRINT_WARNINGS
+      !> @ingorup xcloc_mpi
       !> The precision of the module.
       INTEGER, PRIVATE, SAVE :: precision_ = XCLOC_SINGLE_PRECISION
+      !> @ingroup xcloc_mpi
       !> My rank on the communicator.
       INTEGER, PRIVATE, SAVE :: myid_ = MPI_UNDEFINED
+      !> @ingroup xcloc_mpi
       !> Sampling period (seconds) of signals.
       REAL(C_DOUBLE), PRIVATE, SAVE :: dt_ = 0.d0
+      !> @ingroup xcloc_mpi
       !> Flag indicating that communicator has to be destroyed.
       LOGICAL, PRIVATE, SAVE :: lfreeComm_ = .FALSE.
+      !> @ingroup xcloc_mpi
       !> Flag indicating that the module is initialized.
       LOGICAL, PRIVATE, SAVE :: linit_ = .FALSE.
 
+integer, private, allocatable, save :: nDSMXCsPerGroup_(:)
 
       PUBLIC :: xclocMPI_initialize
       PUBLIC :: xclocMPI_finalize
@@ -111,9 +147,10 @@ integer(c_int), private, save :: xcdsmInterCommID_ = 0
                                            nptsPad, nxcs, ngrd, nfcoeffs,       &
                                            ftype, s2m, verbose, prec, accuracy
       REAL(C_DOUBLE), VALUE, INTENT(IN) :: dt
-      INTEGER(C_INT), INTENT(IN) :: xcPairs(2*nxcs)
+      INTEGER(C_INT), DIMENSION(2*nxcs), INTENT(IN) :: xcPairs
       INTEGER(C_INT), INTENT(OUT) :: ierr
-      INTEGER mpierr, nsignals
+      INTEGER, ALLOCATABLE :: myDSMXCs(:), myDSMXCPtr(:), iwork(:), jwork(:)
+      INTEGER i1, i2, ig, indx, is, mpierr, nsignalPairs, nsignals, nsg, nunique, nxcsLocal
       ierr = 0
       root_ = root
       CALL MPI_Comm_rank(comm, myid_,   mpierr) 
@@ -171,16 +208,74 @@ integer(c_int), private, save :: xcdsmInterCommID_ = 0
          ENDIF
          IF (ierr /= 0) GOTO 500
          ! Copy
+         nsignalsTotal_ = nsignals
          nxcdsmGroups_ = nxcdsmGroups
          xcGroupSize_ = nprocs_/nxcdsmGroups_
-print *, nxcdsmGroups_, xcGroupSize_, nprocs_
+         nXCsTotal_ = nxcs
          ftype_ = ftype
          xcTypeToMigrate_ = s2m
          dt_ = dt
          accuracy_ = accuracy
          precision_ = prec
          verbose_ = verbose
-         ! Divide up the work
+         ! Divide up cross-correlations and DSM's
+         ALLOCATE(myDSMXCs(nXCsTotal_))
+         ALLOCATE(myDSMXCPtr(nxcdsmGroups_)) 
+         CALL xcloc_utils_partitionTasks(nXCsTotal_, nxcdsmGroups_, &
+                                         myDSMXCPtr, myDSMXCs, ierr)
+         IF (ierr /= 0) THEN
+            WRITE(ERROR_UNIT,950)
+            GOTO 500
+         ENDIF
+         ALLOCATE(nDSMXCsPerGroup_(nxcdsmGroups_))
+         DO ig=1,nxcdsmGroups_
+            nDSMXCsPerGroup_(ig) = myDSMXCPtr(ig+1) - myDSMXCPtr(ig)
+            IF (verbose_ > XCLOC_PRINT_WARNINGS) THEN
+               WRITE(OUTPUT_UNIT,800) ig-1, nDSMXCsPerGroup_(ig)
+            ENDIF
+         ENDDO
+         ! Make a map of the unique signals for each group
+         ALLOCATE(l2gSignalPtr_(nxcdsmGroups_+1)) 
+         ALLOCATE(jwork(nxcdsmGroups_*nsignals)); jwork(:) = 0
+         l2gSignalPtr_(1) = 1
+         DO ig=1,nxcdsmGroups_
+            ! Get the unique signals in this group
+            i1 = 2*(myDSMXCPtr(ig) - 1) + 1
+            i2 = 2*(myDSMXCPtr(ig+1) - 1)
+            nsignalPairs = i2 - i1 + 1
+            CALL xcloc_utils_unique32s(nsignalPairs, xcPairs(i1:i2), nunique, iwork, ierr)
+            IF (ierr /= 0) GOTO 500
+            l2gSignalPtr_(ig+1) = l2gSignalPtr_(ig) + nunique
+            i1 = l2gSignalPtr_(ig)
+            i2 = l2gSignalPtr_(ig+1) - 1
+            jwork(i1:i2) = iwork(1:nunique)
+            IF (ALLOCATED(iwork)) DEALLOCATE(iwork)
+         ENDDO
+         nsignalPairs = l2gSignalPtr_(nxcdsmGroups_+1)-1 
+         ALLOCATE(l2gSignal_(nsignalPairs))
+         l2gSignal_(1:nsignalPairs) = jwork(1:nsignalPairs)
+         ! Make a map of the signals that belong to each group 
+         ALLOCATE(signalToGroupPtr_(nsignalsTotal_+1))
+         jwork(:) = 0
+         signalToGroupPtr_(1) = 1
+         nsg = 0
+         DO is=1,nsignals
+            DO ig=1,nxcdsmGroups_
+               i1 = l2gSignalPtr_(ig)
+               i2 = l2gSignalPtr_(ig+1) - 1
+               ! Search for element  
+               CALL xcloc_utils_bsearch32i(i2-i1+1, is, l2gSignal_(i1:i2), &
+                                           indx, ierr, .FALSE.)
+               IF (ierr == 0) THEN
+                  nsg = nsg + 1
+                  jwork(nsg) = is
+               ENDIF
+            ENDDO
+            signalToGroupPtr_(is+1) = nsg + 1
+         ENDDO
+         ALLOCATE(signalToGroup_(nsg))
+         signalToGroup_(1:nsg) = jwork(1:nsg)
+         DEALLOCATE(jwork)
 
          IF (ierr /= 0) GOTO 500
       ENDIF
@@ -189,7 +284,9 @@ print *, nxcdsmGroups_, xcGroupSize_, nprocs_
       IF (ierr /= 0) GOTO 5555
       ! Copy the input communicator
       CALL MPI_Comm_dup_with_info(comm, MPI_INFO_NULL, xclocGlobalComm_, mpierr)
+      IF (mpierr /= MPI_SUCCESS) WRITE(ERROR_UNIT, 960)
       ! Share the group sizes
+print *, nprocs_
       CALL MPI_Bcast(nxcdsmGroups_, 1, MPI_INTEGER, root_, xclocGlobalComm_, mpierr)
       CALL MPI_Bcast(xcGroupSize_,  1, MPI_INTEGER, root_, xclocGlobalComm_, mpierr)
       ! Create a communicator on which to do the parallel cross-correlations and DSMs
@@ -198,19 +295,26 @@ print *, nxcdsmGroups_, xcGroupSize_, nprocs_
                                     xcdsmInterCommID_, xcdsmInterComm_, &
                                     ierr)
       IF (ierr /= 0) THEN
-         WRITE(ERROR_UNIT,920)
+         WRITE(ERROR_UNIT,961)
          GOTO 5555
       ENDIF 
       lfreeComm_ = .TRUE.
       ! Split the communicator
       CALL MPI_Bcast(ftype_,           1, MPI_INTEGER, root_, xclocGlobalComm_, mpierr)
       CALL MPI_Bcast(nfcoeffs_,        1, MPI_INTEGER, root_, xclocGlobalComm_, mpierr)
+      CALL MPI_Bcast(nsignalsTotal_,   1, MPI_INTEGER, root_, xclocGlobalComm_, mpierr)
+      CALL MPI_Bcast(nXCsTotal_,       1, MPI_INTEGER, root_, xclocGlobalComm_, mpierr)
       CALL MPI_Bcast(accuracy_,        1, MPI_INTEGER, root_, xclocGlobalComm_, mpierr)
       CALL MPI_Bcast(precision_,       1, MPI_INTEGER, root_, xclocGlobalComm_, mpierr)
       CALL MPI_Bcast(xcTypeToMigrate_, 1, MPI_INTEGER, root_, xclocGlobalComm_, mpierr)
       CALL MPI_Bcast(verbose_,         1, MPI_INTEGER, root_, xclocGlobalComm_, mpierr)
       CALL MPI_Bcast(dt_, 1, MPI_DOUBLE_PRECISION, root_, xclocGlobalComm_, mpierr)
 
+      IF (ALLOCATED(myDSMXCs))   DEALLOCATE(myDSMXCs)
+      IF (ALLOCATED(myDSMXCPtr)) DEALLOCATE(myDSMXCPtr)
+      ! INfo
+  800 FORMAT("xclocMPI_initialize: Group", I4, " will process ", I6, " correlograms")
+      ! Errors/warnings
   904 FORMAT("xclocMPI_initialize: Minimum signal index must be positive")
   905 FORMAT("xclocMPI_initialize: npts=", I8, " must be positive")
   906 FORMAT("xclocMPI_initialize: nsignals=", I8, " must be at least 2")
@@ -226,7 +330,9 @@ print *, nxcdsmGroups_, xcGroupSize_, nprocs_
   916 FORMAT("xclocMPI_initialize: Number of taps should be odd; setting to=", I4)
   917 FORMAT("xclocMPI_initialize: Number of XC/DSM groups=", I4,  &
              " cannot exceed and must divide equally nprocs_=", I4)
-  920 FORMAT("xclocMPI_initialize: Error splitting communicators")
+  950 FORMAT("xclocMPI_initialize: Failed to partition work")
+  960 FORMAT("xclocMPI_initialize: Failed to duplicate communicator")
+  961 FORMAT("xclocMPI_initialize: Error splitting communicators")
  5555 IF (ierr /= 0) CALL xclocMPI_finalize()
       RETURN
       END
@@ -322,34 +428,69 @@ print *, nxcdsmGroups_, xcGroupSize_, nprocs_
 !                                                                                        !
 !========================================================================================!
 !                                                                                        !
-!>    @param[in] root           Root process ID on the global comm.
 !>    @param[in] tableNumberIn  Global table index.  This is defined on the root process.
-!>    @param[in] ngrdIn         Number of grid points in table.  This is defined on the the root process.
+!>    @param[in] ngrdIn         Number of grid points in table.  This is defined on the
+!>                              the root process.
+!>    @param[in] root           The root process ID on the xcloc global communicator.
+!>    @param[in] table          The
 !>    @ingroup xcloc_mpi
       SUBROUTINE xclocMPI_setTable64f(tableNumberIn, ngrdIn, root, table, ierr) &
       BIND(C, NAME='xclocMPI_setTable64f')
       INTEGER(C_INT), VALUE, INTENT(IN) :: tableNumberIn, ngrdIn, root
-      REAL(C_DOUBLE), INTENT(IN) :: table(*)
+      REAL(C_DOUBLE), DIMENSION(ngrdIn), INTENT(IN) :: table
       INTEGER(C_INT), INTENT(OUT) :: ierr
-      DOUBLE PRECISION, ALLOCATABLE :: tableLoc(:)
-      INTEGER mpierr, ngrd, tableNumber
+      DOUBLE PRECISION, ALLOCATABLE :: work(:)
+      INTEGER commRoot, ig, mpierr, ngrd, tableNumber
+      TYPE(MPI_Status) :: stat
+      LOGICAL lneedTable
       ierr = 0
+      lneedTable = .FALSE.
+      IF (.NOT.linit_) THEN
+         WRITE(ERROR_UNIT,900)
+         ierr = 1
+         RETURN
+      ENDIF
       IF (myid_ == root) THEN
          CALL xcloc_dsmxcMPI_getNumberOGridPointsInTable(ngrd)
          IF (ngrd /= ngrdIn) THEN
-            WRITE(ERROR_UNIT,900) ngrdIn, ngrd          
+            WRITE(ERROR_UNIT,905) ngrdIn, ngrd          
             ierr = 1
          ENDIF
-         
+         IF (tableNumberIn < nTablesTotal_ .OR. tableNumberIn > ntablesTotal_) THEN
+            WRITE(ERROR_UNIT,910) tableNumberIn, nTablesTotal_
+            ierr = 1
+         ENDIF
+         commRoot = xcdsmIntraCommID_
+         tableNumber = tableNumberIN
       ENDIF
       CALL MPI_Bcast(ierr,        1, MPI_INTEGER, root, xclocGlobalComm_, mpierr)
+      IF (ierr /= 0) RETURN
       CALL MPI_Bcast(ngrd,        1, MPI_INTEGER, root, xclocGlobalComm_, mpierr)
       CALL MPI_Bcast(tableNumber, 1, MPI_INTEGER, root, xclocGlobalComm_, mpierr)
-      ! Distribute the table to the masters
+      CALL MPI_Bcast(commRoot,    1, MPI_INTEGER, root, xclocGlobalComm_, mpierr)
+! TODO do i need this table?
 
+      ! Distribute the table to the roots
+      IF (xcdsmIntraCommID_ /= commRoot) THEN
+         DO ig=0,nxcdsmGroups_-1
+! TODO do i need to send this table?
+            IF (myid_ == root) THEN
+               CALL MPI_Send(table, ngrd, MPI_DOUBLE_PRECISION, ig, 0, &
+                             xcdsmInterComm_, mpierr) 
+            ELSE
+               IF (lneedTable) THEN
+                  ALLOCATE(work(ngrd))
+                  CALL MPI_Recv(work, ngrd, MPI_DOUBLE_PRECISION, MPI_ANY_SOURCE, &
+                                MPI_ANY_TAG, xcdsmInterComm_, stat, mpierr)
+               ENDIF
+            ENDIF
+         ENDDO
+      ENDIF
+
+      IF (ALLOCATED(work)) DEALLOCATE(work)
   900 FORMAT("xclocMPI_setTable64f: Module not initialized")
   905 FORMAT("xclocMPI_setTable64f: ngrdIn=", I6, "should be ngrd=", I6)
-  
+  910 FORMAT("xclocMPI_setTable64f: table number=", I6, "should be in range[1,", I6, "]")
       RETURN
       END
 

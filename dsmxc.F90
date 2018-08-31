@@ -34,7 +34,7 @@ MODULE XCLOC_DSMXC
       !> Determines if all tables are set.
       LOGICAL, PRIVATE, ALLOCATABLE, SAVE :: lhaveTable_(:)
       !> Sampling period (seconds) of signals.
-      REAL(C_DOUBLE), PRIVATE, SAVE :: dt_ = 0.d0
+      DOUBLE PRECISION, PRIVATE, SAVE :: dt_ = 0.d0
       !> Leading dimension of the travel time table.
       INTEGER, PRIVATE, SAVE :: ldg_ = 0
       !> Number of grid points in each table.
@@ -214,6 +214,7 @@ MODULE XCLOC_DSMXC
 !                                                                                        !
 !========================================================================================!
 !                                                                                        !
+!>    @brief Returns the total number of grid points in a table.
 !>    @param[out] ngrd   Number of grid points in each table.
 !>    @ingroup dsmxc
       SUBROUTINE xcloc_dsmxc_getNumberOGridPointsInTable(ngrd) &
@@ -542,7 +543,8 @@ MODULE XCLOC_DSMXC
       BIND(C, NAME='xcloc_dsmxc_signalToTableIndex')
       INTEGER(C_INT), VALUE, INTENT(IN) :: is
       INTEGER(C_INT), INTENT(OUT) :: it, ierr
-      CALL xcloc_utils_bsearch32i(ntables_, is, signal2Table_, it, ierr)
+      LOGICAL, PARAMETER :: lshowError = .TRUE.
+      CALL xcloc_utils_bsearch32i(ntables_, is, signal2Table_, it, ierr, lshowError)
       IF (ierr /= 0) THEN
          WRITE(ERROR_UNIT,900) is
          it = 0

@@ -12,7 +12,7 @@ from numpy import copy
 from numpy import linspace
 import sys
 from acoustic2D import Acoustic2D
-sys.path.insert(0, './..')
+#sys.path.insert(0, './..') # This can be used if your PYTHONPATH isn't set
 from xcloc import xcloc
 from xclocTypes import xclocTypes as xctypes
 import matplotlib.pyplot as plt
