@@ -11,10 +11,11 @@
 
 int main(int argc, char *argv[])
 {
-    int ierr, myid, provided;
+    int ierr, myid;
     ierr = EXIT_SUCCESS;
     const int root = 0;
 #ifdef XCLOC_USE_MPI
+    int provided;
     MPI_Comm comm = MPI_COMM_WORLD;
     MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED, &provided);
     //MPI_Init(&argc, &argv);
