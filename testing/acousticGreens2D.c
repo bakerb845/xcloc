@@ -380,12 +380,9 @@ int acousticGreens2D_computeRandomReceiverLocations(
     if (fabs(z1 - z0) > 1.e-8){dz = fabs(z1 - z0);}
     for (irec=0; irec<nrec; irec++)
     {
-        xr[3*irec+0] = x0;
-        xr[3*irec+1] = y0;
-        xr[3*irec+2] = z0;
-        xr[3*irec+0] = ((double) rand()/RAND_MAX)*dx;
-        xr[3*irec+1] = ((double) rand()/RAND_MAX)*dy;
-        xr[3*irec+2] = ((double) rand()/RAND_MAX)*dz;
+        xr[3*irec+0] = x0 + ((double) rand()/RAND_MAX)*dx;
+        xr[3*irec+1] = y0 + ((double) rand()/RAND_MAX)*dy;
+        xr[3*irec+2] = z0 + ((double) rand()/RAND_MAX)*dz;
     }
     return 0;
 }
