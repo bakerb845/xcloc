@@ -57,7 +57,6 @@ MODULE XCLOC_UTILS_MPI
                                           interCommID, interComm, &
                                           ierr)                   &
       BIND(C, NAME='xcloc_utilsMPI_splitComm')
-      IMPLICIT NONE
       TYPE(MPI_Comm), INTENT(IN) :: mpiComm 
       INTEGER, INTENT(IN) :: ncols
       TYPE(MPI_Comm), INTENT(OUT) :: intraComm, interComm
@@ -119,7 +118,6 @@ MODULE XCLOC_UTILS_MPI
       SUBROUTINE xcloc_utilsMPI_head2Comm(mpiGlobalComm, myGlobalID, &
                                           ngroups, mpiHeadComm)      &
       BIND(C, NAME='xcloc_utilsMPI_head2Comm')
-      IMPLICIT NONE
       TYPE(MPI_Comm), VALUE, INTENT(IN) :: mpiGlobalComm
       INTEGER, INTENT(IN) :: myGlobalID, ngroups
       TYPE(MPI_Comm), INTENT(OUT) :: mpiHeadComm
@@ -148,7 +146,7 @@ MODULE XCLOC_UTILS_MPI
       CALL MPI_Group_incl(myHeadGroup, ngroups, ranks, myHeadRow, mpierr)
       CALL MPI_Comm_create(mpiGlobalComm, myHeadRow, mpiHeadComm, mpierr)
       !IF (my_local_id == master) THEN
-      !   CALL MPI_COMM_RANK(mpiHeadComm,my_head_id,mpierr)
+      !   CALL MPI_Comm_rank(mpiHeadComm,my_head_id,mpierr)
       !   print *, myGlobalID, my_local_id, my_head_id
       !ENDIF
       DEALLOCATE(ranks)

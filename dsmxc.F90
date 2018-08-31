@@ -101,7 +101,6 @@ MODULE XCLOC_DSMXC
       SUBROUTINE xcloc_dsmxc_initialize(ngrd, nxcPairs, nptsInXCs,   &
                                         dt, xcPairs, verbose, ierr)  &
       BIND(C, NAME='xcloc_dsmxc_initialize')
-      IMPLICIT NONE
       INTEGER(C_INT), VALUE, INTENT(IN) :: ngrd, nptsInXCs, nxcPairs, verbose
       REAL(C_DOUBLE), VALUE, INTENT(IN) :: dt
       INTEGER(C_INT), INTENT(IN) :: xcPairs(2*nxcPairs)
@@ -180,7 +179,6 @@ MODULE XCLOC_DSMXC
 !>    @ingroup dsmxc
       SUBROUTINE xcloc_dsmxc_finalize( ) &
       BIND(C, NAME='xcloc_dsmxc_finalize')
-      IMPLICIT NONE
       IF (ALLOCATED(lhaveTable_))   DEALLOCATE(lhaveTable_)
       IF (ALLOCATED(xcs32f_))       DEALLOCATE(xcs32f_)
       IF (ALLOCATED(ttimes_))       DEALLOCATE(ttimes_)
@@ -366,7 +364,6 @@ MODULE XCLOC_DSMXC
 !>    @ingroup dsmxc
       SUBROUTINE xcloc_dsmxc_setCorrelograms64f(ldxc, nptsInXCs, nxcPairs, xcs, ierr) &
       BIND(C, NAME='xcloc_dsmxc_setCorrelograms64f')
-      IMPLICIT NONE
       INTEGER(C_INT), VALUE, INTENT(IN) :: ldxc, nptsInXCs, nxcPairs
       REAL(C_DOUBLE), INTENT(IN) :: xcs(ldxc*nxcPairs)
       INTEGER(C_INT), INTENT(OUT) :: ierr
@@ -415,7 +412,6 @@ MODULE XCLOC_DSMXC
 !>    @ingroup dsmxc
       SUBROUTINE xcloc_dsmxc_setCorrelograms32f(ldxc, nptsInXCs, nxcPairs, xcs, ierr) &
       BIND(C, NAME='xcloc_dsmxc_setCorrelograms32f')
-      IMPLICIT NONE
       INTEGER(C_INT), VALUE, INTENT(IN) :: ldxc, nptsInXCs, nxcPairs
       REAL(C_FLOAT), INTENT(IN) :: xcs(ldxc*nxcPairs)
       INTEGER(C_INT), INTENT(OUT) :: ierr
@@ -516,7 +512,6 @@ MODULE XCLOC_DSMXC
 !>    @ingroup dsmxc
       SUBROUTINE xcloc_dsmxc_setBlockSize(blockSize, ierr) &
       BIND(C, NAME='xcloc_dsmxc_setBlockSize')
-      IMPLICIT NONE
       INTEGER(C_INT), VALUE, INTENT(IN) :: blockSize
       INTEGER(C_INT), INTENT(OUT) :: ierr
       INTEGER i, i2
@@ -569,7 +564,6 @@ MODULE XCLOC_DSMXC
 !>    @ingroup dsmxc
       SUBROUTINE xcloc_dsmxc_setTable64f(tableNumber, ngrd, table, ierr) &
       BIND(C, NAME='xcloc_dsmxc_setTable64f')
-      IMPLICIT NONE
       INTEGER(C_INT), VALUE, INTENT(IN) :: tableNumber, ngrd
       REAL(C_DOUBLE), INTENT(IN) :: table(ngrd)
       INTEGER(C_INT), INTENT(OUT) :: ierr
@@ -618,7 +612,6 @@ MODULE XCLOC_DSMXC
 !>    @ingroup dsmxc
       SUBROUTINE xcloc_dsmxc_setTable32f(tableNumber, ngrd, table, ierr) &
       BIND(C, NAME='xcloc_dsmxc_setTable32f')
-      IMPLICIT NONE
       INTEGER(C_INT), VALUE, INTENT(IN) :: tableNumber, ngrd
       REAL(C_FLOAT), INTENT(IN) :: table(ngrd)
       INTEGER(C_INT), INTENT(OUT) :: ierr
@@ -670,7 +663,6 @@ MODULE XCLOC_DSMXC
 !>    @ingroup dsmxc
       SUBROUTINE xcloc_dsmxc_compute(ierr) &
       BIND(C, NAME='xcloc_dsmxc_compute')
-      IMPLICIT NONE
       INTEGER(C_INT), INTENT(OUT) :: ierr
       INTEGER i, igrd, igrd1, igrd2, indxXC, it1, it2, ixc, ixc1, ixc2, jgrd1, jgrd2, &
               kgrd1, kgrd2, lxc2, ngrdLoc

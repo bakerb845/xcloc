@@ -102,7 +102,6 @@ MODULE XCLOC
                                   xcPairs,                       &
                                   verbose, prec, accuracy, ierr) &
       BIND(C, NAME='xcloc_initialize')
-      IMPLICIT NONE
       INTEGER(C_INT), VALUE, INTENT(IN) :: npts, nptsPad, nxcs, ngrd, nfcoeffs, ftype, &
                                            s2m, verbose, prec, accuracy
       REAL(C_DOUBLE), VALUE, INTENT(IN) :: dt
@@ -220,7 +219,6 @@ MODULE XCLOC
 !>    @ingroup xcloc_xcloc 
       SUBROUTINE xcloc_setTable64f(tableNumber, ngrd, table, ierr) &
       BIND(C, NAME='xcloc_setTable64f')
-      IMPLICIT NONE
       INTEGER(C_INT), VALUE, INTENT(IN) :: tableNumber, ngrd
       REAL(C_DOUBLE), INTENT(IN) :: table(ngrd)
       INTEGER(C_INT), INTENT(OUT) :: ierr
@@ -249,7 +247,6 @@ MODULE XCLOC
 !>    @ingroup xcloc_xcloc 
       SUBROUTINE xcloc_setTable32f(tableNumber, ngrd, table, ierr) &
       BIND(C, NAME='xcloc_setTable32f')
-      IMPLICIT NONE
       INTEGER(C_INT), VALUE, INTENT(IN) :: tableNumber, ngrd
       REAL(C_FLOAT), INTENT(IN) :: table(ngrd)
       INTEGER(C_INT), INTENT(OUT) :: ierr
@@ -614,7 +611,6 @@ MODULE XCLOC
 !>    @ingroup xcloc_xcloc
       SUBROUTINE xcloc_getPrecision(prec) &
       BIND(C, NAME='xcloc_getPrecision')
-      IMPLICIT NONE
       INTEGER(C_INT), INTENT(OUT) :: prec
       prec = precision_
       RETURN

@@ -45,6 +45,8 @@ MODULE XCLOC_DSMXC_MPI
       PUBLIC :: xcloc_dsmxcMPI_initialize
       PUBLIC :: xcloc_dsmxcMPI_finalize
       PUBLIC :: xcloc_dsmxcMPI_setTable64f
+      PUBLIC :: xcloc_dsmxcMPI_getNumberOGridPointsInTable
+      PUBLIC :: xcloc_dsmxcMPI_getNumberOfTables
 
       CONTAINS
 !========================================================================================!
@@ -88,8 +90,8 @@ MODULE XCLOC_DSMXC_MPI
       CALL xcloc_dsmxcMPI_finalize()
       ! Get communicator size and my rank
       root_ = root
-      CALL MPI_COMM_RANK(comm, myid_, mpierr)
-      CALL MPI_COMM_SIZE(comm, nprocs_, mpierr)
+      CALL MPI_Comm_rank(comm, myid_, mpierr)
+      CALL MPI_Comm_size(comm, nprocs_, mpierr)
       ! Check the inputs
       ierr = 0
       IF (myid_ == root_) THEN
@@ -134,7 +136,7 @@ MODULE XCLOC_DSMXC_MPI
       CALL MPI_Bcast(ierr, 1, MPI_INTEGER, root_, comm, mpierr)
       IF (ierr /= 0) RETURN
       ! Copy the communicator
-      CALL MPI_COMM_DUP_WITH_INFO(comm, MPI_INFO_NULL, comm_, mpierr)
+      CALL MPI_Comm_dup_with_info(comm, MPI_INFO_NULL, comm_, mpierr)
       lfreeComm_ = .TRUE.
       ! Send some information to the other processes
       CALL MPI_Bcast(ngrdTotal_, 1, MPI_INTEGER, root_, comm_, mpierr)
@@ -233,6 +235,31 @@ MODULE XCLOC_DSMXC_MPI
   910 FORMAT('xcloc_dsmxcMPI_setTable64f: Failed to set table on rank', I4)
       RETURN
       END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Returns the total number of grid points in a table.
+!>    @param[out] ngrd   Number of grid points in each table.
+!>    @ingroup dsmxc
+      SUBROUTINE xcloc_dsmxcMPI_getNumberOGridPointsInTable(ngrd) &
+      BIND(C, NAME='xcloc_dsmxcMPI_getNumberOGridPointsInTable')
+      INTEGER(C_INT), INTENT(OUT) :: ngrd
+      ngrd = ngrdTotal_
+      RETURN
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Returns the number of travel time tables on the module.
+!>    @param[out] ntables  The number of travel time tables.
+!>    @ingroup dsmxc
+      SUBROUTINE xcloc_dsmxcMPI_getNumberOfTables(ntables) &
+      BIND(C, NAME='xcloc_dsmxcMPI_getNumberOfTables')
+      INTEGER(C_INT), INTENT(OUT) :: ntables
+      ntables = ntables_
+      RETURN
+      END
+
 !                                                                                        !
 !========================================================================================!
 !                                                                                        !

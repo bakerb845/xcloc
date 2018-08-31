@@ -7,6 +7,7 @@
 MODULE XCLOC_CONSTANTS
       USE ISO_FORTRAN_ENV
       USE ISO_C_BINDING
+      IMPLICIT NONE
       !> @ingroup constants
       !> Single precision.
       INTEGER(C_INT), PARAMETER :: XCLOC_SINGLE_PRECISION = 0
@@ -163,7 +164,7 @@ MODULE XCLOC_CONSTANTS
           ftype /= XCLOC_SPXC_ENVELOPE_FILTER .AND. &
           ftype /= XCLOC_SPXC_RMS_FILTER) THEN
          WRITE(ERROR_UNIT,900) ftype, XCLOC_SPXC_DONOT_FILTER, &
-                               XCLOC_SPXC_ENVELOPE_FILTER, XCLOC_RMS_FILTER
+                               XCLOC_SPXC_ENVELOPE_FILTER, XCLOC_SPXC_RMS_FILTER
          isValid = .FALSE.
       ENDIF
   900 FORMAT("xcloc_constants_isValidFilteringType: ftype=", I4, &

@@ -121,7 +121,6 @@ MODULE XCLOC_UTILS
       SUBROUTINE xcloc_utils_partitionTasks(ntasks, nprocs,          &
                                             taskPtr, myTasks, ierr)  &
       BIND(C, NAME='xcloc_utils_partitionTasks')
-      IMPLICIT NONE
       INTEGER(C_INT), VALUE, INTENT(IN) :: ntasks, nprocs
       INTEGER(C_INT), INTENT(OUT) :: myTasks(ntasks), taskPtr(nprocs+1), ierr
       INTEGER, ALLOCATABLE :: taskCtr(:)

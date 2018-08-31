@@ -148,8 +148,8 @@ MODULE XCLOC_FDXC_MPI
       CALL xcloc_fdxcMPI_finalize()
       ! Get communicator size and my rank
       root_ = root
-      CALL MPI_COMM_RANK(comm, myid_, mpierr)
-      CALL MPI_COMM_SIZE(comm, nprocs_, mpierr)
+      CALL MPI_Comm_rank(comm, myid_, mpierr)
+      CALL MPI_Comm_size(comm, nprocs_, mpierr)
       ! Some basic checks by root process
       ierr = 0
       IF (myid_ == root_) THEN
@@ -233,10 +233,10 @@ MODULE XCLOC_FDXC_MPI
          IF (ALLOCATED(work)) DEALLOCATE(work)
       ENDIF
   500 CONTINUE
-      CALL MPI_BCAST(ierr, 1, MPI_INTEGER, root_, comm, mpierr)
+      CALL MPI_Bcast(ierr, 1, MPI_INTEGER, root_, comm, mpierr)
       IF (ierr /= 0) RETURN
       ! Copy the communicator
-      CALL MPI_COMM_DUP_WITH_INFO(comm, MPI_INFO_NULL, comm_, mpierr)
+      CALL MPI_Comm_dup_with_info(comm, MPI_INFO_NULL, comm_, mpierr)
       lfreeComm_ = .TRUE.
       ! Set some basic information
       CALL MPI_Bcast(root_,          1, MPI_INTEGER, root, comm_, mpierr)
@@ -268,7 +268,7 @@ MODULE XCLOC_FDXC_MPI
       CALL MPI_Bcast(uniqueGlobalSignalIDs_, nwork, MPI_INTEGER, root_, comm_, mpierr)
       ! Figure out the number of cross-correlations that I need to perform
       nXCsLocal_ = myXCPtr(myid_+2) - myXCPtr(myid_+1)
-      CALL MPI_ALLREDUCE(nXCsLocal_, nwork, 1, MPI_INTEGER, MPI_SUM, comm_, mpierr)
+      CALL MPI_Allreduce(nXCsLocal_, nwork, 1, MPI_INTEGER, MPI_SUM, comm_, mpierr)
       IF (nwork /= nXCsTotal_) THEN
          IF (myid_ == root_) WRITE(ERROR_UNIT,911) nwork, nXCsTotal_
          ierr = 1
@@ -323,7 +323,7 @@ MODULE XCLOC_FDXC_MPI
       ELSE
          ldoXC_ = .FALSE.
       ENDIF
-      CALL MPI_ALLREDUCE(ierrLocal, ierr, 1, MPI_INTEGER, MPI_MAX, comm_, mpierr) 
+      CALL MPI_Allreduce(ierrLocal, ierr, 1, MPI_INTEGER, MPI_MAX, comm_, mpierr) 
       IF (ierr /= 0) RETURN
       ! Free workspace
       IF (ALLOCATED(myXCs))       DEALLOCATE(myXCs)
@@ -355,7 +355,7 @@ MODULE XCLOC_FDXC_MPI
       CALL xcloc_fdxc_finalize()
       IF (ALLOCATED(uniqueGlobalSignalIDPtr_)) DEALLOCATE(uniqueGlobalSignalIDPtr_)
       IF (ALLOCATED(uniqueGlobalSignalIDs_)) DEALLOCATE(uniqueGlobalSignalIDs_)
-      IF (lfreeComm_) CALL MPI_COMM_FREE(comm_, mpierr)
+      IF (lfreeComm_) CALL MPI_Comm_free(comm_, mpierr)
       IF (ALLOCATED(nXCsPerProcess_))     DEALLOCATE(nXCsPerProcess_)
       IF (ALLOCATED(local2GlobalSignal_)) DEALLOCATE(local2GlobalSignal_)
       lfreeComm_ = .FALSE.

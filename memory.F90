@@ -6,6 +6,7 @@
 MODULE XCLOC_MEMORY
       USE ISO_C_BINDING
       USE XCLOC_CONSTANTS
+      IMPLICIT NONE
       PUBLIC :: xcloc_memory_padLength
       CONTAINS
       !==================================================================================!
@@ -16,7 +17,6 @@ MODULE XCLOC_MEMORY
       RESULT(padLength) &
       BIND(C, NAME='xcloc_meomry_padLength')
       USE ISO_C_BINDING
-      IMPLICIT NONE 
       INTEGER(C_SIZE_T), VALUE, INTENT(IN) :: alignment, sizeof_dataType
       INTEGER(C_INT), VALUE, INTENT(IN) :: n 
       INTEGER(C_INT) xmod 
