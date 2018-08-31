@@ -2,7 +2,8 @@ version: 2
 jobs:
   build:
     docker:
-      - image: bakerb845/mkl-iscl-build
+      #- image: bakerb845/mkl-iscl-build
+      - image: bakerb845/ubuntu-xcloc
     steps:
       - checkout
       - run:
@@ -12,7 +13,33 @@ jobs:
           name: List the directory
           command: pwd
       - run:
-          name: Build the code - TODO add cmake
-          command: ls
-          #command: git clone https://github.com/bakerb845/xcloc.git
-          #command: ls
+          name: Build the code
+          command: echo ${DOCKER_USER}
+          command: echo ${DOCKER_PASS}
+          command: |
+            export CC=gcc
+            export FC=gfortran
+            export MKL_LIB_ROOT=/opt/intel/mkl/lib/intel64
+            export IPP_LIB_ROOT=/opt/intel/ipp/lib/intel64
+            if [ -f Makefile ]; then
+               echo "Cleaning..."
+               make clean
+            fi
+            if [ -f CMakeCache.txt ]; then
+               echo "Removing CMakeCache.txt"
+               rm CMakeCache.txt
+            fi
+            if [ -d CMakeFiles ]; then
+               echo "Removing CMakeFiles"
+               rm -rf CMakeFiles
+            fi
+            cmake \
+            -DCMAKE_INSTALL_PREFIX=/usr/local \
+            -DCMAKE_C_COMPILER=gcc \
+            -DCMAKE_Fortran_COMPILER=gfortran \
+            -DCMAKE_C_FLAGS="-g -O2 -Wall -std=c11" \
+            -DCMAKE_Fortran_FLAGS="-g -O2 -fbounds-check -Wall -m64" \
+            -DMKL_INCLUDE_DIR=/opt/intel/mkl/include \
+            -DMKL_LIBRARY="-Wl,--start-group ${MKL_LIB_ROOT}/libmkl_gf_lp64.a ${MKL_LIB_ROOT}/libmkl_sequential.a ${MKL_LIB_ROOT}/libmkl_core.a -Wl,--end-group" \
+            -DIPP_INCLUDE_DIR=/opt/intel/ipp/include \
+            -DIPP_LIBRARY="${IPP_LIB_ROOT}/libipps.so;${IPP_LIB_ROOT}/libippvm.so;${IPP_LIB_ROOT}/libippcore.so"
