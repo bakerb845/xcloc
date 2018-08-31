@@ -15,6 +15,7 @@ MODULE XCLOC_MPI
       USE XCLOC_DSMXC_MPI
       USE XCLOC_SPXC
       USE XCLOC_CONSTANTS
+      IMPLICIT NONE
 #if defined(__INTEL_COMPILER)
       !> @ingroup xcloc_mpi
       !> Global MPI communicator
@@ -254,6 +255,7 @@ integer, private, allocatable, save :: nDSMXCsPerGroup_(:)
          nsignalPairs = l2gSignalPtr_(nxcdsmGroups_+1)-1 
          ALLOCATE(l2gSignal_(nsignalPairs))
          l2gSignal_(1:nsignalPairs) = jwork(1:nsignalPairs)
+print *, l2gSignal_
          ! Make a map of the signals that belong to each group 
          ALLOCATE(signalToGroupPtr_(nsignalsTotal_+1))
          jwork(:) = 0
@@ -263,20 +265,20 @@ integer, private, allocatable, save :: nDSMXCsPerGroup_(:)
             DO ig=1,nxcdsmGroups_
                i1 = l2gSignalPtr_(ig)
                i2 = l2gSignalPtr_(ig+1) - 1
-               ! Search for element  
+               ! Search for element
                CALL xcloc_utils_bsearch32i(i2-i1+1, is, l2gSignal_(i1:i2), &
                                            indx, ierr, .FALSE.)
                IF (ierr == 0) THEN
                   nsg = nsg + 1
-                  jwork(nsg) = is
+                  jwork(nsg) = ig - 1
                ENDIF
             ENDDO
             signalToGroupPtr_(is+1) = nsg + 1
+print *, jwork(signalToGroupPtr_(is):signalToGroupPtr_(is+1)-1)
          ENDDO
          ALLOCATE(signalToGroup_(nsg))
          signalToGroup_(1:nsg) = jwork(1:nsg)
          DEALLOCATE(jwork)
-
          IF (ierr /= 0) GOTO 500
       ENDIF
   500 CONTINUE
@@ -286,7 +288,6 @@ integer, private, allocatable, save :: nDSMXCsPerGroup_(:)
       CALL MPI_Comm_dup_with_info(comm, MPI_INFO_NULL, xclocGlobalComm_, mpierr)
       IF (mpierr /= MPI_SUCCESS) WRITE(ERROR_UNIT, 960)
       ! Share the group sizes
-print *, nprocs_
       CALL MPI_Bcast(nxcdsmGroups_, 1, MPI_INTEGER, root_, xclocGlobalComm_, mpierr)
       CALL MPI_Bcast(xcGroupSize_,  1, MPI_INTEGER, root_, xclocGlobalComm_, mpierr)
       ! Create a communicator on which to do the parallel cross-correlations and DSMs
@@ -437,14 +438,18 @@ print *, nprocs_
       SUBROUTINE xclocMPI_setTable64f(tableNumberIn, ngrdIn, root, table, ierr) &
       BIND(C, NAME='xclocMPI_setTable64f')
       INTEGER(C_INT), VALUE, INTENT(IN) :: tableNumberIn, ngrdIn, root
-      REAL(C_DOUBLE), DIMENSION(ngrdIn), INTENT(IN) :: table
+      REAL(C_DOUBLE), DIMENSION(ngrdIn), TARGET, INTENT(IN) :: table
       INTEGER(C_INT), INTENT(OUT) :: ierr
-      DOUBLE PRECISION, ALLOCATABLE :: work(:)
-      INTEGER commRoot, ig, mpierr, ngrd, tableNumber
+      DOUBLE PRECISION, ALLOCATABLE, TARGET :: work(:)
+      DOUBLE PRECISION, CONTIGUOUS, POINTER :: ttptr(:)
       TYPE(MPI_Status) :: stat
+      INTEGER commRoot, i1, i2, ierrLoc, ig, indx, mpierr, ngrd, tableNumber, &
+              localTableNumber 
       LOGICAL lneedTable
       ierr = 0
       lneedTable = .FALSE.
+      localTableNumber = 0
+      NULLIFY(ttptr)
       IF (.NOT.linit_) THEN
          WRITE(ERROR_UNIT,900)
          ierr = 1
@@ -461,32 +466,54 @@ print *, nprocs_
             ierr = 1
          ENDIF
          commRoot = xcdsmIntraCommID_
-         tableNumber = tableNumberIN
+         tableNumber = tableNumberIn
+         ttptr => table(1:ngrd) ! Associate pointer 
       ENDIF
       CALL MPI_Bcast(ierr,        1, MPI_INTEGER, root, xclocGlobalComm_, mpierr)
       IF (ierr /= 0) RETURN
       CALL MPI_Bcast(ngrd,        1, MPI_INTEGER, root, xclocGlobalComm_, mpierr)
       CALL MPI_Bcast(tableNumber, 1, MPI_INTEGER, root, xclocGlobalComm_, mpierr)
       CALL MPI_Bcast(commRoot,    1, MPI_INTEGER, root, xclocGlobalComm_, mpierr)
-! TODO do i need this table?
-
-      ! Distribute the table to the roots
-      IF (xcdsmIntraCommID_ /= commRoot) THEN
+      ! Is this signal coming my way?
+      lneedTable = .FALSE.
+      i1 = signalToGroupPtr_(tableNumber)
+      i2 = signalToGroupPtr_(tableNumber+1) - 1
+      CALL xcloc_utils_bsearch32i(i2-i1+1, xcdsmInterCommID_, signalToGroup_(i1:i2), &
+                                  indx, ierr, .FALSE.)
+      IF (ierr == 0) lneedTable = .TRUE.
+      ! Distribute the table to the roots (intra-communicator IDs must match)
+      IF (xcdsmIntraCommID_ == commRoot) THEN
+         ! Pass the table to all groups that need it
          DO ig=0,nxcdsmGroups_-1
-! TODO do i need to send this table?
             IF (myid_ == root) THEN
-               CALL MPI_Send(table, ngrd, MPI_DOUBLE_PRECISION, ig, 0, &
-                             xcdsmInterComm_, mpierr) 
+               ! Do I need to send this table?
+               CALL xcloc_utils_bsearch32i(i2-i1+1, ig, signalToGroup_(i1:i2), &
+                                           indx, ierr, .FALSE.)
+               IF (ierr == 0 .AND. ig /= xcdsmInterCommID_) THEN
+                  CALL MPI_Send(ttptr, ngrd, MPI_DOUBLE_PRECISION, ig, 0, &
+                                xcdsmInterComm_, mpierr) 
+               ENDIF
             ELSE
                IF (lneedTable) THEN
-                  ALLOCATE(work(ngrd))
-                  CALL MPI_Recv(work, ngrd, MPI_DOUBLE_PRECISION, MPI_ANY_SOURCE, &
+                  ALLOCATE(work(ngrd)); work(:) = 0.d0
+                  CALL MPI_Recv(ttptr, ngrd, MPI_DOUBLE_PRECISION, MPI_ANY_SOURCE, &
                                 MPI_ANY_TAG, xcdsmInterComm_, stat, mpierr)
+                  ttptr => work(1:ngrd) ! Associate pointer
                ENDIF
             ENDIF
          ENDDO
       ENDIF
-
+      ! Roots distribute the table to members of its DSM/XC group
+      ierrLoc = 0
+      IF (lneedTable) THEN
+         CALL xcloc_dsmxcMPI_setTable64f(localTableNumber, ngrd, xcdsmIntraCommID_, &
+                                         ttptr, ierrLoc)
+         IF (ierrLoc /= 0) THEN
+            ierrLoc = 1
+         ENDIF
+      ENDIF
+      CALL MPI_Allreduce(ierrLoc, ierr, 1, MPI_INTEGER, MPI_SUM, xclocGlobalComm_, mpierr)
+      IF (ASSOCIATED(ttptr)) NULLIFY(ttptr)
       IF (ALLOCATED(work)) DEALLOCATE(work)
   900 FORMAT("xclocMPI_setTable64f: Module not initialized")
   905 FORMAT("xclocMPI_setTable64f: ngrdIn=", I6, "should be ngrd=", I6)

@@ -3,16 +3,16 @@ jobs:
   build:
     docker:
       # In advanced project settings one can set private variables such as the docker username and password
-      #- image: bakerb845/mkl-iscl-build --user ${DOCKER_USER} --password ${DOCKER_PASS} # not sure if this is right
+      #- image: bakerb845/mkl-iscl-build
+      #  auth:
+      #     username: $DOCKER_USER
+      #     password: $DOCKER_PASS
       - image: bakerb845/ubuntu-xcloc
     steps:
       - checkout
       - run:
           name: Print the Current Time
           command: date
-      - run:
-          name: List the directory
-          command: pwd
       - run:
           name: Build the code
           command: |
@@ -42,5 +42,9 @@ jobs:
             -DMKL_LIBRARY="-Wl,--start-group ${MKL_LIB_ROOT}/libmkl_gf_lp64.a ${MKL_LIB_ROOT}/libmkl_sequential.a ${MKL_LIB_ROOT}/libmkl_core.a -Wl,--end-group" \
             -DIPP_INCLUDE_DIR=/opt/intel/ipp/include \
             -DIPP_LIBRARY="${IPP_LIB_ROOT}/libipps.so;${IPP_LIB_ROOT}/libippvm.so;${IPP_LIB_ROOT}/libippcore.so"
+      - run:
+          name: Build
           command: make
+      - run:
+          name: Run cmake test
           command: make test

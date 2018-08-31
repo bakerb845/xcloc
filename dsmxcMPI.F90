@@ -195,21 +195,22 @@ MODULE XCLOC_DSMXC_MPI
 !>                            root process. 
 !>    @param[in] ngrd         Number of grid points in table.  This must match
 !>                            ngrdTotal_.   This must be defined on the root process.
+!>    @param[in] root         The root process ID on the DSM XC communicator.
 !>    @param[in] table        Travel time (seconds) from the receiver to all points.
 !>                            This is an array of dimension [ngrd] and must be defined
 !>                            on the root process.
 !>    @param[out] ierr        0 indicates success.
 !>    @ingroup dsmxcMPI
-      SUBROUTINE xcloc_dsmxcMPI_setTable64f(tableNumber, ngrd, table, ierr) &
+      SUBROUTINE xcloc_dsmxcMPI_setTable64f(tableNumber, ngrd, root, table, ierr) &
       BIND(C, NAME='xcloc_dsmxcMPI_setTable64f')
-      INTEGER(C_INT), VALUE, INTENT(IN) :: tableNumber, ngrd
+      INTEGER(C_INT), VALUE, INTENT(IN) :: tableNumber, ngrd, root
       REAL(C_DOUBLE), INTENT(IN) :: table(ngrd)
       INTEGER(C_INT), INTENT(OUT) :: ierr
       DOUBLE PRECISION, ALLOCATABLE :: twork(:)
       INTEGER, ALLOCATABLE :: displs(:), sendCounts(:)
       INTEGER i, ierrLoc, mpierr, recvCount, tnumber
       ierr = 0
-      IF (myid_ == root_) THEN
+      IF (myid_ == root) THEN
          tnumber = tableNumber
          IF (ngrd /= ngrdTotal_) THEN
             WRITE(ERROR_UNIT,900) ngrd, ngrdTotal_
@@ -225,15 +226,15 @@ MODULE XCLOC_DSMXC_MPI
             displs(i+1) = displs(i) + nGridPtsPerProcess_(i)
          ENDDO
       ENDIF
-      CALL MPI_Bcast(ierr, 1, MPI_INTEGER, root_, comm_, mpierr)
+      CALL MPI_Bcast(ierr, 1, MPI_INTEGER, root, comm_, mpierr)
       IF (ierr /= 0) RETURN
       ! Distribute the table
-      CALL MPI_Bcast(tnumber, 1, MPI_INTEGER, root_, comm_, mpierr)
+      CALL MPI_Bcast(tnumber, 1, MPI_INTEGER, root, comm_, mpierr)
       recvCount = ngrdLocal_
       ALLOCATE(twork(ngrdLocal_))
       CALL MPI_Scatterv(table, sendCounts, displs,                &
                         MPI_DOUBLE_PRECISION, twork, recvcount,   &
-                        MPI_DOUBLE_PRECISION, root_, comm_, mpierr)
+                        MPI_DOUBLE_PRECISION, root, comm_, mpierr)
       CALL xcloc_dsmxc_setTable64f(tnumber, ngrdLocal_, twork, ierrLoc)
       IF (ALLOCATED(displs))     DEALLOCATE(displs)
       IF (ALLOCATED(sendCounts)) DEALLOCATE(sendCounts)
