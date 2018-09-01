@@ -152,6 +152,7 @@ ERROR1:;
     {
         fprintf(stdout, "%s: Initializing parxcloc...\n", __func__);
     }
+    // Initialize
     int nptsPad = npts;
     xclocMPI_initialize(fcomm, root, 
                         nxcdsmGroups,
@@ -161,9 +162,20 @@ ERROR1:;
                         xcPairs,
                         verbose, precision, accuracy,
                         &ierrLoc);
+    if (ierrLoc != 0){ierrLoc = 1;}
+    MPI_Allreduce(&ierrLoc, &ierr, 1, MPI_INTEGER, MPI_MAX, comm);
+    if (ierr != 0)
+    {
+        if (myid == root)
+        {
+            fprintf(stderr, "%s: Failed to initialize xclocMPI", __func__);
+        }
+        return EXIT_FAILURE;
+    }
+    // Set the tables
 
-    xclocMPI_finalize();
     // Free space
+    xclocMPI_finalize();
     if (xcPairs != NULL){free(xcPairs);}
     if (xr != NULL){free(xr);}
     if (image != NULL){free(image);}

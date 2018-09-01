@@ -77,7 +77,7 @@ class dsmxc:
         @param[in] dt         Sampling period (seconds) of correlograms. 
         @param[in] verbose    Controls verbosity.
         @retval ierr          Error flag where 0 indicates success.
-        @ingroup dsmxc 
+        @ingroup pydsmxc 
         """
         fname = '%s::%s'%(self.__class__.__name__, self.initialize.__name__)
         if (ngrd < 1):
@@ -105,7 +105,7 @@ class dsmxc:
     def finalize(self):
         """!
         Releases memory on the diffraction stack migration module.
-        @ingroup dsmxc
+        @ingroup pydsmxc
         """
         self.lib.xcloc_dsmxc_finalize()
         self.linit = False

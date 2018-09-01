@@ -101,6 +101,9 @@ MODULE XCLOC_FDXC_MPI
       PUBLIC :: xcloc_fdxcMPI_computeCrossCorrelograms
       PUBLIC :: xcloc_fdxcMPI_computePhaseCorrelograms
       PUBLIC :: xcloc_fdxcMPI_gatherCorrelograms64f
+      PUBLIC :: xcloc_fdxcMPI_getCorrelogramLength
+      PUBLIC :: xcloc_fdxcMPI_getNumberOfCorrelograms
+      PUBLIC :: xcloc_fdxcMPI_getNumberOfSignals
       PUBLIC :: xcloc_fdxcMPI_setSignals64f
       PUBLIC :: xcloc_fdxcMPI_setSignals32f
       CONTAINS
@@ -414,6 +417,66 @@ MODULE XCLOC_FDXC_MPI
       ENDIF
       CALL MPI_Allreduce(ierrLoc, ierr, 1, MPI_INTEGER, MPI_SUM, comm_, mpierr)
   900 FORMAT('xcloc_fdxcMPI_computePhaseCorrelograms: Error computing pxcs on rank ', I0)
+      RETURN
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Returns the number of points in the time domain correlations.
+!>    @param[out] nptsInXCs  Number of points in the correlograms.
+!>    @param[out] ierr       0 indicates success.
+!>    @ingroup fdxcmpi
+      SUBROUTINE xcloc_fdxcMPI_getCorrelogramLength(nptsInXCs, ierr) &
+      BIND(C, NAME='xcloc_fdxcMPI_getCorrelogramLength')
+      IMPLICIT NONE 
+      INTEGER(C_INT), INTENT(OUT) :: nptsInXCs, ierr 
+      ierr = 0
+      nptsInXCs = nptsInXCs_
+      IF (nptsInXCs_ < 1) THEN 
+         WRITE(ERROR_UNIT,900)
+         ierr = 1
+      ENDIF 
+  900 FORMAT('xcloc_fdxcMPI_getCorrelogramLength: Correlogram length is 0')
+      RETURN
+      END 
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Returns the number of correlograms to be computed.
+!>    @param[out] nxcs   Number of correlograms.
+!>    @param[out] ierr   0 indicates success.
+!>    @ingroup fdxcmpi
+      SUBROUTINE xcloc_fdxcMPI_getNumberOfCorrelograms(nxcs, ierr) &
+      BIND(C, NAME='xcloc_fdxcMPI_getNumberOfCorrelograms')
+      IMPLICIT NONE
+      INTEGER(C_INT), INTENT(OUT) :: nxcs, ierr
+      ierr = 0
+      nxcs = nxcsTotal_
+      IF (nxcsTotal_ < 1) THEN
+         WRITE(ERROR_UNIT,900)
+         ierr = 1 
+      ENDIF 
+  900 FORMAT('xcloc_fdxcMPI_getNumberOfCorrelograms: Correlation table never set!')
+      RETURN
+      END 
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Returns the number of input time domain signals.
+!>    @param[out] nsignals  Number of time domain input signals to correlate.
+!>    @param[out] ierr      0 indicates success. 
+!>    @ingroup fdxcmpi
+      SUBROUTINE xcloc_fdxcMPI_getNumberOfSignals(nsignals, ierr) &
+      BIND(C, NAME='xcloc_fdxcMPI_getNumberOfSignals')
+      IMPLICIT NONE
+      INTEGER(C_INT), INTENT(OUT) :: nsignals, ierr
+      ierr = 0 
+      nsignals = nsignalsTotal_
+      IF (nsignalsTotal_ < 1) THEN
+         WRITE(ERROR_UNIT,900)
+         ierr = 1
+      ENDIF
+  900 FORMAT('xcloc_fdxcMPI_getNumberOfSignals: No signals!')
       RETURN
       END
 !                                                                                        !

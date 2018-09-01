@@ -119,7 +119,7 @@ MODULE XCLOC_DSMXC_MPI
          IF (nptsInXCs < 1 .OR. MOD(nptsInXCs, 2) /= 1) THEN
             IF (nptsInXCs < 1) WRITE(ERROR_UNIT,905)
             IF (MOD(nptsInXCs, 2) /= 1) WRITE(ERROR_UNIT,906) nptsInXCs
-            ierr = 1 
+            ierr = 1
          ENDIF
          IF (ierr /= 0) GOTO 500
          ! Copy some input variables 
@@ -285,7 +285,7 @@ MODULE XCLOC_DSMXC_MPI
       INTEGER mpierr
       CALL xcloc_dsmxc_finalize()
       IF (ALLOCATED(nGridPtsPerProcess_)) DEALLOCATE(nGridPtsPerProcess_)
-      IF (lfreeComm_) CALL MPI_COMM_FREE(comm_, mpierr)
+      IF (lfreeComm_) CALL MPI_Comm_free(comm_, mpierr)
       lfreeComm_ = .FALSE.
       ngrdTotal_ = 0
       ngrdLocal_ = 0

@@ -72,6 +72,7 @@ MODULE XCLOC_DSMXC
       PUBLIC :: xcloc_dsmxc_getImage32f
       PUBLIC :: xcloc_dsmxc_getNumberOGridPointsInTable
       PUBLIC :: xcloc_dsmxc_getNumberOfTables
+      PUBLIC :: xcloc_dsmxc_getSamplingPeriod
       PUBLIC :: xcloc_dsmxc_setCorrelograms64f
       PUBLIC :: xcloc_dsmxc_setCorrelograms32f
       PUBLIC :: xcloc_dsmxc_setCorrelogram64fF 
@@ -81,7 +82,7 @@ MODULE XCLOC_DSMXC
       PUBLIC :: xcloc_dsmxc_getImageMax
       ! Public but for Fortran only
       PUBLIC :: xcloc_dsmxc_getImagePtr
-
+      PUBLIC :: xcloc_dsmxc_getTravelTimePtr
       PRIVATE :: xcloc_dsmxc_checkTables
       CONTAINS
 !----------------------------------------------------------------------------------------!
@@ -238,6 +239,55 @@ MODULE XCLOC_DSMXC
 !                                                                                        !
 !========================================================================================!
 !                                                                                        !
+!>    @brief Returns the sampling period corresponding to the tables on the module.
+!>    @param[out] dt   The sampling period (seconds) corresponding to the travel time
+!>                     tables.
+!>    @ingroup dsmxc
+      SUBROUTINE xcloc_dsmxc_getSamplingPeriod(dt) &
+      BIND(C, NAME='xcloc_dsmxc_getSamplingPeriod')
+      REAL(C_DOUBLE), INTENT(OUT) :: dt
+      dt = dt_
+      RETURN
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Gets a pointer to the travel time table.
+!>    @param[in] tableNumber  The table number.
+!>    @param[out] ttPtr       Pointer to the integer travel time delays from the receiver 
+!>                            to all points in the grid.  The travel times can be 
+!>                            obtained by computing ttPtr*dt where dt is the sampling
+!>                            period.  This has dimension [ngrd_] and should not be
+!>                            modified.
+!>    @param[out] ierr        0 indiates success. 
+!>    @ingroup dsmxc
+      SUBROUTINE xcloc_dsmxc_getTravelTimePtr(tableNumber, ttPtr, ierr)
+      INTEGER(C_INT), VALUE, INTENT(IN) :: tableNumber
+      INTEGER(C_INT), CONTIGUOUS, POINTER, DIMENSION(:), INTENT(OUT) :: ttPtr
+      INTEGER(C_INT), INTENT(OUT) :: ierr
+      INTEGER i1, i2
+      ierr = 0
+      NULLIFY(ttPtr)
+      IF (tableNumber < 1 .OR. tableNumber > ntables_) THEN
+         WRITE(ERROR_UNIT,900) tableNumber, ntables_ 
+         ierr = 1 
+         RETURN
+      ENDIF
+      IF (.NOT.lhaveTable_(tableNumber)) THEN
+         WRITE(ERROR_UNIT,905) tableNumber
+      ENDIF
+      i1 = (tableNumber - 1)*ldg_ + 1
+      i2 = i1 + ngrd_ - 1
+      ttPtr(1:ngrd_) => ttimes_(i1:i2)  
+  900 FORMAT('xcloc_dsmxc_setTraveltimePtr32f: tableNumber=', I0, &
+             ' must be in range [1,',I0,']')
+  905 FORMAT('xcloc_dsmxc_getTravelTimePtr32f: tableNumber=', I0, ' not intialize')
+      RETURN
+      END
+
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
 !>    @brief Gets the maximum value of the image.  
 !>    @param[out] maxIndex  The index of the maximum.  This is Fortran indexed.
 !>    @param[out] maxValue  Maximum value corresponding the maxIndex.
@@ -315,7 +365,7 @@ MODULE XCLOC_DSMXC
       ENDIF
       image(1:ngrd_) = DBLE(image32f_(1:ngrd_))
   900 FORMAT('xcloc_dsmxc_getImage64f: Image not yet computed')
-  905 FORMAT('xcloc_dsmxc_getImage64f: nwork=', I6, ' must be at least ngrd_=', I6)
+  905 FORMAT('xcloc_dsmxc_getImage64f: nwork=', I0, ' must be at least ngrd_=', I6)
       RETURN
       END
 !>    Gets the diffraction stack migration image of the correlograms from the module.
@@ -342,7 +392,7 @@ MODULE XCLOC_DSMXC
       ENDIF
       image(1:ngrd_) = image32f_(1:ngrd_)
   900 FORMAT('xcloc_dsmxc_getImage32f: Image not yet computed')
-  905 FORMAT('xcloc_dsmxc_getImage32f: nwork=', I6, ' must be at least ngrd_=', I6)
+  905 FORMAT('xcloc_dsmxc_getImage32f: nwork=', I0, ' must be at least ngrd_=', I6)
       RETURN
       END
 !                                                                                        !
@@ -388,9 +438,9 @@ MODULE XCLOC_DSMXC
             RETURN
          ENDIF
       ENDDO
-  900 FORMAT('xcloc_dsmxc_setCorrelograms64f: nxcPairs=', I4,'- expecting nxcPairs=',I4)
-  901 FORMAT('xcloc_dsmxc_setCorrelograms64f: nPtsInXCs=', I6,'- expecting nptsInXCS=',I6)
-  902 FORMAT('xcloc_dsmxc_setCorrelograms64f: Error setting xc number', I4) 
+  900 FORMAT('xcloc_dsmxc_setCorrelograms64f: nxcPairs=', I0,'; expecting nxcPairs=',I0)
+  901 FORMAT('xcloc_dsmxc_setCorrelograms64f: nPtsInXCs=', I0,'; expecting nptsInXCS=',I0)
+  902 FORMAT('xcloc_dsmxc_setCorrelograms64f: Error setting xc number ', I0)
       RETURN
       END
 !                                                                                        !
@@ -436,9 +486,9 @@ MODULE XCLOC_DSMXC
             RETURN
          ENDIF
       ENDDO
-  900 FORMAT('xcloc_dsmxc_setCorrelograms32f: nxcPairs=', I4,'- expecting nxcPairs=',I4)
-  901 FORMAT('xcloc_dsmxc_setCorrelograms32f: nPtsInXCs=', I6,'- expecting nptsInXCS=',I6)
-  902 FORMAT('xcloc_dsmxc_setCorrelograms32f: Error setting xc number', I4)
+  900 FORMAT('xcloc_dsmxc_setCorrelograms32f: nxcPairs=', I0,'; expecting nxcPairs=',I0)
+  901 FORMAT('xcloc_dsmxc_setCorrelograms32f: nPtsInXCs=', I0,'; expecting nptsInXCS=',I0)
+  902 FORMAT('xcloc_dsmxc_setCorrelograms32f: Error setting xc number ', I0)
       RETURN
       END
 !                                                                                        !
@@ -468,8 +518,8 @@ MODULE XCLOC_DSMXC
       i1 = (xcIndex - 1)*dataOffset_ + 1
       i2 = i1 + nptsInXCs_ - 1 
       xcs32f_(i1:i2) = SNGL(xc(1:nptsInXCs_))
-  900 FORMAT('xcloc_dsmxc_setCorrelogram64fF: nptsInXCs=', I6,'- expecting nptsInXCS=',I6)
-  901 FORMAT('xcloc_dsmxc_setCorrelogram64fF: xcIndex must be in range [1,',I4,']')
+  900 FORMAT('xcloc_dsmxc_setCorrelogram64fF: nptsInXCs=', I0,'; expecting nptsInXCS=',I0)
+  901 FORMAT('xcloc_dsmxc_setCorrelogram64fF: xcIndex must be in range [1,',I0,']')
       RETURN
       END
 !                                                                                        !
@@ -499,8 +549,8 @@ MODULE XCLOC_DSMXC
       i1 = (xcIndex - 1)*dataOffset_ + 1
       i2 = i1 + nptsInXCs_ - 1
       xcs32f_(i1:i2) = xc(1:nptsInXCs_)
-  900 FORMAT('xcloc_dsmxc_setCorrelogram32fF: nptsInXCs=', I6,'- expecting nptsInXCS=',I6)
-  901 FORMAT('xcloc_dsmxc_setCorrelogram32fF: xcIndex must be in range [1,',I4,']')
+  900 FORMAT('xcloc_dsmxc_setCorrelogram32fF: nptsInXCs=', I0,'; expecting nptsInXCS=',I0)
+  901 FORMAT('xcloc_dsmxc_setCorrelogram32fF: xcIndex must be in range [1,',I0,']')
       RETURN
       END
 !                                                                                        !
@@ -525,7 +575,7 @@ MODULE XCLOC_DSMXC
       ENDDO
       ierr = 1
       WRITE(ERROR_UNIT,900) blockSize
-  900 FORMAT('xcloc_dsmxc_setBlockSize: blockSize=', I6, 'is not a power of 2')
+  900 FORMAT('xcloc_dsmxc_setBlockSize: blockSize=', I0, ' is not a power of 2')
       RETURN
   500 CONTINUE 
       blockSize_ = blockSize 
@@ -549,7 +599,7 @@ MODULE XCLOC_DSMXC
          WRITE(ERROR_UNIT,900) is
          it = 0
       ENDIF
-  900 FORMAT('xcloc_dsmxc_signalToTableIndex: Failed to find signal number', I4, &
+  900 FORMAT('xcloc_dsmxc_signalToTableIndex: Failed to find signal number', I0, &
              ' in table')
       RETURN
       END 
@@ -596,8 +646,8 @@ MODULE XCLOC_DSMXC
          CALL xcloc_dsmxc_checkTables(ierr)
          IF (ierr /= 0) WRITE(OUTPUT_UNIT,910)
       ENDIF
-  900 FORMAT('xcloc_dsmxc_setTable64f: tableNumber=', I4, ' must be in range [1,',I4,']')
-  905 FORMAT('xcloc_dsmxc_setTable64f: ngrd=', I6, ' expecting ngrd_=', I6) 
+  900 FORMAT('xcloc_dsmxc_setTable64f: tableNumber=', I0, ' must be in range [1,',I0,']')
+  905 FORMAT('xcloc_dsmxc_setTable64f: ngrd=', I0, ' expecting ngrd_=', I0) 
   910 FORMAT('xcloc_dsmxc_setTable64f: All tables set')
       RETURN
       END
@@ -645,8 +695,8 @@ MODULE XCLOC_DSMXC
          CALL xcloc_dsmxc_checkTables(ierr)
          IF (ierr /= 0) WRITE(OUTPUT_UNIT,910) 
       ENDIF
-  900 FORMAT('xcloc_dsmxc_setTable32f: tableNumber=', I4, ' must be in range [1,',I4,']')
-  905 FORMAT('xcloc_dsmxc_setTable32f: ngrd=', I6, ' expecting ngrd_=', I6)
+  900 FORMAT('xcloc_dsmxc_setTable32f: tableNumber=', I0, ' must be in range [1,',I0,']')
+  905 FORMAT('xcloc_dsmxc_setTable32f: ngrd=', I0, ' expecting ngrd_=', I0)
   910 FORMAT('xcloc_dsmxc_setTable32f: All tables set')
       RETURN
       END
@@ -779,9 +829,9 @@ MODULE XCLOC_DSMXC
       ENDIF
       !print *, indxMinXC, indxMaxXC, nptsInXCs_
   905 FORMAT('xcloc_dsmxc_checkTables: Only a subset of tables were set')
-  910 FORMAT('xcloc_dsmxc_checkTables: Min index=', I6, ' is less than 0')
-  911 FORMAT('xcloc_dsmxc_checkTables: Max index=', I6, ' exceeds nptsInXCs_=', I6)
-  912 FORMAT('xcloc_dsmxc_checktables: Segfault will occur - increase nptsInXCs to:', I6)
+  910 FORMAT('xcloc_dsmxc_checkTables: Min index=', I0, ' is less than 0')
+  911 FORMAT('xcloc_dsmxc_checkTables: Max index=', I0, ' exceeds nptsInXCs_=', I6)
+  912 FORMAT('xcloc_dsmxc_checktables: Segfault will occur - increase nptsInXCs to ', I0)
       RETURN
       END
 END MODULE

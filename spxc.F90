@@ -163,7 +163,7 @@ MODULE XCLOC_SPXC
   900 FORMAT('xcloc_spxc_initialize: Number of filter coefficients must be posisitve')
   901 FORMAT('xcloc_spxc_initialize: nTaps=1; skipping filtering')
   904 FORMAT('xcloc_spxc_initialize: Adding one filter coefficient')
-  905 FORMAT('xcloc_spxc_initialize: Invalid filter type', I4)
+  905 FORMAT('xcloc_spxc_initialize: Invalid filter type ', I0)
   906 FORMAT('xcloc_spxc_initialize: Error designing Hilbert transformer')
   907 FORMAT('xcloc_spxc_initialize: Error designing RMS filter')
       RETURN

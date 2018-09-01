@@ -107,7 +107,6 @@ MODULE XCLOC
       REAL(C_DOUBLE), VALUE, INTENT(IN) :: dt
       INTEGER(C_INT), INTENT(IN) :: xcPairs(2*nxcs)
       INTEGER(C_INT), INTENT(OUT) :: ierr
-      INTEGER nptsInXCs
       ierr = 0
       CALL xcloc_finalize()
       CALL xcloc_setXCTypeToMigrate(s2m, ierr)
@@ -124,8 +123,9 @@ MODULE XCLOC
          CALL xcloc_finalize()
          RETURN
       ENDIF
-      ! Get the length of the correlograms.
-      CALL xcloc_fdxc_getCorrelogramLength(nptsInXCs, ierr)
+      ! Get the number and length of the correlograms.
+      CALL xcloc_fdxc_getNumberOfCorrelograms(nxcs_, ierr)
+      CALL xcloc_fdxc_getCorrelogramLength(nptsInXCs_, ierr)
       IF (ierr /= 0) THEN
          WRITE(ERROR_UNIT,901)
          CALL xcloc_finalize()
@@ -139,15 +139,13 @@ MODULE XCLOC
          RETURN
       ENDIF
       ! Initialize the diffraction stack migration module.
-      CALL xcloc_dsmxc_initialize(ngrd, nxcs, nptsInXCs,    &
+      CALL xcloc_dsmxc_initialize(ngrd, nxcs_, nptsInXCs_,    &
                                   dt, xcPairs, verbose, ierr)
       IF (ierr /= 0) THEN
          WRITE(ERROR_UNIT,905)
          CALL xcloc_finalize()
          RETURN
       ENDIF
-      CALL xcloc_fdxc_getNumberOfCorrelograms(nxcs_, ierr)
-      CALL xcloc_fdxc_getCorrelogramLength(nptsInXCs_, ierr)
       CALL xcloc_dsmxc_getNumberOGridPointsInTable(ngrd_)
       ! Set some basic info
       accuracy_ = accuracy
