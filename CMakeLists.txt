@@ -131,6 +131,23 @@ SET(CPACK_PACKAGE_VERSION_MINOR ${XCLOC_VERSION_MINOR})
 SET(CPACK_PACKAGE_VERSION_PATCH ${XCLOC_VERSION_PATCH})
 SET(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
 
+##########################################################################################
+#                                  Configuration Details                                 #
+##########################################################################################
+SET(XCLOC_LIBRARY xcloc)
+SET(INCLUDE_INSTALL_DIR include/)
+SET(LIB_INSTALL_DIR lib/)
+SET(SYSCONFIG_INSTALL_DIR etc/xcloc/)
+INCLUDE(CMakePackageConfigHelpers)
+CONFIGURE_PACKAGE_CONFIG_FILE(${CMAKE_MODULE_PATH}/FindXCLOC.cmake.in
+                              ${CMAKE_BINARY_DIR}/FindXCLOC.cmake
+                              INSTALL_DESTINATION ${LIB_INSTALL_DIR}/ispl/cmake
+                              PATH_VARS INCLUDE_INSTALL_DIR SYSCONFIG_INSTALL_DIR)
+WRITE_BASIC_PACKAGE_VERSION_FILE(${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/xclocConfigVersion.cmake
+                                 VERSION ${XCLOC_VERSION} 
+                                 COMPATIBILITY SameMajorVersion)
+
+
 
 IF (NOT (${CMAKE_LIBRARY_OUTPUT_DIRECTORY} STREQUAL ${CMAKE_INSTALL_PREFIX}/lib))
    INSTALL(TARGETS xcloc_shared
@@ -145,7 +162,7 @@ INSTALL(TARGETS ${TARGET_NAMES}
         RUNTIME DESTINATION ${CMAKE_BINARY_DIR})
 INSTALL(FILES
         ${CMAKE_BINARY_DIR}/FindXCLOC.cmake
-        ${CMAKE_INSTALL_PREFIX}/lib/xclocConfigVersion.cmake
-        DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/xcloc/cmake)
+        ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/xclocConfigVersion.cmake
+        DESTINATION ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/xcloc/cmake)
 
 
