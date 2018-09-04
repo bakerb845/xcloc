@@ -65,35 +65,5 @@
  padding; \
 })
 
-/*
-#define DALES_PAD_COMPLEX32(ALIGNMENT, n) \
-({ \
- size_t paddingElements = ALIGNMENT/sizeof(float complex); \
- size_t padding = n + (paddingElements - n%paddingElements); \
- padding; \
-})
-
-#define DALES_PAD_COMPLEX64(ALIGNMENT, n) \
-({ \
- size_t paddingElements = ALIGNMENT/sizeof(double complex); \
- size_t padding = n + (paddingElements - n%paddingElements); \
- padding; \
-})
-
-#define DALES_PAD_FLOAT64(ALIGNMENT, n) \
-({ \
- size_t paddingElements = ALIGNMENT/sizeof(double); \
- size_t padding = n + (paddingElements - n%paddingElements); \
- padding; \
-})
-
-#define DALES_PAD_FLOAT32(ALIGNMENT, n) \
-({ \
- size_t paddingElements = ALIGNMENT/sizeof(float); \
- size_t padding = n + (paddingElements - n%paddingElements); \
- padding; \
-})
-*/
-
 #endif /* XCLOC_CONFIG_H__ */
 
