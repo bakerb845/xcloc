@@ -33,6 +33,15 @@ MODULE XCLOC_MPI
       TYPE(MPI_Comm), PRIVATE, SAVE :: xcdsmIntraComm_
 #endif
       !> @ingroup xcloc_mpi
+      !> RMA window for setting signals.
+      TYPE(MPI_Win), PRIVATE, SAVE :: signalRMAWindow_
+      !> @ingroup xcloc_mpi
+DOUBLE PRECISION, POINTER, DIMENSION(:), PRIVATE, SAVE :: signalsRMA64f_
+      !> @ingroup xcloc_mpi
+REAL, POINTER, DIMENSION(:), PRIVATE, SAVE :: signalsRMA32f_ 
+      !> @ingroup xcloc_mpi
+TYPE(C_PTR), SAVE :: dataPtr_ = C_NULL_PTR
+      !> @ingroup xcloc_mpi
       !> Maps from the XC/DSM's starting block of correlograms.  This has dimension
       !> [nxcdsmGroups_ + 1].
       INTEGER, PRIVATE, ALLOCATABLE, SAVE :: myDSMXCPtr_(:)
@@ -133,6 +142,9 @@ MODULE XCLOC_MPI
       !> Flag indicating that communicator has to be destroyed.
       LOGICAL, PRIVATE, SAVE :: lfreeComm_ = .FALSE.
       !> @ingroup xcloc_mpi
+      !> Flag indiating that the RMA signal window has to be destroyed.
+      LOGICAL, PRIVATE, SAVE :: lfreeWindow_ = .FALSE.
+      !> @ingroup xcloc_mpi
       !> Flag indicating that the module is initialized.
       LOGICAL, PRIVATE, SAVE :: linit_ = .FALSE.
 
@@ -151,7 +163,7 @@ integer, private, allocatable, save :: nDSMXCsPerGroup_(:)
 !                                     Begin the Code                                     !
 !========================================================================================!
 !>    @brief Initializes the MPI-based xcloc module.
-!>    @param[in] comm          The MPI communicator.  
+!>    @param[in] fcomm         The MPI communicator.  
 !>    @param[in] root          The root process ID on the MPI communicator.
 !>                             This will likely be 0.
 !>    @param[in] nxcdsmGroups  Number of XC/DSM groups.
@@ -170,7 +182,7 @@ integer, private, allocatable, save :: nDSMXCsPerGroup_(:)
 !>    @param[in] accuracy      Controls the accuracy of the vectorized MKL calculations.
 !>    @param[out] ierr         0 indicates success.
 !>    @ingroup xcloc_mpi
-      SUBROUTINE xclocMPI_initialize(comm, root,                     &
+      SUBROUTINE xclocMPI_initialize(fcomm, root,                    &
                                      nxcdsmGroups,                   &
                                      npts, nptsPad, nxcs,            &
                                      s2m, dt, ngrd,                  &
@@ -179,16 +191,23 @@ integer, private, allocatable, save :: nDSMXCsPerGroup_(:)
                                      verbose, prec, accuracy, ierr ) &
       BIND(C, NAME='xclocMPI_initialize')
       IMPLICIT NONE
-      TYPE(MPI_Comm), VALUE, INTENT(IN) :: comm
+      !TYPE(MPI_Comm), VALUE, INTENT(IN) :: comm
+      INTEGER(C_INT64_T), VALUE, INTENT(IN) :: fcomm
       INTEGER(C_INT), VALUE, INTENT(IN) :: root, npts, nxcdsmGroups,            &
                                            nptsPad, nxcs, ngrd, nfcoeffs,       &
                                            ftype, s2m, verbose, prec, accuracy
       REAL(C_DOUBLE), VALUE, INTENT(IN) :: dt
       INTEGER(C_INT), DIMENSION(2*nxcs), INTENT(IN) :: xcPairs
       INTEGER(C_INT), INTENT(OUT) :: ierr
+      INTEGER(C_INT64_T) commTemp
       INTEGER, ALLOCATABLE :: myDSMXCs(:), iwork(:), jwork(:), xcPairsWork(:)
       INTEGER i1, i2, ig, ierrLoc, indx, is, ixc, mpierr, nalloc, nsignalPairs, nsignals, &
               nsg, nunique
+      TYPE(MPI_Comm) comm
+      INTEGER(KIND=MPI_ADDRESS_KIND) nallocMPI
+      INTEGER arrayShape(1), sizeDataType
+      comm%MPI_VAL = INT(fcomm, KIND(comm%MPI_VAL))
+
       ierr = 0
       root_ = root
       CALL MPI_Comm_rank(comm, myid_,   mpierr) 
@@ -402,7 +421,9 @@ integer, private, allocatable, save :: nDSMXCsPerGroup_(:)
                 verbose_ >= XCLOC_PRINT_INFO) THEN
                WRITE(OUTPUT_UNIT,810) ig
             ENDIF
-            CALL xcloc_fdxcMPI_initialize(xcdsmIntraComm_, subModuleRoot_,     &
+            commTemp = INT(xcdsmIntraComm_%MPI_VAL, KIND(commTemp))
+            CALL xcloc_fdxcMPI_initialize(commTemp, & !xcdsmIntraComm_.MPI_VAL, &
+                                          subModuleRoot_,  &
                                           npts_, nptsPad_,                     &
                                           nxcsLocal_, xcPairsLocal_,           &
                                           verbose_, precision_, accuracy_, ierr)
@@ -431,7 +452,8 @@ integer, private, allocatable, save :: nDSMXCsPerGroup_(:)
                 verbose_ >= XCLOC_PRINT_INFO) THEN
                WRITE(OUTPUT_UNIT,815) ig
             ENDIF
-            CALL xcloc_dsmxcMPI_initialize(xcdsmIntraComm_, subModuleRoot_,     &
+            commTemp = INT(xcdsmIntraComm_%MPI_VAL, KIND(commTemp))
+            CALL xcloc_dsmxcMPI_initialize(commTemp, subModuleRoot_,            &
                                            ngrdTotal_, nxcsLocal_, nptsInXCs_,  &
                                            dt_, xcPairsLocal_, verbose_, ierr)
             IF (ierr /= 0) THEN
@@ -443,6 +465,29 @@ integer, private, allocatable, save :: nDSMXCsPerGroup_(:)
       ENDDO
       CALL MPI_Allreduce(ierrLoc, ierr, 1, MPI_INTEGER, MPI_MAX, xclocGlobalComm_, mpierr)
       IF (ierr /= 0) GOTO 5555 
+      ! Create an RMA window to set the signals.
+      CALL MPI_Sizeof(signalsRMA64f_, sizeDataType, mpierr)
+      IF (precision_ == XCLOC_SINGLE_PRECISION) THEN
+         CALL MPI_Sizeof(signalsRMA32f_, sizeDataType, mpierr) 
+      ENDIF
+      arrayShape(1) = 1
+      nallocMPI = 1
+      IF (myid_ == root_) THEN
+         arrayShape(1) = npts_*nSignalsTotal_ 
+         nallocMPI = INT(arrayShape(1), KIND(nallocMPI)) &
+                    *INT(sizeDataType,  KIND(nallocMPI))
+      ENDIF
+      CALL MPI_Alloc_mem(nallocMPI, MPI_INFO_NULL, dataPtr_, mpierr)
+      IF (precision_ == XCLOC_SINGLE_PRECISION) THEN
+         CALL C_F_POINTER(dataPtr_, signalsRMA32f_, arrayShape)
+      ELSE
+         CALL C_F_POINTER(dataPtr_, signalsRMA64f_, arrayShape)
+      ENDIF
+      !CALL MPI_Win_create(dataPtr_, nallocMPI, sizeDataType, MPI_INFO_NULL, &
+      !                    xclocGlobalComm_, signalRMAWindow_, mpierr)
+      CALL MPI_Win_create_dynamic(MPI_INFO_NULL, xclocGlobalComm_, &
+                                  signalRMAWindow_, mpierr)
+      lfreeWindow_ = .TRUE.
       linit_ = .TRUE.
       ! Finish and clean up
  5555 CONTINUE
@@ -515,18 +560,22 @@ integer, private, allocatable, save :: nDSMXCsPerGroup_(:)
          CALL MPI_Comm_free(xcdsmInterComm_,  mpierr)
          CALL MPI_Comm_free(xclocGlobalComm_, mpierr)
       ENDIF
+      IF (lfreeWindow_) CALL MPI_Win_free(signalRMAWindow_, mpierr)
       IF (ALLOCATED(myDSMXCPtr_))       DEALLOCATE(myDSMXCPtr_)
       IF (ALLOCATED(l2gSignalPtr_))     DEALLOCATE(l2gSignalPtr_)
       IF (ALLOCATED(l2gSignal_))        DEALLOCATE(l2gSignal_)
       IF (ALLOCATED(signalToGroupPtr_)) DEALLOCATE(signalToGroupPtr_)
       IF (ALLOCATED(signalToGroup_))    DEALLOCATE(signalToGroup_)
-      IF (ALLOCATED(xcPairsLocal_))     DEALLOCATE(xcPairsLocal_) 
+      IF (ALLOCATED(xcPairsLocal_))     DEALLOCATE(xcPairsLocal_)
+!     IF (ASSOCIATED(signalsRMA32f_))   CALL MPI_Free_mem(signalsRMA32f_, mpierr)
+!     IF (ASSOCIATED(signalsRMA64f_))   CALL MPI_Free_mem(signalsRMA64f_, mpierr)
 if (allocated(nDSMXCsPerGroup_)) deallocate(nDSMXCsPerGroup_)
       root_ = 0
       nprocs_ = 0
       xcdsmIntraCommID_ = 0
       xcdsmInterCommID_ = 0
       lfreeComm_ = .FALSE.
+      lfreeWindow_ = .FALSE.
       linit_ = .FALSE.
       RETURN
       END
@@ -592,6 +641,119 @@ if (allocated(nDSMXCsPerGroup_)) deallocate(nDSMXCsPerGroup_)
       ENDIF
       root_ = root
   900 FORMAT("xclocMPI_getGlobalRootProcessID: Module not initialized")
+      RETURN
+      END
+
+      SUBROUTINE xclocMPI_setSignals64f(ldxIn, nptsIn, nsignalsIn, root, x, ierr) &
+      BIND(C, NAME='xclocMPI_setSignals')
+      INTEGER(C_INT), VALUE, INTENT(IN) :: ldxIn, nptsIn, nsignalsIn, root
+      REAL(C_DOUBLE), DIMENSION(1:ldxIn*nsignalsIn), TARGET, INTENT(IN) :: x 
+      INTEGER(C_INT), INTENT(OUT) :: ierr
+      REAL(C_DOUBLE), POINTER :: ptr(:)
+      REAL(C_DOUBLE), ALLOCATABLE :: xloc(:)
+      TYPE(MPI_Status) stat
+      INTEGER i1, i2, ig, isl, j1, j2, ldx, mpierr, npts, nrecv, nsend, nsignals, nsl, rootGroup, source
+      INTEGER(KIND=MPI_ADDRESS_KIND) :: size_, offset
+      INTEGER sizeDataType
+      ierr = 0
+      size_ = 0
+      IF (myid_ == MPI_UNDEFINED) RETURN ! I don't belong here
+      IF (myid_ == root) THEN
+         ldx = ldxIn
+         npts = nptsIn
+         nsignals = nsignalsIn
+         IF (.NOT.linit_ .OR. ldx < npts .OR. &
+             npts /= npts_ .OR. nsignals /= nSignalsTotal_) THEN
+            IF (.NOT.linit_) WRITE(ERROR_UNIT,850)
+            IF (ldx < npts) WRITE(ERROR_UNIT,900) ldx, npts
+            IF (npts /= npts_) WRITE(ERROR_UNIT,901) npts_
+            IF (nsignals /= nSignalsTotal_) WRITE(ERROR_UNIT,902) nSignalsTotal_
+            ierr = 1
+         ENDIF
+         CALL MPI_Sizeof(1.d0, sizeDataType, mpierr)
+         size_ = INT(sizeDataType, KIND(size_))*INT(nSignalsTotal_*ldx, KIND(size_))
+      ENDIF
+      ! Ditch early because of errors
+      CALL MPI_Bcast(ierr,  1, MPI_INTEGER, root, xclocGlobalComm_, mpierr)
+      IF (ierr /= 0) RETURN
+      ! Figure out the DSM/XC group and the rank on that group that will send the data
+      IF (myid_ == root) THEN
+         rootGroup = xcdsmInterCommID_
+         source = xcdsmIntraCommID_
+      ENDIF
+      CALL MPI_Bcast(rootGroup, 1, MPI_INTEGER, root, xclocGlobalComm_, mpierr)
+      CALL MPI_Bcast(source,    1, MPI_INTEGER, root, xclocGlobalComm_, mpierr)
+
+      CALL MPI_Win_attach(signalRMAWindow_, x, size_, mpierr)
+      CALL MPI_Barrier(xclocGlobalComm_, mpierr)
+      CALL MPI_WIN_FENCE(MPI_MODE_NOPRECEDE, signalRMAWindow_, mpierr)
+      IF (xcdsmIntraCommID_ == source) THEN
+         ALLOCATE(xloc(nsignalsLocal_*npts))
+         DO isl=1,nsignalsLocal_
+            i1 = (isl - 1)*npts + 1
+            offset = (isl - 1)*ldx  ! C numbering
+            CALL MPI_Get(xloc(i1), npts,                                     &
+                         MPI_DOUBLE_PRECISION, root, offset,                 &
+                         npts, MPI_DOUBLE_PRECISION, signalRMAWindow_, mpierr)
+         ENDDO
+         CALL MPI_Win_fence(MPI_MODE_NOSTORE + MPI_MODE_NOPUT + MPI_MODE_NOSUCCEED, &
+                            signalRMAWindow_, mpierr)
+      ENDIF
+!call 
+      CALL MPI_Win_detach(signalRMAWindow_, x, mpierr)
+      CALL MPI_Barrier(xclocGlobalComm_, mpierr)
+      IF (ALLOCATED(xloc)) DEALLOCATE(xloc)
+ return
+if (root /= root_) then
+ print *, 'this isnt done yet'
+ ierr = 1
+endif
+      CALL MPI_Bcast(ierr,  1, MPI_INTEGER, root, xclocGlobalComm_, mpierr)
+      IF (ierr /= 0) RETURN
+      ! Figure out the DSM/XC group and the rank on that group that will send the data
+      IF (myid_ == root) THEN
+         rootGroup = xcdsmInterCommID_
+         source = xcdsmIntraCommID_
+      ENDIF
+      CALL MPI_Bcast(rootGroup, 1, MPI_INTEGER, root, xclocGlobalComm_, mpierr)
+      CALL MPI_Bcast(source,    1, MPI_INTEGER, root, xclocGlobalComm_, mpierr)
+      ! Have the root distribute data to the other DSM/XC group roots
+      IF (xcdsmIntraCommID_ == source) THEN
+         IF (nsignalsLocal_ > 0) ALLOCATE(xloc(nsignalsLocal_*npts))
+         DO ig=0,nxcdsmGroups_-1
+            ! Have the root send the input data to the other processes that require it
+            IF (myid_ == root) THEN
+               nsl = l2gSignalPtr_(ig+1) - l2gSignalPtr_(ig)
+               IF (nsl < 1) CYCLE ! Nothing to to
+               ! Extract the data for this group
+               DO isl=1,nsl
+                  i1 = (isl - 1)*ldx + 1
+                  i2 = isl*ldx
+                  j1 = (isl - 1)*npts + 1
+                  j2 = isl*npts
+                  ptr(j1:j2) => x(i1:i2)
+               ENDDO
+               nsend = nsl*npts
+               CALL MPI_Send(ptr, nsend, MPI_DOUBLE_PRECISION, ig, root, &
+                              xcdsmInterComm_, mpierr) !send_request(1), mpierr)
+            ELSE
+               ! This group is ready to receive the data.
+               IF (ig == xcdsmInterCommID_) THEN
+                  nrecv = nsignalsLocal_*npts
+                  CALL MPI_Recv(xloc, nrecv, MPI_DOUBLE_PRECISION, MPI_ANY_SOURCE, &
+                                MPI_ANY_TAG, xcdsmInterComm_, stat, mpierr)
+               ENDIF
+            ENDIF
+         ENDDO
+      ENDIF
+      IF (nsignalsLocal_ > 0) THEN
+
+      ENDIF
+      IF (ALLOCATED(xloc)) DEALLOCATE(xloc)
+  850 FORMAT("xclocMPI_setSignals64f: Module not yet initialized")
+  900 FORMAT('xclocMPI_setSignals64f: Error ldx=', I0, ' < ', 'npts=', I0)
+  901 FORMAT('xclocMPI_setSignals64f: Error expecting npts=', I0)
+  902 FORMAT('xclocMPI_setSignals64f: Error expecting nsignals=', I0)
       RETURN
       END
 !                                                                                        !

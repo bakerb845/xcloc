@@ -1,6 +1,7 @@
 #ifndef XCLOC_FINTER_H__
 #define XCLOC_FINTER_H__
 #include <stdbool.h>
+#include <stdint.h>
 #include "xcloc_config.h"
 #include "xcloc_enum.h"
 
@@ -193,7 +194,7 @@ void xcloc_spxc_finalize(void);
 /*                              Parallel xcloc                                */
 /*----------------------------------------------------------------------------*/
 /* Initializes the parallel xcloc */
-void xclocMPI_initialize(const MPI_Fint comm, //const MPI_Comm comm,
+void xclocMPI_initialize(const int64_t comm, //const MPI_Fint comm, //const MPI_Comm comm,
                          const int root,
                          const int dsmGroupSize,
                          const int npts,
@@ -211,12 +212,12 @@ void xclocMPI_initialize(const MPI_Fint comm, //const MPI_Comm comm,
                          int *ierr);
 /* Releases memory on the parallel xcloc module */
 void xclocMPI_finalize(void);
-                        
+
 /*----------------------------------------------------------------------------*/
 /*                 Parallel Frequency Domain Cross-Correlation                */
 /*----------------------------------------------------------------------------*/
 /* Initialize parallel frequency domain cross correlation. */
-void xcloc_fdxcMPI_initialize(const MPI_Fint comm, //const MPI_Comm comm,
+void xcloc_fdxcMPI_initialize(const int64_t comm, //const MPI_Fint comm, //const MPI_Comm comm,
                               const int root, 
                               const int npts,
                               const int nptsPad,
@@ -254,7 +255,7 @@ void xcloc_fdxcMPI_finalize(void);
 /*                      Parallel DSM of Correlograms                          */
 /*----------------------------------------------------------------------------*/
 /* Initialize parallel DSM. */
-void xcloc_dsmxcMPI_initialize(const MPI_Fint comm, //const MPI_Comm comm,
+void xcloc_dsmxcMPI_initialize(const int64_t comm, //const MPI_Fint comm, //const MPI_Comm comm,
                                const int root,
                                const int ngrd, const int nxcPairs,
                                const int nptsInXCs, 

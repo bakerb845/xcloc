@@ -68,7 +68,7 @@ MODULE XCLOC_DSMXC_MPI
 !========================================================================================!
 !>    @brief Initializes the MPI-based module to compute the diffraction stack migration
 !>           of correlograms. 
-!>    @param[in] comm       MPI communicator.  This must be defined on all processes.
+!>    @param[in] fcomm      MPI communicator.  This must be defined on all processes.
 !>    @param[in] root       The root process ID on the communicator.  This likely will
 !>                          be 0.
 !>    @param[in] ngrd       Number of points in migration grid.  This is defined on the
@@ -87,11 +87,12 @@ MODULE XCLOC_DSMXC_MPI
 !>    @param[out] ierr      0 indicates success.
 !>    @ingroup dsmxcMPI
 !>    @bug Need to verify that MPI_Comm is the same size as MPI_Fcomm.
-      SUBROUTINE xcloc_dsmxcMPI_initialize(comm, root,                 &
+      SUBROUTINE xcloc_dsmxcMPI_initialize(fcomm, root,                &
                                            ngrd, nxcPairs, nptsInXCs,  &
                                            dt, xcPairs, verbose, ierr) &
       BIND(C, NAME='xcloc_dsmxcMPI_initialize')
-      TYPE(MPI_Comm),  VALUE, INTENT(IN) :: comm
+      !TYPE(MPI_Comm),  VALUE, INTENT(IN) :: comm
+      INTEGER(C_INT64_T), VALUE, INTENT(IN) :: fcomm
       !INTEGER(C_INT), VALUE, INTENT(IN) :: fcomm !TODO could be problematic w/ *finter.h
       INTEGER(C_INT), VALUE, INTENT(IN) :: root, ngrd, nxcPairs, nptsInXCs, &
                                            verbose
@@ -100,6 +101,8 @@ MODULE XCLOC_DSMXC_MPI
       INTEGER(C_INT), INTENT(OUT) :: ierr
       INTEGER, ALLOCATABLE :: myGrid(:), myGridPtr(:), xcPairsWork(:)
       INTEGER ierrLoc, ip, mpierr
+      TYPE(MPI_Comm) comm
+      comm%MPI_VAL = INT(fcomm, KIND(comm%MPI_VAL))
       ! iRelease module in case someone called this twice.
       CALL xcloc_dsmxcMPI_finalize()
       ! Get communicator size and my rank

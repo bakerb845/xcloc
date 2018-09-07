@@ -154,7 +154,7 @@ ERROR1:;
     }
     // Initialize
     int nptsPad = npts;
-    xclocMPI_initialize(fcomm, root, 
+    xclocMPI_initialize((int64_t) fcomm, root, 
                         nxcdsmGroups,
                         npts, nptsPad, nxcs,
                         s2m, dt, ngrd,

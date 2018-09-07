@@ -57,7 +57,7 @@ int test_parallel_fdxc(const MPI_Comm comm, const int root)
         xcPairs = (int *) calloc(1, sizeof(int));
     }
     xcloc_fdxcMPI_initialize(//comm, root,
-                             fcomm, root,
+                             (int64_t) fcomm, root,
                              npts, nptsPad,
                              nxcs, xcPairs,
                              verbose, precision, accuracy, &ierr);

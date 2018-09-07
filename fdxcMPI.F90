@@ -111,7 +111,7 @@ MODULE XCLOC_FDXC_MPI
 !                                      Begin the Code                                    !
 !========================================================================================!
 !>    @brief Initializes the parallel frequency domain cross-correlation calculator.
-!>    @param[in] comm      MPI communicator.  This must be defined on all processes.
+!>    @param[in] fcomm     MPI communicator.  This must be defined on all processes.
 !>    @param[in] root      ID of root process.  This will likely be 0 and must be 
 !>                         defined on all processes.
 !>    @param[in] npts      Number of points in each input signal.  This is defined on
@@ -133,12 +133,13 @@ MODULE XCLOC_FDXC_MPI
 !>                         This is defined on the root process.
 !>    @param[out] ierr     0 indicates sucess.
 !>    @ingroup fdxcmpi
-      SUBROUTINE xcloc_fdxcMPI_initialize(comm, root,                     &
+      SUBROUTINE xcloc_fdxcMPI_initialize(fcomm, root,                    &
                                           npts, nptsPad,                  &
                                           nxcs, xcPairs,                  &
                                           verbose, prec, accuracy, ierr)  &
       BIND(C, NAME='xcloc_fdxcMPI_initialize')
-      TYPE(MPI_Comm),  VALUE, INTENT(IN) :: comm
+      !TYPE(MPI_Comm),  VALUE, INTENT(IN) :: comm
+      INTEGER(C_INT64_T), VALUE, INTENT(IN) :: fcomm
       !INTEGER(C_INT), VALUE, INTENT(IN) :: fcomm !TODO could be problematic w/ *finter.h
       INTEGER(C_INT), VALUE, INTENT(IN) :: root, npts, nptsPad, nxcs, &
                                            verbose, prec, accuracy
@@ -147,6 +148,8 @@ MODULE XCLOC_FDXC_MPI
       INTEGER, ALLOCATABLE, DIMENSION(:) :: l2gSignal, myXCs,  myXCPtr, signalList, &
                                             work, xcPairsWork, xcPairsLocal
       INTEGER i, i1, i2, ierrLocal, indx, ip, mpierr, nsignals, nsloc, nwork
+      TYPE(MPI_Comm) comm
+      comm%MPI_VAL = INT(fcomm, KIND(comm%MPI_VAL))
       ! Release module in case someone called this twice.
       CALL xcloc_fdxcMPI_finalize()
       ! Get communicator size and my rank

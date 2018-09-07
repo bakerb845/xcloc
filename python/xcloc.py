@@ -3,6 +3,7 @@
 import sys
 from ctypes import cdll
 from ctypes import c_int
+from ctypes import c_int64
 from ctypes import c_bool
 from ctypes import c_float
 from ctypes import c_double
@@ -71,40 +72,86 @@ class xcloc:
                                                c_int, # prec
                                                c_int, # accuracy
                                                POINTER(c_int)]
+        xcloc_lib.xcloc_initialize.restype = None
         xcloc_lib.xcloc_signalToTableIndex.argtypes = [c_int, # is
                                                        POINTER(c_int), # it
                                                        POINTER(c_int)] 
+        xcloc_lib.xcloc_signalToTableIndex.restype = None
         xcloc_lib.xcloc_setTable64f.argtypes = [c_int, # tableNumber
                                                 c_int, # ngrd
                                                 POINTER(c_double), # table
                                                 POINTER(c_int)]
+        xcloc_lib.xcloc_setTable64f.restype = None
         xcloc_lib.xcloc_setTable32f.argtypes = [c_int, # tableNumber
                                                 c_int, # ngrd
                                                 POINTER(c_float), # table
                                                 POINTER(c_int)]
+        xcloc_lib.xcloc_setTable32f.restype = None
         xcloc_lib.xcloc_setSignals64f.argtypes = [c_int, # ldx
                                                   c_int, # npts
                                                   c_int, # nsignals
                                                   POINTER(c_double), # signals
                                                   POINTER(c_int)]
+        xcloc_lib.xcloc_setSignals64f.restype = None
         xcloc_lib.xcloc_getImageMax.argtypes = [POINTER(c_int), # Max index
                                                 POINTER(c_float), # Max value
                                                 POINTER(c_int)]
+        xcloc_lib.xcloc_getImageMax.restype = None
         xcloc_lib.xcloc_setSignals32f.argtypes = [c_int, # ldx
                                                   c_int, # npts
                                                   c_int, # nsignals
                                                   POINTER(c_float), # signals
                                                   POINTER(c_int)]
+        xcloc_lib.xcloc_setSignals32f.restype = None
         xcloc_lib.xcloc_getImage64f.argtypes = [c_int, #nwork
                                                 POINTER(c_double), # image
                                                 POINTER(c_int)]
+        xcloc_lib.xcloc_getImage64f.restype = None
         xcloc_lib.xcloc_getImage32f.argtypes = [c_int, #nwork
                                                 POINTER(c_float), # image
                                                 POINTER(c_int)]
+        xcloc_lib.xcloc_getImage32f.restype = None
         xcloc_lib.xcloc_getNumberOfGridPointsInImage.argtypes = [POINTER(c_int), # ngrd
                                                                  POINTER(c_int)]
+        xcloc_lib.xcloc_getNumberOfGridPointsInImage.restype = None
         xcloc_lib.xcloc_compute.argtypes = [POINTER(c_int)]
+        xcloc_lib.xcloc_compute.restype = None
         xcloc_lib.xcloc_finalize.argtypes = None
+        xcloc_lib.xcloc_finalize.restype = None
+        ##################################################################################
+        #                                       xclocMPI                                 #
+        ##################################################################################
+        try:
+            xcloc_lib.xclocMPI_initialize.argtypes = [c_int64, # MPI_Fint
+                                                      c_int, # root
+                                                      c_int, # dsmGroupsize
+                                                      c_int, # npts
+                                                      c_int, # nptsPad
+                                                      c_int, # nxcs
+                                                      c_int, # signal2migrate
+                                                      c_double, # dt
+                                                      c_int, # ngrd
+                                                      c_int, # nfCoeffs
+                                                      c_int, # filtertype
+                                                      POINTER(c_int), # xcPairs
+                                                      c_int,  # verbose
+                                                      c_int,  # precision
+                                                      c_int,  # accuracy
+                                                      POINTER(c_int)]
+            xcloc_lib.xclocMPI_initialize.restype = None
+            xcloc_lib.xclocMPI_setXCTypeToMigrate.argtypes = [c_int, # root
+                                                              c_int, # xcTypeToMigrate
+                                                              POINTER(c_int)]
+            xcloc_lib.xclocMPI_setXCTypeToMigrate.restype = None
+            xcloc_lib.xclocMPI_getGlobalRootProcessID.argtypes = [c_int, # root
+                                                                  POINTER(c_int)]
+            xcloc_lib.xclocMPI_getGlobalRootProcessID.restype = None
+            xcloc_lib.xclocMPI_finalize.argtypes = None
+            xcloc_lib.xclocMPI_finalize.restype = None
+            self.lhaveMPI = True
+            print("yes")
+        except:
+            self.lhaveMPI = False
 
         # Hook up the modules
         self.utils = utils(xcloc_lib)
