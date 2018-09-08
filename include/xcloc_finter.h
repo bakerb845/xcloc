@@ -210,6 +210,11 @@ void xclocMPI_initialize(const int64_t comm, //const MPI_Fint comm, //const MPI_
                          const enum xclocPrecision_enum precision,
                          const enum xclocAccuracy_enum accuracy,
                          int *ierr);
+/* Sets the input signals. */
+void xclocMPI_setSignals64f(const int ldx, const int npts, const int nsignals,
+                            const int root, const double x[], int *ierr);
+void xclocMPI_setSignals32f(const int ldx, const int npts, const int nsignals,
+                            const int root, const float x[], int *ierr);;
 /* Releases memory on the parallel xcloc module */
 void xclocMPI_finalize(void);
 

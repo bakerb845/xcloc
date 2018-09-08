@@ -174,6 +174,8 @@ ERROR1:;
     }
     // Set the tables
 
+    // Set the signals
+    xclocMPI_setSignals64f(npts, npts, nsignals, root, obs, &ierr);
     // Free space
     xclocMPI_finalize();
     if (xcPairs != NULL){free(xcPairs);}
