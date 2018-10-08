@@ -63,7 +63,7 @@ SET(SRC ${IO_SRC}
     memory.F90 spxc.F90
     dsmxc.F90 utils.F90 sort.c)
 IF (XCLOC_USE_MPI)
-   SET(SRC ${SRC} utilsMPI.F90 fdxcMPI.F90 dsmxcMPI.F90 xclocMPI.F90)
+   SET(SRC ${SRC} utils_mpi.F90 fdxc_mpi.F90 dsmxc_mpi.F90 xcloc_mpi.F90)
 ENDIF()
 SET(SRC ${SRC} xcloc.F90)
 SET(HEADERS include/xcloc_config.h include/xcloc.h include/xcloc_enum.h include/xcloc_finter.h)
@@ -163,8 +163,8 @@ ENDIF()
 #   INSTALL(TARGETS xcloc_static
 #           ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}/lib))
 #ENDIF()
-INSTALL(TARGETS ${TARGET_NAMES}
-        RUNTIME DESTINATION ${CMAKE_BINARY_DIR})
+#INSTALL(TARGETS ${TARGET_NAMES}
+#        RUNTIME DESTINATION ${CMAKE_BINARY_DIR})
 INSTALL(FILES
         ${CMAKE_BINARY_DIR}/FindXCLOC.cmake
         ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/xclocConfigVersion.cmake

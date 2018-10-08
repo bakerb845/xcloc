@@ -215,6 +215,16 @@ void xclocMPI_setSignals64f(const int ldx, const int npts, const int nsignals,
                             const int root, const double x[], int *ierr);
 void xclocMPI_setSignals32f(const int ldx, const int npts, const int nsignals,
                             const int root, const float x[], int *ierr);;
+/* Sets the it'th travel time table. */
+void xclocMPI_setTable64f(const int tableNumberIn, const int ngrdIn,
+                          const int root, const double table[],
+                          int *ierr);
+void xclocMPI_setTable32f(const int tableNumberIn, const int ngrdIn,
+                          const int root, const float table[],
+                          int *ierr);
+/* Gets the table number corresponding to the signal number. */
+void xclocMPI_signalToTableIndex(const int is, const int root,
+                                 int *it, int *ierr);
 /* Releases memory on the parallel xcloc module */
 void xclocMPI_finalize(void);
 

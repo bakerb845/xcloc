@@ -57,10 +57,16 @@ TYPE(C_PTR), SAVE :: dataPtr_ = C_NULL_PTR
       !> Maps from the is'th signal to the start index of signal2Group_.  This has
       !> dimension [nsignalsTotal_+1].
       INTEGER, PRIVATE, ALLOCATABLE, SAVE :: signalToGroupPtr_(:) 
+      !> @ingroup xcloc_mpi
       !> Maps from the a signal to the DSM/XC group to which this signal belongs.
       !> This has dimension [signalToGroupPtr_(nsignalsTotal_+1)-1].
       INTEGER, PRIVATE, ALLOCATABLE, SAVE :: signalToGroup_(:)
- 
+      !> @ingroup xcloc_mpi
+      !> Tabulates the unique signals.  This has dimension [nSignalsTotal_].
+      INTEGER, PRIVATE, ALLOCATABLE, SAVE :: uniqueSignals_(:)
+      !> @ingroup xcloc_mpi
+      !> A local cross-correlation pairs table for a an XC/DSM group.
+      !> This has dimension [2 x nxcsLocal_]. 
       INTEGER, PRIVATE, ALLOCATABLE, SAVE :: xcPairsLocal_(:)
       !> @ingroup xcloc_mpi
       !> Root ID on communicator.
@@ -101,10 +107,12 @@ TYPE(C_PTR), SAVE :: dataPtr_ = C_NULL_PTR
       !> Number of signals pertinent to the xcdsm intra-communicator.
       INTEGER, PRIVATE, SAVE :: nsignalsLocal_ = 0
       !> @ingroup xcloc_mpi
-      !> Total number of signals.
+      !> Total number of signals.  This should equal the total number of travel 
+      !> time tables.
       INTEGER, PRIVATE, SAVE :: nsignalsTotal_ = 0
       !> @ingroup xcloc_mpi
-      !> Total number of travel time tables.
+      !> Total number of travel time tables.  This should equal the total number of
+      !> signals.
       INTEGER, PRIVATE, SAVE :: nTablesTotal_ = 0
       !> @ingroup xcloc_mpi
       !> Number of correlograms that process is responsible for.
@@ -203,8 +211,8 @@ integer, private, allocatable, save :: nDSMXCsPerGroup_(:)
       INTEGER(C_INT), INTENT(OUT) :: ierr
       INTEGER(C_INT64_T) commTemp
       INTEGER, ALLOCATABLE :: myDSMXCs(:), iwork(:), jwork(:), xcPairsWork(:)
-      INTEGER i1, i2, ig, ierrLoc, indx, is, ixc, mpierr, nalloc, nsignalPairs, nsignals, &
-              nsg, nunique
+      INTEGER i1, i2, ig, ierrLoc, indx, is, ixc, mpierr, nalloc, nsignalPairs, &
+              nsignals, nsg, nunique
       TYPE(MPI_Comm) comm
       INTEGER(KIND=MPI_ADDRESS_KIND) nallocMPI
       INTEGER arrayShape(1), sizeDouble
@@ -228,7 +236,9 @@ integer, private, allocatable, save :: nDSMXCsPerGroup_(:)
             WRITE(ERROR_UNIT,904)
             ierr = 1
          ENDIF
-         nsignals = MAXVAL(xcPairs(1:2*nxcs))
+         !nsignals = MAXVAL(xcPairs(1:2*nxcs))
+         CALL xcloc_utils_unique32s(2*nxcs, xcPairs,             &
+                                   nsignals, uniqueSignals_, ierr)
          IF (nsignals < 2) THEN
             WRITE(ERROR_UNIT,906) nsignals
             ierr = 1
@@ -267,6 +277,7 @@ integer, private, allocatable, save :: nDSMXCsPerGroup_(:)
          IF (ierr /= 0) GOTO 500
          ! Copy
          nsignalsTotal_ = nsignals
+         nTablesTotal_ = nsignals
          nxcdsmGroups_ = nxcdsmGroups
          xcGroupSize_ = nprocs_/nxcdsmGroups_
          ngrdTotal_ = ngrd
@@ -366,6 +377,7 @@ integer, private, allocatable, save :: nDSMXCsPerGroup_(:)
       CALL MPI_Bcast(npts_,            1, MPI_INTEGER, root_, xclocGlobalComm_, mpierr)
       CALL MPI_Bcast(nptsPad_,         1, MPI_INTEGER, root_, xclocGlobalComm_, mpierr)
       CALL MPI_Bcast(nsignalsTotal_,   1, MPI_INTEGER, root_, xclocGlobalComm_, mpierr)
+      CALL MPI_Bcast(nTablesTotal_,    1, MPI_INTEGER, root_, xclocGlobalComm_, mpierr)
       CALL MPI_Bcast(nxcdsmGroups_,    1, MPI_INTEGER, root_, xclocGlobalComm_, mpierr)
       CALL MPI_Bcast(nxcsTotal_,       1, MPI_INTEGER, root_, xclocGlobalComm_, mpierr)
       CALL MPI_Bcast(accuracy_,        1, MPI_INTEGER, root_, xclocGlobalComm_, mpierr)
@@ -397,6 +409,9 @@ integer, private, allocatable, save :: nDSMXCsPerGroup_(:)
                      xclocGlobalComm_, mpierr) 
       IF (.NOT.ALLOCATED(nDSMXCsPerGroup_)) ALLOCATE(nDSMXCsPerGroup_(nxcdsmGroups_))
       CALL MPI_Bcast(nDSMXCsPerGroup_, nxcdsmGroups_, MPI_INTEGER, root_, &
+                     xclocGlobalComm_, mpierr)
+      IF (.NOT.ALLOCATED(uniqueSignals_)) ALLOCATE(uniqueSignals_(nSignalsTotal_))
+      CALL MPI_Bcast(uniqueSignals_, nSignalsTotal_, MPI_INTEGER, root_,  &
                      xclocGlobalComm_, mpierr)
       ! Compute some local information from pointers
       nsignalsLocal_ = l2gSignalPtr_(xcdsmInterCommID_ + 2) &
@@ -559,6 +574,7 @@ integer, private, allocatable, save :: nDSMXCsPerGroup_(:)
       IF (ALLOCATED(l2gSignal_))        DEALLOCATE(l2gSignal_)
       IF (ALLOCATED(signalToGroupPtr_)) DEALLOCATE(signalToGroupPtr_)
       IF (ALLOCATED(signalToGroup_))    DEALLOCATE(signalToGroup_)
+      IF (ALLOCATED(uniqueSignals_))    DEALLOCATE(uniqueSignals_)
       IF (ALLOCATED(xcPairsLocal_))     DEALLOCATE(xcPairsLocal_)
 !     IF (ASSOCIATED(signalsRMA32f_))   CALL MPI_Free_mem(signalsRMA32f_, mpierr)
       IF (ASSOCIATED(signalsRMA64f_))   CALL MPI_Free_mem(signalsRMA64f_, mpierr)
@@ -851,6 +867,49 @@ if (allocated(nDSMXCsPerGroup_)) deallocate(nDSMXCsPerGroup_)
   915 FORMAT('xclocMPI_setSignals32f: Errors encountered while setting signals')
       RETURN
       END
+!>    @brief Maps a signal number to the table index.
+!>    @param[in] is     Signal number.  This must be in the xcPairs table.
+!>    @param[in] root   ID of root process on global communicator.
+!>    @param[out] it    Table index corresponding to the signal number.  This is
+!>                      Fortran indexed.
+!>    @param[out] ierr  0 indicates success.
+!>    @ingroup xcloc_mpi 
+      SUBROUTINE xclocMPI_signalToTableIndex(is, root, it, ierr) &
+      BIND(C, NAME='xclocMPI_signalToTableIndex')
+      INTEGER(C_INT), VALUE, INTENT(IN) :: is, root
+      INTEGER(C_INT), INTENT(OUT) :: it, ierr
+      INTEGER mpierr
+      it = 0
+      ierr = 0
+      IF (.NOT.linit_) THEN
+         WRITE(ERROR_UNIT,900)
+         ierr = 1 
+         RETURN
+      ENDIF
+      IF (root == myid_) THEN
+         IF (is < 1 .OR. is > nsignalsTotal_) THEN
+            WRITE(ERROR_UNIT,905) is, nsignalsTotal_
+            ierr = 1 
+            GOTO 500
+         ENDIF
+         CALL xcloc_utils_bsearch32i(nSignalsTotal_, is, uniqueSignals_, &
+                                     it, ierr, .FALSE.)
+         IF (ierr /= 0) THEN
+            WRITE(ERROR_UNIT,910)
+            ierr = 1
+            it = 0
+         ENDIF
+      ENDIF
+  500 CONTINUE
+      CALL MPI_Bcast(it,   1, MPI_INTEGER, root, xclocGlobalComm_, mpierr)
+      CALL MPI_Bcast(ierr, 1, MPI_INTEGER, root, xclocGlobalComm_, mpierr)
+      IF (ierr /= 0) it = 0
+  900 FORMAT("xclocMPI_signalToTableIndex: Module not initialized")
+  905 FORMAT("xclocMPI_signalToTableIndex: Source index = ", I0, &
+            " must be in range [1,", I0, "]")
+  910 FORMAT("xclocMPI_signalToTableIndex: Failed to find signal index ", I0)
+      RETURN
+      END
 !                                                                                        !
 !========================================================================================!
 !                                                                                        !
@@ -860,6 +919,7 @@ if (allocated(nDSMXCsPerGroup_)) deallocate(nDSMXCsPerGroup_)
 !>                              the root process.
 !>    @param[in] root           The root process ID on the xcloc global communicator.
 !>    @param[in] table          The
+!>    @param[out] ierr          0 indicates success.
 !>    @ingroup xcloc_mpi
       SUBROUTINE xclocMPI_setTable64f(tableNumberIn, ngrdIn, root, table, ierr) &
       BIND(C, NAME='xclocMPI_setTable64f')
@@ -884,10 +944,10 @@ if (allocated(nDSMXCsPerGroup_)) deallocate(nDSMXCsPerGroup_)
       IF (myid_ == root) THEN
          CALL xcloc_dsmxcMPI_getNumberOGridPointsInTable(ngrd)
          IF (ngrd /= ngrdIn) THEN
-            WRITE(ERROR_UNIT,905) ngrdIn, ngrd          
+            WRITE(ERROR_UNIT,905) ngrdIn, ngrd
             ierr = 1
          ENDIF
-         IF (tableNumberIn < nTablesTotal_ .OR. tableNumberIn > ntablesTotal_) THEN
+         IF (tableNumberIn < 1 .OR. tableNumberIn > ntablesTotal_) THEN
             WRITE(ERROR_UNIT,910) tableNumberIn, nTablesTotal_
             ierr = 1
          ENDIF
@@ -942,8 +1002,9 @@ if (allocated(nDSMXCsPerGroup_)) deallocate(nDSMXCsPerGroup_)
       IF (ASSOCIATED(ttptr)) NULLIFY(ttptr)
       IF (ALLOCATED(work)) DEALLOCATE(work)
   900 FORMAT("xclocMPI_setTable64f: Module not initialized")
-  905 FORMAT("xclocMPI_setTable64f: ngrdIn=", I6, "should be ngrd=", I6)
-  910 FORMAT("xclocMPI_setTable64f: table number=", I6, "should be in range[1,", I6, "]")
+  905 FORMAT("xclocMPI_setTable64f: ngrdIn = ", I0, " should be equal ngrd =", I0)
+  910 FORMAT("xclocMPI_setTable64f: table number = ", I0, " should be in range[1,", &
+             I0, "]")
       RETURN
       END
 

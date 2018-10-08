@@ -786,18 +786,18 @@ INPUT                  = ./xcloc.wiki/Home.md \
                          ./xcloc.wiki/Algorithm.md \
                          ./xcloc.wiki/Python-Bindings.md \
                          ./fdxc.F90 \
-                         ./fdxcMPI.F90 \
+                         ./fdxc_mpi.F90 \
                          ./dsmxc.F90 \
-                         ./dsmxcMPI.F90 \
+                         ./dsmxc_mpi.F90 \
                          ./constants.F90 \
                          ./ipps.F90 \
                          ./memory.F90 \
                          ./spxc.F90 \
                          ./firFilter.c \
                          ./utils.F90 \
-                         ./utilsMPI.F90 \
+                         ./utils_mpi.F90 \
                          ./xcloc.F90 \
-                         ./xclocMPI.F90 \
+                         ./xcloc_mpi.F90 \
                          ./h5io.c \
                          ./xdmf.c \
                          ./include/xcloc.h \

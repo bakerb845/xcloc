@@ -76,6 +76,7 @@ int test_parallel_xcloc(const MPI_Comm comm, const int root)
     float *image = NULL;
     bool lfound;
     int nxcdsmGroups = 1;
+    int i, it;
     ierr = EXIT_SUCCESS;
     MPI_Fint fcomm = MPI_Comm_c2f(comm); // why is this necessary openMPI?
     MPI_Comm_rank(comm, &myid);
@@ -173,8 +174,32 @@ ERROR1:;
         return EXIT_FAILURE;
     }
     // Set the tables
-
+    double *ttable = NULL;
+    if (myid == root)
+    {
+        fprintf(stdout, "%s: Making tables...\n", __func__);
+        ttable = (double *) calloc((size_t) ngrd, sizeof(double));
+    }
+    for (i=0; i<nrec; i++)
+    {
+        if (myid == root)
+        {
+            acousticGreens2D_computeTravelTimeTable(nx, ny, nz, 
+                                                    vel, x0, y0, z0, dx, dy, dz,
+                                                    xr[3*i],xr[3*i+1],xr[3*i+2],
+                                                    ttable);
+        }
+        xclocMPI_signalToTableIndex(i+1, root, &it, &ierr);
+        if (ierr != 0 || i + 1 != it)
+        {
+            fprintf(stderr, "%s: Error getting table index\n", __func__);
+            return EXIT_FAILURE;
+        }
+        xclocMPI_setTable64f(it, ngrd, root, ttable, &ierr);
+    }
+    MPI_Barrier(comm);
     // Set the signals
+    if (myid == root){fprintf(stdout, "%s: Setting signals..\n", __func__);}
     xclocMPI_setSignals64f(npts, npts, nsignals, root, obs, &ierr);
     // Free space
     xclocMPI_finalize();
