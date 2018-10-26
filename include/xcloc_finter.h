@@ -222,6 +222,8 @@ void xclocMPI_setTable64f(const int tableNumberIn, const int ngrdIn,
 void xclocMPI_setTable32f(const int tableNumberIn, const int ngrdIn,
                           const int root, const float table[],
                           int *ierr);
+/* Performs cross-correlations and computes the xcloc image. */
+void xclocMPI_compute(int *ierr);
 /* Gets the table number corresponding to the signal number. */
 void xclocMPI_signalToTableIndex(const int is, const int root,
                                  int *it, int *ierr);

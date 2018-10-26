@@ -147,8 +147,20 @@ TYPE(C_PTR), SAVE :: dataPtr_ = C_NULL_PTR
       INTEGER, PRIVATE, SAVE :: myid_ = MPI_UNDEFINED
 
       !> @ingroup xcloc_mpi
+      !> Flag indicating that all the signals are set.
+      LOGICAL, PRIVATE, SAVE :: lhaveSignals_ = .FALSE.
+      !> @ingroup xcloc_mpi
+      !> @Flag indicating that cross-correlograms have been computed.
+      LOGICAL, PRIVATE, SAVE :: lhaveXCs_ = .FALSE.
+      !> @ingroup xcloc_mpi
+      !> Flag indicating that the migration image is computed.
+      LOGICAL, PRIVATE, SAVE :: lhaveImage_ = .FALSE.
+      !> @ingroup xcloc_mpi
       !> Flag indicating that communicator has to be destroyed.
       LOGICAL, PRIVATE, SAVE :: lfreeComm_ = .FALSE.
+      !> @ingroup xcloc_mpi
+      !> Flag indicating that all the travel time tables have been set.
+      LOGICAL, PRIVATE, SAVE :: lhaveAllTables_ = .FALSE.
       !> @ingroup xcloc_mpi
       !> Flag indiating that the RMA signal window has to be destroyed.
       LOGICAL, PRIVATE, SAVE :: lfreeWindow_ = .FALSE.
@@ -344,7 +356,6 @@ integer, private, allocatable, save :: nDSMXCsPerGroup_(:)
                ENDIF
             ENDDO
             signalToGroupPtr_(is+1) = nsg + 1
-!print *, jwork(signalToGroupPtr_(is):signalToGroupPtr_(is+1)-1)
          ENDDO
          ALLOCATE(signalToGroup_(nsg))
          signalToGroup_(1:nsg) = jwork(1:nsg)
@@ -585,6 +596,10 @@ if (allocated(nDSMXCsPerGroup_)) deallocate(nDSMXCsPerGroup_)
       xcdsmInterCommID_ = 0
       lfreeComm_ = .FALSE.
       lfreeWindow_ = .FALSE.
+      lhaveAllTables_ = .FALSE.
+      lhaveSignals_ = .FALSE.
+      lhaveXCs_ = .FALSE.
+      lhaveImage_ = .FALSE.
       linit_ = .FALSE.
       RETURN
       END
@@ -678,6 +693,8 @@ if (allocated(nDSMXCsPerGroup_)) deallocate(nDSMXCsPerGroup_)
               rootGroup, source
       INTEGER(KIND=MPI_ADDRESS_KIND) :: offset
       ierr = 0
+      lhaveSignals_ = .FALSE. 
+      lhaveXCs_ = .FALSE.
       IF (myid_ == MPI_UNDEFINED) RETURN ! I don't belong here
       IF (myid_ == root) THEN
          ldx = ldxIn
@@ -750,7 +767,11 @@ if (allocated(nDSMXCsPerGroup_)) deallocate(nDSMXCsPerGroup_)
          ENDIF
       ENDIF
       CALL MPI_Allreduce(ierrLoc, ierr, 1, MPI_INTEGER, MPI_MAX, xclocGlobalComm_, mpierr)
-      IF (ierr /= 0 .AND. myid_ == root_) WRITE(ERROR_UNIT,915)
+      IF (ierr /= 0) THEN
+         IF (myid_ == root_) WRITE(ERROR_UNIT,915)
+      ELSE
+         lhaveSignals_ = .TRUE.
+      ENDIF
       IF (ALLOCATED(xloc)) DEALLOCATE(xloc)
   850 FORMAT("xclocMPI_setSignals64f: Module not yet initialized")
   900 FORMAT('xclocMPI_setSignals64f: Error ldx=', I0, ' < ', 'npts=', I0)
@@ -784,6 +805,7 @@ if (allocated(nDSMXCsPerGroup_)) deallocate(nDSMXCsPerGroup_)
               rootGroup, source
       INTEGER(KIND=MPI_ADDRESS_KIND) :: offset
       ierr = 0
+      lhaveSignals_ = .FALSE.
       IF (myid_ == MPI_UNDEFINED) RETURN ! I don't belong here
       IF (myid_ == root) THEN
          ldx = ldxIn
@@ -856,7 +878,11 @@ if (allocated(nDSMXCsPerGroup_)) deallocate(nDSMXCsPerGroup_)
          ENDIF
       ENDIF
       CALL MPI_Allreduce(ierrLoc, ierr, 1, MPI_INTEGER, MPI_MAX, xclocGlobalComm_, mpierr)
-      IF (ierr /= 0 .AND. myid_ == root_) WRITE(ERROR_UNIT,915)
+      IF (ierr /= 0) THEN
+         IF (myid_ == root_) WRITE(ERROR_UNIT,915)
+      ELSE
+         lhaveSignals_ = .TRUE.
+      ENDIF
       IF (ALLOCATED(xloc)) DEALLOCATE(xloc)
   850 FORMAT("xclocMPI_setSignals32f: Module not yet initialized")
   900 FORMAT('xclocMPI_setSignals32f: Error ldx=', I0, ' < ', 'npts=', I0)
@@ -929,10 +955,12 @@ if (allocated(nDSMXCsPerGroup_)) deallocate(nDSMXCsPerGroup_)
       DOUBLE PRECISION, ALLOCATABLE, TARGET :: work(:)
       DOUBLE PRECISION, CONTIGUOUS, POINTER :: ttptr(:)
       TYPE(MPI_Status) :: stat
-      INTEGER commRoot, i1, i2, ierrLoc, ig, indx, mpierr, ngrd, tableNumber, &
-              localTableNumber 
+      INTEGER commRoot, i1, i2, ierrLoc, ihaveAll, ihaveAllLoc, ig, indx, mpierr, ngrd, &
+              tableNumber, localTableNumber 
       LOGICAL lneedTable
+      LOGICAL(C_BOOL) lhaveAll
       ierr = 0
+      IF (myid_ == MPI_UNDEFINED) RETURN ! I don't belong here
       lneedTable = .FALSE.
       localTableNumber = 0
       NULLIFY(ttptr)
@@ -942,6 +970,7 @@ if (allocated(nDSMXCsPerGroup_)) deallocate(nDSMXCsPerGroup_)
          RETURN
       ENDIF
       IF (myid_ == root) THEN
+         ngrd = ngrdIn
          CALL xcloc_dsmxcMPI_getNumberOGridPointsInTable(ngrd)
          IF (ngrd /= ngrdIn) THEN
             WRITE(ERROR_UNIT,905) ngrdIn, ngrd
@@ -980,9 +1009,9 @@ if (allocated(nDSMXCsPerGroup_)) deallocate(nDSMXCsPerGroup_)
                                 xcdsmInterComm_, mpierr) 
                ENDIF
             ELSE
-               IF (lneedTable) THEN
+               IF (ig == xcdsmInterCommID_ .AND. lneedTable) THEN
                   ALLOCATE(work(ngrd)); work(:) = 0.d0
-                  CALL MPI_Recv(ttptr, ngrd, MPI_DOUBLE_PRECISION, MPI_ANY_SOURCE, &
+                  CALL MPI_Recv(work, ngrd, MPI_DOUBLE_PRECISION, MPI_ANY_SOURCE, &
                                 MPI_ANY_TAG, xcdsmInterComm_, stat, mpierr)
                   ttptr => work(1:ngrd) ! Associate pointer
                ENDIF
@@ -992,19 +1021,117 @@ if (allocated(nDSMXCsPerGroup_)) deallocate(nDSMXCsPerGroup_)
       ! Roots distribute the table to members of its DSM/XC group
       ierrLoc = 0
       IF (lneedTable) THEN
-         CALL xcloc_dsmxcMPI_setTable64f(localTableNumber, ngrd, xcdsmIntraCommID_, &
-                                         ttptr, ierrLoc)
-         IF (ierrLoc /= 0) THEN
-            ierrLoc = 1
+         IF (xcdsmIntraCommID_ == commRoot) THEN
+            i1 = l2gSignalPtr_(xcdsmInterCommID_+1)
+            i2 = l2gSignalPtr_(xcdsmInterCommID_+2) - 1
+            CALL xcloc_utils_bsearch32i(i2-i1+1, tableNumber, l2gSignal_(i1:i2), &
+                                        localTableNumber, ierrLoc, .TRUE.)
+            IF (ierrLoc /= 0) THEN
+               ierrLoc = 1
+               localTableNumber =-1
+            ENDIF
+         ENDIF
+         CALL MPI_Bcast(localTableNumber, 1, MPI_INTEGER, commRoot, &
+                        xcdsmIntraComm_, mpierr)
+         IF (localTableNumber > 0) THEN
+            CALL xcloc_dsmxcMPI_setTable64f(localTableNumber, ngrd, commRoot, &
+                                            ttptr, ierrLoc)
+            IF (ierrLoc /= 0) THEN
+               WRITE(ERROR_UNIT,915) tableNumber, xcdsmInterCommID_
+               ierrLoc = 1
+            ENDIF
          ENDIF
       ENDIF
       CALL MPI_Allreduce(ierrLoc, ierr, 1, MPI_INTEGER, MPI_SUM, xclocGlobalComm_, mpierr)
       IF (ASSOCIATED(ttptr)) NULLIFY(ttptr)
       IF (ALLOCATED(work)) DEALLOCATE(work)
+      ! Do I have all the tables?
+      CALL xcloc_dsmxcMPI_haveAllTables(lhaveAll)
+      ihaveAllLoc = 0
+      IF (lhaveAll) ihaveAllLoc = 1
+      CALL MPI_Allreduce(ihaveAllLoc, ihaveAll, 1, MPI_INTEGER, MPI_MIN, &
+                         xclocGlobalComm_, mpierr)
+      IF (ihaveAll == 1) lhaveAllTables_ = .TRUE.
+      IF (lhaveAllTables_ .AND. myid_ == root_ .AND. verbose_ > XCLOC_PRINT_WARNINGS) &
+      WRITE(OUTPUT_UNIT,920)
   900 FORMAT("xclocMPI_setTable64f: Module not initialized")
   905 FORMAT("xclocMPI_setTable64f: ngrdIn = ", I0, " should be equal ngrd =", I0)
   910 FORMAT("xclocMPI_setTable64f: table number = ", I0, " should be in range[1,", &
              I0, "]")
+  915 FORMAT("xclocMPI_setTable64f: Failed to set table = ", I0, " on group ", I0)
+  920 FORMAT("xclocMPI_setTable64f: All tables set")
+      RETURN
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief After setting the travel time tables and signals this will:
+!>           1. Compute the phase or cross-correlograms depending on the signal migration
+!>              policy.
+!>           2. Either compute the envelope or RMS of the correlograms or leave the 
+!>              correlograms unchanged.
+!>           3. Migrate the (processed) correlograms.
+!>    @param[out] ierr   0 indicates success.
+!>    @ingroup xcloc_mpi
+      SUBROUTINE xclocMPI_compute(ierr) &
+      BIND(C, NAME='xclocMPI_compute')
+      INTEGER(C_INT), INTENT(OUT) :: ierr
+      DOUBLE PRECISION, DIMENSION(:), ALLOCATABLE :: xcs64f
+      REAL, DIMENSION(:), ALLOCATABLE :: xcs32f
+      DOUBLE PRECISION timer_end, timer_start
+      INTEGER ierrLoc, mpierr
+      ierr = 0
+      lhaveImage_ = .FALSE.
+      IF (myid_ == MPI_UNDEFINED) RETURN ! I don't belong here
+      ierrLoc = 0
+      IF (.NOT.linit_) THEN
+         WRITE(ERROR_UNIT,850) myid_
+         ierrLoc = 1
+      ENDIF
+      IF (.NOT.lhaveSignals_) THEN
+         WRITE(ERROR_UNIT,855) myid_
+         ierrLoc = 1
+      ENDIF
+      IF (.NOT.lhaveAllTables_) THEN
+         WRITE(ERROR_UNIT,860) myid_
+         ierrLoc = 1
+      ENDIF
+      CALL MPI_Allreduce(ierrLoc, ierr, 1, MPI_INTEGER, MPI_MAX, xclocGlobalComm_, mpierr)
+      IF (ierr /= 0) RETURN
+      timer_start = MPI_Wtime()
+      IF (xcTypeToMigrate_ == XCLOC_MIGRATE_PHASE_XCS) THEN
+         CALL xcloc_fdxcMPI_computePhaseCorrelograms(ierrLoc)
+      ELSE
+         CALL xcloc_fdxcMPI_computeCrossCorrelograms(ierrLoc)
+      ENDIF
+      IF (ierrLoc /= 0) ierrLoc = 1
+      timer_end = MPI_Wtime()
+      ! This isn't the most accurate count - technically I should block
+      CALL MPI_Allreduce(ierrLoc, ierr, 1, MPI_INTEGER, MPI_MAX, xclocGlobalComm_, mpierr)
+      IF (ierr /= 0) THEN
+         IF (myid_ == root_) WRITE(ERROR_UNIT,865)
+         RETURN
+      ENDIF
+      IF (myid_ == root_ .AND. verbose_ > XCLOC_PRINT_WARNINGS) &
+      WRITE(OUTPUT_UNIT,905) timer_end - timer_start
+  !   lhaveXCs_ = .TRUE.
+!     IF (precision_ == XCLOC_SINGLE_PRECISION) THEN
+!        ALLOCATE(xcs32f(nxcsLocal_*nptsInXCs_))
+!        CALL xcloc_fdxcMPI_gatherCorrelograms32f(nptsInXCs_, nxcsLocal_, root_, xcs32f, ierr)
+!        DEALLOCATE(xcs32f)
+!     ELSE
+         ALLOCATE(xcs64f(nxcsLocal_*nptsInXCs_))
+         CALL xcloc_fdxcMPI_gatherCorrelograms64f(nptsInXCs_, nxcsLocal_, root_, &
+                                                  xcs64f, ierrLoc)
+print *, 'yes - need to make allgather'
+         DEALLOCATE(xcs64f)
+!     ENDIF
+ 
+  850 FORMAT('xclocMPI_compute: Module not initialized on rank ', I0)
+  855 FORMAT('xclocMPI_compute: Signals not yet set on rank ', I0)
+  860 FORMAT('xclocMPI_compute: Travel time tables not yet set on rank ', I0)
+  865 FORMAT('xcloc_compute: Failed to compute correlograms')
+  905 FORMAT('xcloc_compute: Correlogram computation time=', F8.4, 's')
       RETURN
       END
 

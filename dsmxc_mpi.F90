@@ -53,6 +53,9 @@ MODULE XCLOC_DSMXC_MPI
       !> Number of grid points belonging to each process.
       INTEGER, PRIVATE, DIMENSION(:), ALLOCATABLE, SAVE :: nGridPtsPerProcess_
       !> @ingroup dsmxcMPI
+      !> If true then all tables are set.
+      LOGICAL, PRIVATE, SAVE :: lhaveAllTables_ = .FALSE.
+      !> @ingroup dsmxcMPI
       !> If true then free the communicator.
       LOGICAL, PRIVATE, SAVE :: lfreeComm_ = .FALSE.
 
@@ -61,6 +64,7 @@ MODULE XCLOC_DSMXC_MPI
       PUBLIC :: xcloc_dsmxcMPI_setTable64f
       PUBLIC :: xcloc_dsmxcMPI_getNumberOGridPointsInTable
       PUBLIC :: xcloc_dsmxcMPI_getNumberOfTables
+      PUBLIC :: xcloc_dsmxcMPI_haveAllTables
 
       CONTAINS
 !========================================================================================!
@@ -99,7 +103,7 @@ MODULE XCLOC_DSMXC_MPI
       REAL(C_DOUBLE), VALUE, INTENT(IN) :: dt
       INTEGER(C_INT), INTENT(IN) :: xcPairs(2*nxcPairs)
       INTEGER(C_INT), INTENT(OUT) :: ierr
-      INTEGER, ALLOCATABLE :: myGrid(:), myGridPtr(:), xcPairsWork(:)
+      INTEGER, ALLOCATABLE :: uniqueSignals(:), myGrid(:), myGridPtr(:), xcPairsWork(:)
       INTEGER ierrLoc, ip, mpierr
       TYPE(MPI_Comm) comm
       comm%MPI_VAL = INT(fcomm, KIND(comm%MPI_VAL))
@@ -125,6 +129,12 @@ MODULE XCLOC_DSMXC_MPI
             ierr = 1
          ENDIF
          IF (ierr /= 0) GOTO 500
+         CALL xcloc_utils_unique32s(2*nxcPairs, xcPairs, ntables_, uniqueSignals, ierr)
+         IF (ierr /= 0) THEN
+            WRITE(ERROR_UNIT,907)
+            GOTO 500
+         ENDIF 
+         IF (ALLOCATED(uniqueSignals)) DEALLOCATE(uniqueSignals)
          ! Copy some input variables 
          ngrdTotal_ = ngrd
          dt_ = dt
@@ -165,6 +175,7 @@ MODULE XCLOC_DSMXC_MPI
       IF (.NOT.ALLOCATED(xcPairsWork)) ALLOCATE(xcPairsWork(2*nxcPairs_))
       CALL MPI_Bcast(nGridPtsPerProcess_, nprocs_, MPI_INTEGER, root_, comm_, mpierr)
       CALL MPI_Bcast(xcPairsWork, 2*nxcPairs_, MPI_INTEGER, root_, comm_, mpierr)
+      ngrdLocal_ = nGridPtsPerProcess_(myid_+1)
       ierrLoc = 0
       IF (ngrdLocal_ > 0) THEN
          CALL xcloc_dsmxc_initialize(ngrdLocal_, nxcPairs_, nptsInXCs_, &
@@ -184,12 +195,31 @@ MODULE XCLOC_DSMXC_MPI
   901 FORMAT('xcloc_dsmxcMPI_initialize: No correlation pairs')
   902 FORMAT('xcloc_dsmxcMPI_initialize: Sampling period must be positive')
   905 FORMAT('xcloc_dsmxcMPI_initialize: No points in xcs')
-  906 FORMAT('xcloc_dsmxcMPI_initialize: Number of points in xcs is even', I6)
-  910 FORMAT('xcloc_dsmxcMPI_initialize: Process', I4, ' has ', I6, ' grid points')
+  906 FORMAT('xcloc_dsmxcMPI_initialize: Number of points in xcs is even ', I0)
+  907 FORMAT('xcloc_dsmxcMPI_initialize: Failed to make unique table list')
+  910 FORMAT('xcloc_dsmxcMPI_initialize: Process ', I0, ' has ', I0, ' grid points')
   920 FORMAT('xcloc_dsmxcMPI_initialize: Failed to partition grid')
-  930 FORMAT('xcloc_dsmxcMPI_initialize: Failed to initialize dsmxc on rank', I4)
+  930 FORMAT('xcloc_dsmxcMPI_initialize: Failed to initialize dsmxc on rank', I0)
       RETURN
       END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Maps a signal number to the table index.
+!>    @param[in] is     Signal number.  This must be in the xcPairs table.
+!>    @param[out] it    The table index corresponding to is.
+!>    @param[out] ierr  0 indicates success.
+!>    @ingroup dsmxc
+      SUBROUTINE xcloc_dsmxcMPI_signalToTableIndex(is, it, ierr) &
+      BIND(C, NAME='xcloc_dsmxcMPI_signalToTableIndex')
+      INTEGER, INTENT(IN) :: is
+      INTEGER, INTENT(OUT) :: it, ierr
+      CALL xcloc_dsmxc_signalToTableIndex(is, it, ierr)
+      IF (ierr /= 0) WRITE(ERROR_UNIT,900)
+  900 FORMAT('xcloc_dsmxcMPI_signalToTableIndex: Failed to find signal number', I0, &
+             ' in table')
+      RETURN
+      END 
 !                                                                                        !
 !========================================================================================!
 !                                                                                        !
@@ -207,28 +237,31 @@ MODULE XCLOC_DSMXC_MPI
       SUBROUTINE xcloc_dsmxcMPI_setTable64f(tableNumber, ngrd, root, table, ierr) &
       BIND(C, NAME='xcloc_dsmxcMPI_setTable64f')
       INTEGER(C_INT), VALUE, INTENT(IN) :: tableNumber, ngrd, root
-      REAL(C_DOUBLE), INTENT(IN) :: table(ngrd)
+      REAL(C_DOUBLE), DIMENSION(ngrd), INTENT(IN) :: table
       INTEGER(C_INT), INTENT(OUT) :: ierr
       DOUBLE PRECISION, ALLOCATABLE :: twork(:)
       INTEGER, ALLOCATABLE :: displs(:), sendCounts(:)
-      INTEGER i, ierrLoc, mpierr, recvCount, tnumber
+      INTEGER i, ibool, ierrLoc, itemp, mpierr, recvCount, tnumber
+      LOGICAL(C_BOOL) :: ltemp
       ierr = 0
       IF (myid_ == root) THEN
          tnumber = tableNumber
+         IF (tnumber < 1 .OR. tnumber > ntables_) THEN
+            WRITE(ERROR_UNIT,900) tnumber, ntables_
+            ierr = 1
+         ENDIF
          IF (ngrd /= ngrdTotal_) THEN
-            WRITE(ERROR_UNIT,900) ngrd, ngrdTotal_
-            ierr = 1
+            WRITE(ERROR_UNIT,905) ngrd, ngrdTotal_
+            ierr = 1 
          ENDIF
-         IF (tableNumber < 1 .OR. tableNumber > ntables_) THEN
-            WRITE(ERROR_UNIT,905) tableNumber, ntables_
-            ierr = 1
-         ENDIF
+         IF (ierr /= 0) GOTO 500
          ALLOCATE(displs(nprocs_)); displs(:) = 0
          ALLOCATE(sendCounts(nprocs_)); sendCounts(:) = nGridPtsPerProcess_(:)
          DO i=1,nprocs_-1
             displs(i+1) = displs(i) + nGridPtsPerProcess_(i)
          ENDDO
       ENDIF
+  500 CONTINUE
       CALL MPI_Bcast(ierr, 1, MPI_INTEGER, root, comm_, mpierr)
       IF (ierr /= 0) RETURN
       ! Distribute the table
@@ -247,10 +280,28 @@ MODULE XCLOC_DSMXC_MPI
          ierrLoc = 1
       ENDIF
       CALL MPI_Allreduce(ierrLoc, ierr, 1, MPI_INTEGER, MPI_MAX, comm_, mpierr)
-  900 FORMAT('xcloc_dsmxcMPI_setTable64f: tableNumber=', I4, &
-             ' must be in range [1,',I4,']')
-  905 FORMAT('xcloc_dsmxcMPI_setTable64f: ngrd=', I6, ' expecting ngrdTotal_=', I6)
-  910 FORMAT('xcloc_dsmxcMPI_setTable64f: Failed to set table on rank', I4)
+      IF (ierr /= 0) RETURN
+      CALL xcloc_dsmxc_haveAllTables(ltemp) 
+      itemp = 0
+      IF (ltemp) itemp = 1
+      CALL MPI_Allreduce(itemp, ibool, 1, MPI_INTEGER, MPI_MIN, comm_, mpierr)
+      IF (ibool == 1) lhaveAllTables_ = .TRUE.
+  900 FORMAT('xcloc_dsmxcMPI_setTable64f: tableNumber = ', I0, &
+             ' must be in range [1,',I0,']')
+  905 FORMAT('xcloc_dsmxcMPI_setTable64f: ngrd = ', I0, ' expecting ngrdTotal_ =', I0)
+  910 FORMAT('xcloc_dsmxcMPI_setTable64f: Failed to set table on rank ', I0)
+      RETURN
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Convenience utility to determine if all the tables have been set.
+!>    @param[out] lhaveAllTables  If true then all tables have been set.
+!>    @ingroup dsmxcMPI
+      SUBROUTINE xcloc_dsmxcMPI_haveAllTables(lhaveAllTables) &
+      BIND(C, NAME='xcloc_dsmxcMPI_haveAllTables')
+      LOGICAL(C_BOOL), INTENT(OUT) :: lhaveAllTables
+      lhaveAllTables = lhaveAllTables_
       RETURN
       END
 !                                                                                        !
@@ -258,7 +309,7 @@ MODULE XCLOC_DSMXC_MPI
 !                                                                                        !
 !>    @brief Returns the total number of grid points in a table.
 !>    @param[out] ngrd   Number of grid points in each table.
-!>    @ingroup dsmxc
+!>    @ingroup dsmxcMPI
       SUBROUTINE xcloc_dsmxcMPI_getNumberOGridPointsInTable(ngrd) &
       BIND(C, NAME='xcloc_dsmxcMPI_getNumberOGridPointsInTable')
       INTEGER(C_INT), INTENT(OUT) :: ngrd
@@ -290,6 +341,7 @@ MODULE XCLOC_DSMXC_MPI
       IF (ALLOCATED(nGridPtsPerProcess_)) DEALLOCATE(nGridPtsPerProcess_)
       IF (lfreeComm_) CALL MPI_Comm_free(comm_, mpierr)
       lfreeComm_ = .FALSE.
+      lhaveAllTables_ = .FALSE.
       ngrdTotal_ = 0
       ngrdLocal_ = 0
       nptsInXCs_ = 0

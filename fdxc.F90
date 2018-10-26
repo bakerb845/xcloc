@@ -114,7 +114,7 @@ MODULE XCLOC_FDXC
       PUBLIC :: xcloc_fdxc_makeCorrelogramsPtr64f
       PUBLIC :: xcloc_fdxc_makeCorrelogramsPtr32f
 
-      PRIVATE :: xcloc_fdxc_setXCTableF
+      PRIVATE :: xcloc_fdxc_setXCTable
       PRIVATE :: xcloc_fdxc_setAccuracy
       PRIVATE :: xcloc_fdxc_computeFDCorrelations
       PRIVATE :: xcloc_fdxc_initializeFFTW
@@ -204,7 +204,7 @@ MODULE XCLOC_FDXC
       ALLOCATE(lhaveSignal_(nsignals_))
       CALL xcloc_fdxc_haveNoSignals()
       ! Set the cross-correlation table which will, in turn, initialize FFTw
-      CALL xcloc_fdxc_setXCTableF(nxcs, xcPairs, ierr)
+      CALL xcloc_fdxc_setXCTable(nxcs, xcPairs, ierr)
       IF (ierr /= 0) THEN
          WRITE(ERROR_UNIT,910) 
          CALL xcloc_fdxc_finalize()
@@ -252,7 +252,7 @@ MODULE XCLOC_FDXC
       ENDIF
       accuracyMKL_ = vmlgetmode() ! Get the accuracy however MKL defines it
   900 FORMAT('xcloc_fdxc_setAccuracy: Error setting accuracy')
-  905 FORMAT('xcloc_fdxc_setAccuracy: Invalid accuracy', I4)
+  905 FORMAT('xcloc_fdxc_setAccuracy: Invalid accuracy ', I0)
       RETURN
       END
 !                                                                                        !
@@ -309,11 +309,11 @@ MODULE XCLOC_FDXC
 !>                        (i,j)'th signal pair comprising a correlation.
 !>    @param[out] ierr    0 indicates success 
 !>    @ingroup fdxc
-      SUBROUTINE xcloc_fdxc_setXCTableF(nxcs, xcPairs, ierr)
+      SUBROUTINE xcloc_fdxc_setXCTable(nxcs, xcPairs, ierr)
       IMPLICIT NONE
-      INTEGER(C_INT), VALUE, INTENT(IN) :: nxcs
-      INTEGER(C_INT), INTENT(IN) :: xcPairs(2*nxcs)
-      INTEGER(C_INT), INTENT(OUT) :: ierr
+      INTEGER, INTENT(IN) :: nxcs
+      INTEGER, INTENT(IN) :: xcPairs(2*nxcs)
+      INTEGER, INTENT(OUT) :: ierr
       ierr = 1
       lhaveTable_ = .FALSE.
       IF (nxcs < 1) THEN
@@ -336,10 +336,10 @@ MODULE XCLOC_FDXC
       CALL xcloc_fdxc_initializeFFTW(ierr)
       IF (ierr /= 0) WRITE(ERROR_UNIT,903)
       ! Format statements
-  900 FORMAT('xcloc_fdxc_setXCTableF: Error nxcs must be positive', I5)
-  901 FORMAT('xcloc_fdxc_setXCTableF: minval(xcPairs)=', I6, ' must be positive')
-  902 FORMAT('xcloc_fdxc_setXCTableF: minval(xcPairs)=', I6, ' cannot exceed', I4)
-  903 FORMAT('xcloc_fdxc_setXCTableF: Error initializing FFTs')
+  900 FORMAT('xcloc_fdxc_setXCTable: Error nxcs = ', I0, '  must be positive')
+  901 FORMAT('xcloc_fdxc_setXCTable: minval(xcPairs) = ', I0, ' must be positive')
+  902 FORMAT('xcloc_fdxc_setXCTable: maxval(xcPairs) = ', I0, ' cannot exceed ', I0)
+  903 FORMAT('xcloc_fdxc_setXCTable: Error initializing FFTs')
       RETURN
       END
 !                                                                                        !
@@ -378,10 +378,10 @@ MODULE XCLOC_FDXC
             RETURN
          ENDIF
       ENDDO
-  900 FORMAT('xcloc_fdxc_setSignals64f: Error ldx=', I6, '<', 'npts=', I6)
-  901 FORMAT('xcloc_fdxc_setSignals64f: Error expecting npts=', I6)
-  902 FORMAT('xcloc_fdxc_setSignals64f: Error expecting nsignals=', I6)
-  910 FORMAT('xcloc_fdxc_setSignals64f: Error setting signal index', I4)
+  900 FORMAT('xcloc_fdxc_setSignals64f: Error ldx = ', I0, '< npts = ', I0)
+  901 FORMAT('xcloc_fdxc_setSignals64f: Error expecting npts = ', I0)
+  902 FORMAT('xcloc_fdxc_setSignals64f: Error expecting nsignals = ', I0)
+  910 FORMAT('xcloc_fdxc_setSignals64f: Error setting signal index ', I0)
       RETURN
       END
 !                                                                                        !
@@ -420,10 +420,10 @@ MODULE XCLOC_FDXC
             RETURN
          ENDIF
       ENDDO
-  900 FORMAT('xcloc_fdxc_setSignals32f: Error ldx=', I6, '<', 'npts=', I6)
-  901 FORMAT('xcloc_fdxc_setSignals32f: Error expecting npts=', I6)
-  902 FORMAT('xcloc_fdxc_setSignals32f: Error expecting nsignals=', I6)
-  910 FORMAT('xcloc_fdxc_setSignals32f: Error setting signal index', I4)
+  900 FORMAT('xcloc_fdxc_setSignals32f: Error ldx = ', I0, '< npts = ', I0)
+  901 FORMAT('xcloc_fdxc_setSignals32f: Error expecting npts = ', I0)
+  902 FORMAT('xcloc_fdxc_setSignals32f: Error expecting nsignals = ', I0)
+  910 FORMAT('xcloc_fdxc_setSignals32f: Error setting signal index ', I0)
       RETURN
       END
 !                                                                                        !
@@ -581,8 +581,8 @@ MODULE XCLOC_FDXC
          i2 = i1 + nptsInXCs_ - 1
          CALL xcloc_fdxc_getCorrelogram32fF(ixc, ldxc, xcs(i1:i2), ierr)
       ENDDO
-  900 FORMAT('xcloc_fdxc_getCorrelograms32f: ldxc must be at least', I6)
-  905 FORMAT('xcloc_fdxc_getCorrelograms32f: nxcs must be at least', I6)
+  900 FORMAT('xcloc_fdxc_getCorrelograms32f: ldxc must be at least ', I0)
+  905 FORMAT('xcloc_fdxc_getCorrelograms32f: nxcs must be at least ', I0)
       RETURN
       END
 !                                                                                        !
@@ -668,8 +668,8 @@ MODULE XCLOC_FDXC
       i2 = i1 + nptsInXCs_ - 1
       xc64f(1:nptsInXCs_) => xcs64f_(i1:i2)
   900 FORMAT('xcloc_fdxc_makeCorrelogramPtr64f: Precision must be single')
-  905 FORMAT('xcloc_fdxc_makeCorrelogramPtr64f: corrNumber',I6,  &
-             'must be in range [1',I6,']')
+  905 FORMAT('xcloc_fdxc_makeCorrelogramPtr64f: corrNumber ',I0,  &
+             'must be in range [1',I0,']')
       RETURN 
       END
 !                                                                                        !
@@ -700,8 +700,8 @@ MODULE XCLOC_FDXC
       i2 = i1 + nptsInXCs_ - 1
       xc32f(1:nptsInXCs_) => xcs32f_(i1:i2)
   900 FORMAT('xcloc_fdxc_makeCorrelogramPtr32f: Precision must be single')
-  905 FORMAT('xcloc_fdxc_makeCorrelogramPtr32f: corrNumber',I6,  &
-             'must be in range [1',I6,']')
+  905 FORMAT('xcloc_fdxc_makeCorrelogramPtr32f: corrNumber ',I0,  &
+             'must be in range [1',I0,']')
       RETURN 
       END
 !                                                                                        !

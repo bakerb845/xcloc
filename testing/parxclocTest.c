@@ -26,7 +26,7 @@
 
 int test_parallel_xcloc(const MPI_Comm comm, const int root)
 {
-    const int nrec = 20;
+    const int nrec = 5; //20;
     int nsignals = nrec;
     int nfcoeffs = 301; // Number of FIR filter taps
     double dt = 1.0/6000.0; // Sampling rate is 6000 Hz
@@ -151,7 +151,7 @@ ERROR1:;
     if (ierr != EXIT_SUCCESS){return EXIT_FAILURE;}
     if (myid == root)
     {
-        fprintf(stdout, "%s: Initializing parxcloc...\n", __func__);
+        fprintf(stdout, "%s: Initializing xclocMPI...\n", __func__);
     }
     // Initialize
     int nptsPad = npts;
@@ -169,7 +169,7 @@ ERROR1:;
     {
         if (myid == root)
         {
-            fprintf(stderr, "%s: Failed to initialize xclocMPI", __func__);
+            fprintf(stderr, "%s: Failed to initialize xclocMPI\n", __func__);
         }
         return EXIT_FAILURE;
     }
@@ -177,7 +177,7 @@ ERROR1:;
     double *ttable = NULL;
     if (myid == root)
     {
-        fprintf(stdout, "%s: Making tables...\n", __func__);
+        fprintf(stdout, "%s: Making and setting tables...\n", __func__);
         ttable = (double *) calloc((size_t) ngrd, sizeof(double));
     }
     for (i=0; i<nrec; i++)
@@ -196,11 +196,20 @@ ERROR1:;
             return EXIT_FAILURE;
         }
         xclocMPI_setTable64f(it, ngrd, root, ttable, &ierr);
+        if (ierr != 0)
+        {
+            fprintf(stderr, "%s: Error setting table %d on process %d\n",
+                    __func__, i+1, myid);
+            break;
+        }
     }
     MPI_Barrier(comm);
     // Set the signals
     if (myid == root){fprintf(stdout, "%s: Setting signals..\n", __func__);}
     xclocMPI_setSignals64f(npts, npts, nsignals, root, obs, &ierr);
+    // Do the heavy lifting
+    if (myid == root){fprintf(stdout, "%s: Computing...\n", __func__);}
+    xclocMPI_compute(&ierr);
     // Free space
     xclocMPI_finalize();
     if (xcPairs != NULL){free(xcPairs);}

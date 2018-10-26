@@ -594,6 +594,7 @@ MODULE XCLOC
       accuracy_ = XCLOC_HIGH_ACCURACY
       precision_ = XCLOC_SINGLE_PRECISION
       verbose_ = XCLOC_PRINT_WARNINGS
+      lhaveAllTables_ = .FALSE.
       lhaveSignals_ = .FALSE.
       lhaveImage_ = .FALSE.
       lhaveXCs_ = .FALSE.

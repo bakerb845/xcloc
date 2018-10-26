@@ -128,7 +128,7 @@ int test_serial_xcloc(void)
     fprintf(stdout, "%s: Setting signals...\n", __func__);
     xcloc_setSignals64f(nptsSig, nptsSig, nsignals, obs, &ierr);
     CHKERR(ierr, "failed to set signals");
-    // Do the heavy lifting 
+    // Do the heavy lifting
     fprintf(stdout, "%s: Computing...\n", __func__);
     xcloc_compute(&ierr);
     // Get the max of image and th image itself

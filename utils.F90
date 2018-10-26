@@ -125,7 +125,7 @@ MODULE XCLOC_UTILS
       INTEGER(C_INT), INTENT(OUT) :: myTasks(ntasks), taskPtr(nprocs+1), ierr
       INTEGER, ALLOCATABLE :: taskCtr(:)
       DOUBLE PRECISION dPart
-      INTEGER i, ip, isum, low, high
+      INTEGER i, i1, i2, ip, iPart, isum, low, high
       ierr = 0
       IF (ntasks < 1 .OR. nprocs < 1) THEN
          ierr = 1
@@ -134,19 +134,30 @@ MODULE XCLOC_UTILS
       myTasks(:) =-1 ! ID of my task
       ALLOCATE(taskCtr(nprocs)); taskCtr(:) = 0 ! Number of tasks process must do
       dPart = DBLE(ntasks)/DBLE(nprocs)
-      ! Try to evenly divide the number of takss 
-      DO ip=1,nprocs
-         low  = MAX(1,      INT(DBLE(ip-1)*dPart + 0.5d0))
-         high = MIN(ntasks, INT(DBLE(ip)*dPart   + 0.5d0))
-         IF (ip == 1) low = 1 
-         IF (ip == nprocs) high = ntasks + 1 
-         DO i=1,ntasks
-            IF (i >= low .AND. i < high) THEN
-               myTasks(i) = ip - 1
-               taskCtr(ip) = taskCtr(ip) + 1 
-            ENDIF
+      ! Can definitely divide evenly
+      IF (MOD(ntasks, nprocs) == 0 .AND. nprocs <= ntasks) THEN
+         iPart = ntasks/nprocs
+         DO ip=1,nprocs
+            i1 = (ip - 1)*iPart + 1
+            i2 = ip*iPart
+            myTasks(i1:i2) = ip - 1
          ENDDO
-      ENDDO
+         taskCtr(1:nprocs) = ntasks/nprocs
+      ! Try to evenly divide the number of tasks 
+      ELSE
+         DO ip=1,nprocs
+            low  = MAX(1,      INT(DBLE(ip-1)*dPart + 0.5d0))
+            high = MIN(ntasks, INT(DBLE(ip)*dPart   + 0.5d0))
+            IF (ip == 1) low = 1 
+            IF (ip == nprocs) high = ntasks + 1 
+            DO i=1,ntasks
+               IF (i >= low .AND. i < high) THEN
+                  myTasks(i) = ip - 1
+                  taskCtr(ip) = taskCtr(ip) + 1 
+               ENDIF
+            ENDDO
+         ENDDO
+      ENDIF
       ! Verify
       DO i=1,ntasks
          IF (myTasks(i) < 0) THEN
