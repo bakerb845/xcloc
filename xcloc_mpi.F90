@@ -1104,34 +1104,78 @@ if (allocated(nDSMXCsPerGroup_)) deallocate(nDSMXCsPerGroup_)
       ELSE
          CALL xcloc_fdxcMPI_computeCrossCorrelograms(ierrLoc)
       ENDIF
-      IF (ierrLoc /= 0) ierrLoc = 1
-      timer_end = MPI_Wtime()
-      ! This isn't the most accurate count - technically I should block
-      CALL MPI_Allreduce(ierrLoc, ierr, 1, MPI_INTEGER, MPI_MAX, xclocGlobalComm_, mpierr)
-      IF (ierr /= 0) THEN
-         IF (myid_ == root_) WRITE(ERROR_UNIT,865)
-         RETURN
+      IF (ierrLoc /= 0) THEN
+         WRITE(ERROR_UNIT,865) myid_
+         ierrLoc = 1
+         GOTO 500
       ENDIF
+      ! This timing isn't the most accurate.  Technically I should block.
+      timer_end = MPI_Wtime()
       IF (myid_ == root_ .AND. verbose_ > XCLOC_PRINT_WARNINGS) &
       WRITE(OUTPUT_UNIT,905) timer_end - timer_start
-  !   lhaveXCs_ = .TRUE.
-!     IF (precision_ == XCLOC_SINGLE_PRECISION) THEN
-!        ALLOCATE(xcs32f(nxcsLocal_*nptsInXCs_))
-!        CALL xcloc_fdxcMPI_gatherCorrelograms32f(nptsInXCs_, nxcsLocal_, root_, xcs32f, ierr)
-!        DEALLOCATE(xcs32f)
-!     ELSE
+      timer_start = MPI_Wtime()
+      IF (precision_ == XCLOC_SINGLE_PRECISION) THEN
+         ALLOCATE(xcs32f(nxcsLocal_*nptsInXCs_))
+         CALL xcloc_fdxcMPI_gatherCorrelograms32f(nptsInXCs_, nxcsLocal_, root_, &
+                                                  xcs32f, ierrLoc)
+         IF (ierrLoc /= 0) THEN 
+            WRITE(ERROR_UNIT,870) myid_
+            GOTO 500
+         ENDIF
+         IF (xcdsmIntraCommID_ == root_) THEN 
+            CALL xcloc_spxc_filterXCsInPlace32f(nptsInXCs_, nptsInXCs_, nxcsLocal_, &
+                                                xcs32f, ierrLoc)
+            IF (ierrLoc /= 0) THEN 
+               WRITE(ERROR_UNIT,875) xcdsmInterCommID_
+               ierrLoc = 1
+            ENDIF
+         ENDIF
+         CALL MPI_Bcast(ierrLoc, 1, MPI_INTEGER, root_, xcdsmIntraComm_, mpierr)   
+         IF (ierrLoc /= 0) GOTO 500
+         CALL MPI_Bcast(xcs32f, nxcsLocal_*nptsInXCs_, MPI_REAL, &
+                        root_, xcdsmIntraComm_, mpierr)
+         DEALLOCATE(xcs32f)
+      ELSE
          ALLOCATE(xcs64f(nxcsLocal_*nptsInXCs_))
          CALL xcloc_fdxcMPI_gatherCorrelograms64f(nptsInXCs_, nxcsLocal_, root_, &
                                                   xcs64f, ierrLoc)
-print *, 'yes - need to make allgather'
+         IF (ierrLoc /= 0) THEN
+            WRITE(ERROR_UNIT,870) myid_
+            GOTO 500
+         ENDIF
+         IF (xcdsmIntraCommID_ == root_) THEN
+            CALL xcloc_spxc_filterXCsInPlace64f(nptsInXCs_, nptsInXCs_, nxcsLocal_, &
+                                                xcs64f, ierrLoc)
+            IF (ierrLoc /= 0) THEN
+               WRITE(ERROR_UNIT,875) xcdsmInterCommID_
+               ierrLoc = 1
+            ENDIF
+         ENDIF
+         CALL MPI_Bcast(ierrLoc, 1, MPI_INTEGER, root_, xcdsmIntraComm_, mpierr)   
+         IF (ierrLoc /= 0) GOTO 500
+         CALL MPI_Bcast(xcs64f, nxcsLocal_*nptsInXCs_, MPI_DOUBLE_PRECISION, &
+                        root_, xcdsmIntraComm_, mpierr)
          DEALLOCATE(xcs64f)
-!     ENDIF
- 
+      ENDIF
+      timer_end = MPI_Wtime()
+      IF (verbose_ > XCLOC_PRINT_WARNINGS .AND. myid_ == root_) &
+      WRITE(OUTPUT_UNIT,910) timer_end - timer_start
+      ! Check for errors
+  500 CALL MPI_Allreduce(ierrLoc, ierr, 1, MPI_INTEGER, MPI_MAX, xclocGlobalComm_, mpierr)
+      IF (ierr /= 0) THEN
+         IF (myid_ == root_) WRITE(ERROR_UNIT,950)
+      ELSE
+         lhaveXCs_ = .TRUE.
+      ENDIF
   850 FORMAT('xclocMPI_compute: Module not initialized on rank ', I0)
   855 FORMAT('xclocMPI_compute: Signals not yet set on rank ', I0)
   860 FORMAT('xclocMPI_compute: Travel time tables not yet set on rank ', I0)
-  865 FORMAT('xcloc_compute: Failed to compute correlograms')
-  905 FORMAT('xcloc_compute: Correlogram computation time=', F8.4, 's')
+  865 FORMAT('xclocMPI_compute: Failed to compute correlograms on rank ', I0)
+  870 FORMAT('xclocMPI_compute: Failed to get correlograms on rank ', I0)
+  875 FORMAT('xclocMPI_compute: Failed to process correlograms on group ', I0)
+  905 FORMAT('xclocMPI_compute: Correlogram computation time=', F8.4, 's')
+  910 FORMAT('xcloc_compute: Correlogram processing time=', F8.4, 's')
+  950 FORMAT('xclocMPI_compute: Errors detected in processing')
       RETURN
       END
 
