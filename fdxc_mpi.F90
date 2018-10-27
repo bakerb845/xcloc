@@ -101,6 +101,7 @@ MODULE XCLOC_FDXC_MPI
       PUBLIC :: xcloc_fdxcMPI_computeCrossCorrelograms
       PUBLIC :: xcloc_fdxcMPI_computePhaseCorrelograms
       PUBLIC :: xcloc_fdxcMPI_gatherCorrelograms64f
+      PUBLIC :: xcloc_fdxcMPI_gatherCorrelograms32f
       PUBLIC :: xcloc_fdxcMPI_getCorrelogramLength
       PUBLIC :: xcloc_fdxcMPI_getNumberOfCorrelograms
       PUBLIC :: xcloc_fdxcMPI_getNumberOfSignals
@@ -499,7 +500,7 @@ MODULE XCLOC_FDXC_MPI
       SUBROUTINE xcloc_fdxcMPI_gatherCorrelograms64f(ldxcIn, nxcsIn, root, xcs, ierr) &
       BIND(C, NAME='xcloc_fdxcMPI_gatherCorrelograms64f')
       INTEGER(C_INT), VALUE, INTENT(IN) :: ldxcin, nxcsIn, root
-      REAL(C_DOUBLE), INTENT(OUT) :: xcs(ldxcIn*nxcsIn)
+      REAL(C_DOUBLE), DIMENSION(ldxcIn*nxcsIn), INTENT(OUT) :: xcs
       INTEGER(C_INT), INTENT(OUT) :: ierr
       DOUBLE PRECISION, DIMENSION(:), ALLOCATABLE :: work
       INTEGER irecv, ldxc, mpierr, nxcs, nxcsLoc, sendCount
@@ -556,6 +557,79 @@ MODULE XCLOC_FDXC_MPI
   900 FORMAT('xcloc_fdxcMPI_gatherCorrelograms64f: ldxcIn must be at least ', I0)
   905 FORMAT('xcloc_fdxcMPI_gatherCorrelograms64f: nxcsIn must be at least ', I0)
   910 FORMAT("xcloc_fdxcMPI_gatherCorrelograms64f: Failed to get data on rank ", I0)
+      RETURN
+      END
+!>    @brief Gathers the correlograms onto the root process on the module.
+!>    @param[in] ldxcIn   The leading dimension of the correlograms.  This must be at
+!>                        least nptsInXCs_.  This is defined on the root process.
+!>    @param[in] nxcsIn   Total number of correlograms.  This must equal nXCsTotal_.
+!>                        This is defined on the root process.
+!>    @param[in] root     The root process ID on which to gather the correlograms.
+!>    @param[out] xcs     All of the cross-correlograms.  This is an array of dimension
+!>                        [ldxcIn x nxcsIn] with leading dimension ldxcIn.  This need
+!>                        only be defined on the root process.
+!>    @param[out] ierr    0 indicates succcess.
+!>    @ingroup fdxcmpi
+      SUBROUTINE xcloc_fdxcMPI_gatherCorrelograms32f(ldxcIn, nxcsIn, root, xcs, ierr) &
+      BIND(C, NAME='xcloc_fdxcMPI_gatherCorrelograms32f')
+      INTEGER(C_INT), VALUE, INTENT(IN) :: ldxcin, nxcsIn, root
+      REAL(C_FLOAT), DIMENSION(ldxcIn*nxcsIn), INTENT(OUT) :: xcs
+      INTEGER(C_INT), INTENT(OUT) :: ierr
+      REAL, DIMENSION(:), ALLOCATABLE :: work
+      INTEGER irecv, ldxc, mpierr, nxcs, nxcsLoc, sendCount
+      INTEGER, ALLOCATABLE :: displs(:), recvCount(:)
+      ierr = 0
+      IF (myid_ == MPI_UNDEFINED) RETURN
+      IF (root < 0 .OR. root > nprocs_ - 1) THEN
+         IF (myid_ == root_) WRITE(ERROR_UNIT,895) root
+         ierr = 1
+      ENDIF
+      IF (myid_ == root_) THEN
+         IF (ldxcIn < nptsInXCs_) THEN
+            WRITE(ERROR_UNIT,900) nptsInXCs_
+            ierr = 1
+         ENDIF
+         IF (nxcsIn < nXCsTotal_) THEN 
+            WRITE(ERROR_UNIT,905) nxcsIn
+            ierr = 1
+         ENDIF
+         ldxc = ldxcIn
+         nxcs = nxcsIn
+      ENDIF
+      CALL MPI_Bcast(ierr, 1, MPI_INTEGER, root, comm_, mpierr)
+      IF (ierr /= 0) RETURN
+      CALL MPI_Bcast(ldxc, 1, MPI_INTEGER, root, comm_, mpierr)
+      CALL MPI_Bcast(nxcs, 1, MPI_INTEGER, root, comm_, mpierr)
+      ! Set space to gather result
+      sendCount = nXCsLocal_*ldxc
+      ALLOCATE(work(sendCount))
+      ! Have master figure out who is sending what and how much
+      IF (myid_ == root) THEN
+         ALLOCATE(recvCount(nprocs_)); recvCount(:) = 0 
+         ALLOCATE(displs(nprocs_)); displs(:) = 0 
+         displs(1) = 0 ! This is C indexed
+         DO irecv=1,nprocs_
+            nxcsLoc = nXCsPerProcess_(irecv)
+            recvCount(irecv) = nxcsLoc*ldxc
+            IF (irecv < nprocs_) displs(irecv+1) = displs(irecv) + recvCount(irecv)
+         ENDDO
+      ENDIF
+      ! Get the data
+      CALL xcloc_fdxc_getCorrelograms32f(ldxc, nXCsLocal_, work, ierr)
+      IF (ierr /= 0) THEN
+         WRITE(ERROR_UNIT,910) myid_
+      ENDIF
+      ! Gather the data
+      CALL MPI_Gatherv(work, sendCount, MPI_REAL, &
+                       xcs, recvCount, displs,    &
+                       MPI_REAL, root, comm_, mpierr)
+      IF (ALLOCATED(work))      DEALLOCATE(work)
+      IF (ALLOCATED(recvCount)) DEALLOCATE(recvCount) 
+      IF (ALLOCATED(displs))    DEALLOCATE(displs)
+  895 FORMAT('xcloc_fdxcMPI_gatherCorrelograms32f: Invalid root=', I0)
+  900 FORMAT('xcloc_fdxcMPI_gatherCorrelograms32f: ldxcIn must be at least ', I0)
+  905 FORMAT('xcloc_fdxcMPI_gatherCorrelograms32f: nxcsIn must be at least ', I0)
+  910 FORMAT('xcloc_fdxcMPI_gatherCorrelograms32f: Failed to get data on rank ', I0)
       RETURN
       END
 !                                                                                        !

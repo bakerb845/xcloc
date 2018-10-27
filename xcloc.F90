@@ -354,6 +354,7 @@ MODULE XCLOC
             RETURN
          ENDIF
          CALL xcloc_dsmxc_setCorrelograms32f(nptsInXCs_, nptsInXCs_, nxcs_, xcs32f, ierr)
+         IF (ALLOCATED(xcs32f)) DEALLOCATE(xcs32f)
       ELSE
          ALLOCATE(xcs64f(nxcs_*nptsInXCs_))
          CALL xcloc_fdxc_getCorrelograms64f(nptsInXCs_, nxcs_, xcs64f, ierr)
@@ -369,6 +370,7 @@ MODULE XCLOC
             RETURN
          ENDIF
          CALL xcloc_dsmxc_setCorrelograms64f(nptsInXCs_, nptsInXCs_, nxcs_, xcs64f, ierr)
+         IF (ALLOCATED(xcs64f)) DEALLOCATE(xcs64f)
       ENDIF
       IF (ierr /= 0) THEN
          WRITE(ERROR_UNIT,880)

@@ -61,7 +61,10 @@ MODULE XCLOC_DSMXC_MPI
 
       PUBLIC :: xcloc_dsmxcMPI_initialize
       PUBLIC :: xcloc_dsmxcMPI_finalize
+      PUBLIC :: xcloc_dsmxcMPI_compute
       PUBLIC :: xcloc_dsmxcMPI_setTable64f
+      PUBLIC :: xcloc_dsmxcMPI_setCorrelograms64f
+      PUBLIC :: xcloc_dsmxcMPI_setCorrelograms32f
       PUBLIC :: xcloc_dsmxcMPI_getNumberOGridPointsInTable
       PUBLIC :: xcloc_dsmxcMPI_getNumberOfTables
       PUBLIC :: xcloc_dsmxcMPI_haveAllTables
@@ -328,7 +331,137 @@ MODULE XCLOC_DSMXC_MPI
       ntables = ntables_
       RETURN
       END
-
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Sets the correlograms to migrate on the module.
+!>    @param[in] ldxcIn     The leading dimension of the XCs.  This must be greater than
+!>                          or equal to nptsInXCs.  This need only be defined on the root
+!>                          process.
+!>    @param[in] nptsInXCs  The number of points in each correlogram.  This must equal
+!>                          nptsInXCs_.  This need only be defined on the root process.
+!>    @param[in] nxcPairs   The number of cross-correlogram pairs.  This must equal
+!>                          nxcPairs_.  This need only be defined on the root process.
+!>    @param[in] root       The rank of the process that is broadcasting the data.
+!>    @param[in] xcs        The cross-correlograms to migrate.  This an array of dimension
+!>                          [ldxc x nxcPairs] in column major format with leading
+!>                          dimension ldxc.  The order of the correlograms is dictated
+!>                          by xcPairs_ - i.e., for the ixc'th correlation the correlogram
+!>                          is expected to represent the cross-correlation between the
+!>                          signal index pairs given by xcPairs_(2*(ixc-1)+1) and
+!>                          xcPairs_(2*ixc).  This need only be defined on the root
+!>                          process.
+!>    @param[out] ierr      0 indicates success.
+!>    @ingroup dsmxcMPI
+      SUBROUTINE xcloc_dsmxcMPI_setCorrelograms64f(ldxcIn, nptsInXCs, nxcPairs, root, &
+                                                   xcs, ierr)                         &
+      BIND(C, NAME='xcloc_dsmxcMPI_setCorrelograms64f')
+      INTEGER(C_INT), VALUE, INTENT(IN) :: ldxcIn, nptsInXCs, nxcPairs, root
+      REAL(C_DOUBLE), DIMENSION(ldxcIn*nxcPairs), INTENT(IN) :: xcs 
+      INTEGER(C_INT), INTENT(OUT) :: ierr
+      DOUBLE PRECISION, ALLOCATABLE, DIMENSION(:) :: xcwork
+      INTEGER ierrLoc, ldxc, mpierr
+      ierr = 0
+      IF (myid_ == root) THEN
+         ldxc = ldxcIn
+         IF (nxcPairs /= nxcPairs_) THEN
+            WRITE(ERROR_UNIT,900) nxcPairs, nxcPairs_
+            ierr = 1
+         ENDIF
+         IF (nptsInXCs /= nptsInXCs_) THEN
+            WRITE(ERROR_UNIT,901) nptsInXCs, nptsInXCs_
+            ierr = 1
+         ENDIF
+         IF (ldxcIn < nptsInXCs_) THEN
+            WRITE(ERROR_UNIT,902) ldxcIn, nptsInXCs
+            ierr = 1
+         ENDIF
+      ENDIF
+      CALL MPI_Bcast(ierr, 1, MPI_INTEGER, root, comm_, mpierr)
+      IF (ierr /= 0) RETURN
+      CALL MPI_Bcast(ldxc, 1, MPI_INTEGER, root, comm_, mpierr)
+      ALLOCATE(xcwork(ldxc*nxcPairs_))
+      IF (myid_ == root) xcwork(:) = xcs(:)
+      CALL MPI_Bcast(xcwork, ldxc*nxcPairs_, MPI_DOUBLE_PRECISION, root, comm_, mpierr)
+      CALL xcloc_dsmxc_setCorrelograms64f(ldxc, nptsInXCs_, nxcPairs_, xcwork, ierrLoc)
+      IF (ALLOCATED(xcwork)) DEALLOCATE(xcwork)
+      IF (ierrLoc /= 0) THEN
+         WRITE(ERROR_UNIT,903) myid_
+         ierrLoc = 1
+      ENDIF
+      CALL MPI_Allreduce(ierrLoc, ierr, 1, MPI_INTEGER, MPI_MAX, comm_, mpierr)
+  900 FORMAT('xcloc_dsmxcMPI_setCorrelograms64f: nxcPairs = ', I0, &
+             '; expecting nxcPairs = ',I0)
+  901 FORMAT('xcloc_dsmxcMPI_setCorrelograms64f: nPtsInXCs=', I0, &
+              '; expecting nptsInXCS =',I0)
+  902 FORMAT('xcloc_dsmxcMPI_setCorrelograms64f: ldxcIn = ', I0, ' < nptsInXCs_ = ', I0) 
+  903 FORMAT('xcloc_dsmxcMPI_setCorrelograms64f: Failed to set xcs on rank ', I0) 
+      RETURN
+      END 
+!>    @brief Sets the correlograms to migrate on the module.
+!>    @param[in] ldxcIn     The leading dimension of the XCs.  This must be greater than
+!>                          or equal to nptsInXCs.  This need only be defined on the root
+!>                          process.
+!>    @param[in] nptsInXCs  The number of points in each correlogram.  This must equal
+!>                          nptsInXCs_.  This need only be defined on the root process.
+!>    @param[in] nxcPairs   The number of cross-correlogram pairs.  This must equal
+!>                          nxcPairs_.  This need only be defined on the root process.
+!>    @param[in] root       The rank of the process that is broadcasting the data.
+!>    @param[in] xcs        The cross-correlograms to migrate.  This an array of dimension
+!>                          [ldxc x nxcPairs] in column major format with leading
+!>                          dimension ldxc.  The order of the correlograms is dictated
+!>                          by xcPairs_ - i.e., for the ixc'th correlation the correlogram
+!>                          is expected to represent the cross-correlation between the
+!>                          signal index pairs given by xcPairs_(2*(ixc-1)+1) and
+!>                          xcPairs_(2*ixc).  This need only be defined on the root
+!>                          process.
+!>    @param[out] ierr      0 indicates success.
+!>    @ingroup dsmxcMPI
+      SUBROUTINE xcloc_dsmxcMPI_setCorrelograms32f(ldxcIn, nptsInXCs, nxcPairs, root, &
+                                                   xcs, ierr)                         &
+      BIND(C, NAME='xcloc_dsmxcMPI_setCorrelograms32f')
+      INTEGER(C_INT), VALUE, INTENT(IN) :: ldxcIn, nptsInXCs, nxcPairs, root
+      REAL(C_FLOAT), DIMENSION(ldxcIn*nxcPairs), INTENT(IN) :: xcs
+      INTEGER(C_INT), INTENT(OUT) :: ierr
+      REAL, ALLOCATABLE, DIMENSION(:) :: xcwork
+      INTEGER ierrLoc, ldxc, mpierr
+      ierr = 0
+      IF (myid_ == root) THEN
+         ldxc = ldxcIn
+         IF (nxcPairs /= nxcPairs_) THEN
+            WRITE(ERROR_UNIT,900) nxcPairs, nxcPairs_
+            ierr = 1
+         ENDIF
+         IF (nptsInXCs /= nptsInXCs_) THEN
+            WRITE(ERROR_UNIT,901) nptsInXCs, nptsInXCs_
+            ierr = 1
+         ENDIF 
+         IF (ldxcIn < nptsInXCs_) THEN
+            WRITE(ERROR_UNIT,902) ldxcIn, nptsInXCs
+            ierr = 1
+         ENDIF
+      ENDIF 
+      CALL MPI_Bcast(ierr, 1, MPI_INTEGER, root, comm_, mpierr)
+      IF (ierr /= 0) RETURN
+      CALL MPI_Bcast(ldxc, 1, MPI_INTEGER, root, comm_, mpierr)
+      ALLOCATE(xcwork(ldxc*nxcPairs_))
+      IF (myid_ == root) xcwork(:) = xcs(:)
+      CALL MPI_Bcast(xcwork, ldxc*nxcPairs_, MPI_REAL, root, comm_, mpierr)
+      CALL xcloc_dsmxc_setCorrelograms32f(ldxc, nptsInXCs_, nxcPairs_, xcwork, ierrLoc)
+      IF (ALLOCATED(xcwork)) DEALLOCATE(xcwork)
+      IF (ierrLoc /= 0) THEN
+         WRITE(ERROR_UNIT,903) myid_
+         ierrLoc = 1
+      ENDIF
+      CALL MPI_Allreduce(ierrLoc, ierr, 1, MPI_INTEGER, MPI_MAX, comm_, mpierr)
+  900 FORMAT('xcloc_dsmxcMPI_setCorrelograms32f: nxcPairs = ', I0, &
+             '; expecting nxcPairs = ',I0)
+  901 FORMAT('xcloc_dsmxcMPI_setCorrelograms32f: nPtsInXCs=', I0, &
+              '; expecting nptsInXCS =',I0)
+  902 FORMAT('xcloc_dsmxcMPI_setCorrelograms32f: ldxcIn = ', I0, ' < nptsInXCs_ = ', I0)
+  903 FORMAT('xcloc_dsmxcMPI_setCorrelograms32f: Failed to set xcs on rank ', I0)
+      RETURN
+      END
 !                                                                                        !
 !========================================================================================!
 !                                                                                        !
@@ -348,6 +481,25 @@ MODULE XCLOC_DSMXC_MPI
       ntables_ = 0
       dt_ = 0.d0
       myid_ = MPI_UNDEFINED
+      RETURN
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Computes the diffraction stack migration image of the cross-correlograms.
+!>    @param[out] ierr   0 indicates success.
+!>    @ingroup dsmxcMPI
+      SUBROUTINE xcloc_dsmxcMPI_compute(ierr) &
+      BIND(C, NAME='xcloc_dsmxcMPI_compute')
+      INTEGER(C_INT), INTENT(OUT) :: ierr
+      INTEGER ierrLoc, mpierr
+      CALL xcloc_dsmxc_compute(ierrLoc)
+      IF (ierrLoc /= 0) THEN
+         WRITE(ERROR_UNIT,905) myid_
+         ierrLoc = 1
+      ENDIF
+      CALL MPI_Allreduce(ierrLoc, ierr, 1, MPI_INTEGER, MPI_MAX, comm_, mpierr)
+  905 FORMAT('xcloc_dsmxcMPI_compute: Error computing DSMXC on rank ', I0) 
       RETURN
       END
 !                                                                                        !

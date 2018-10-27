@@ -26,7 +26,7 @@
 
 int test_parallel_xcloc(const MPI_Comm comm, const int root)
 {
-    const int nrec = 5; //20;
+    const int nrec = 20; //5; //20;
     int nsignals = nrec;
     int nfcoeffs = 301; // Number of FIR filter taps
     double dt = 1.0/6000.0; // Sampling rate is 6000 Hz

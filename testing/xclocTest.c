@@ -85,7 +85,7 @@ int test_serial_xcloc(void)
     //-------------------------- Initialize xcloc ----------------------------//
     fprintf(stdout, "%s: Creating correlation table...\n", __func__); 
     int nsignals = nrec;
-    int verbose = XCLOC_PRINT_ERRORS;
+    int verbose = XCLOC_PRINT_INFO;//WARNINGS; //ERRORS;
     int prec = XCLOC_SINGLE_PRECISION; //0;
     int accuracy = XCLOC_HIGH_ACCURACY; //0;
     bool ldoAutoCorrs = false;

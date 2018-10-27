@@ -399,7 +399,7 @@ MODULE XCLOC_DSMXC
 !========================================================================================!
 !                                                                                        !
 !>    @brief Sets the correlograms to migrate on the module.
-!>    @param[in] ldxc       Leading dimension of nxcs.  This must be greater than or equal
+!>    @param[in] ldxc       Leading dimension of xcs.  This must be greater than or equal
 !>                          to nptsInXCs.
 !>    @param[in] nptsInXCs  The number of points in each correlogram.  This must
 !>                          equal nptsInXCs_.
@@ -430,6 +430,11 @@ MODULE XCLOC_DSMXC
          ierr = 1
          RETURN
       ENDIF
+      IF (ldxc < nptsInXCs_) THEN
+         WRITE(ERROR_UNIT,902) ldxc, nptsInXCs_
+         ierr = 1 
+         RETURN
+      ENDIF
       DO i=1,nxcPairs_
          indx = (i - 1)*ldxc + 1 
          CALL xcloc_dsmxc_setCorrelogram64fF(i, nptsInXCs, xcs(indx), ierr)
@@ -440,14 +445,15 @@ MODULE XCLOC_DSMXC
       ENDDO
   900 FORMAT('xcloc_dsmxc_setCorrelograms64f: nxcPairs=', I0,'; expecting nxcPairs=',I0)
   901 FORMAT('xcloc_dsmxc_setCorrelograms64f: nPtsInXCs=', I0,'; expecting nptsInXCS=',I0)
-  902 FORMAT('xcloc_dsmxc_setCorrelograms64f: Error setting xc number ', I0)
+  902 FORMAT('xcloc_dsmxc_setCorrelograms64f: ldxc = ', I0, ' < nptsInXCs_ = ', I0)
+  903 FORMAT('xcloc_dsmxc_setCorrelograms64f: Error setting xc number ', I0)
       RETURN
       END
 !                                                                                        !
 !========================================================================================!
 !                                                                                        !
 !>    @brief Sets the correlograms to migrate on the module.
-!>    @param[in] ldxc       Leading dimension of nxcs.  This must be greater than or equal
+!>    @param[in] ldxc       Leading dimension of xcs.  This must be greater than or equal
 !>                          to nptsInXCs.
 !>    @param[in] nptsInXCs  The number of points in each correlogram.  This must
 !>                          equal nptsInXCs_.
@@ -478,17 +484,23 @@ MODULE XCLOC_DSMXC
          ierr = 1
          RETURN
       ENDIF
+      IF (ldxc < nptsInXCs_) THEN
+         WRITE(ERROR_UNIT,902) ldxc, nptsInXCs_
+         ierr = 1
+         RETURN
+      ENDIF
       DO i=1,nxcPairs_
          indx = (i - 1)*ldxc + 1
          CALL xcloc_dsmxc_setCorrelogram32fF(i, nptsInXCs, xcs(indx), ierr)
          IF (ierr /= 0) THEN
-            WRITE(ERROR_UNIT,902) i
+            WRITE(ERROR_UNIT,903) i
             RETURN
          ENDIF
       ENDDO
   900 FORMAT('xcloc_dsmxc_setCorrelograms32f: nxcPairs=', I0,'; expecting nxcPairs=',I0)
   901 FORMAT('xcloc_dsmxc_setCorrelograms32f: nPtsInXCs=', I0,'; expecting nptsInXCS=',I0)
-  902 FORMAT('xcloc_dsmxc_setCorrelograms32f: Error setting xc number ', I0)
+  902 FORMAT('xcloc_dsmxc_setCorrelograms32f: ldxc = ', I0, ' < nptsInXCs_ = ', I0)
+  903 FORMAT('xcloc_dsmxc_setCorrelograms32f: Error setting xc number ', I0)
       RETURN
       END
 !                                                                                        !
