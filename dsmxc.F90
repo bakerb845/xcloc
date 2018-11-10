@@ -79,6 +79,7 @@ MODULE XCLOC_DSMXC
       PUBLIC :: xcloc_dsmxc_setCorrelogram32fF
       PUBLIC :: xcloc_dsmxc_signalToTableIndex
       PUBLIC :: xcloc_dsmxc_haveAllTables
+      PUBLIC :: xcloc_dsmxc_isImageComputed
       PUBLIC :: xcloc_dsmxc_getImageMax
       ! Public but for Fortran only
       PUBLIC :: xcloc_dsmxc_getImagePtr
@@ -198,6 +199,16 @@ MODULE XCLOC_DSMXC
       lhaveAllTables_ = .FALSE.
       lhaveImage_ = .FALSE.
       blockSize_ = XCLOC_DEFAULT_BLOCKSIZE
+      RETURN
+      END
+!>    @brief Convenience utility to determine if the image has yet to be computed'
+!>    @param[out] lhaveImage  If true then the image has been computed.
+!>    @param[out] lhaveImage  If false then the image has not yet been computed.
+!>    @ingroup dsmxc
+      SUBROUTINE xcloc_dsmxc_isImageComputed(lhaveImage) &
+      BIND(C, NAME='xcloc_dsmxc_isImageComputed')
+      LOGICAL(C_BOOL), INTENT(OUT) :: lhaveImage
+      lhaveImage = lhaveImage_
       RETURN
       END
 !                                                                                        !
@@ -326,8 +337,8 @@ MODULE XCLOC_DSMXC
 !>    @param[out] ierr      0 indicates success.
 !>    @ingroup dsmxc
       SUBROUTINE xcloc_dsmxc_getImagePtr(imagePtr, ierr)
-      REAL(C_FLOAT), CONTIGUOUS, POINTER, DIMENSION(:), INTENT(OUT) :: imagePtr
-      INTEGER(C_INT), INTENT(OUT) :: ierr
+      REAL, CONTIGUOUS, POINTER, DIMENSION(:), INTENT(OUT) :: imagePtr
+      INTEGER, INTENT(OUT) :: ierr
       ierr = 0
       IF (.NOT.lhaveImage_) THEN
          WRITE(ERROR_UNIT,900)

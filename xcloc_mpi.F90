@@ -69,6 +69,10 @@ TYPE(C_PTR), SAVE :: dataPtr_ = C_NULL_PTR
       !> This has dimension [2 x nxcsLocal_]. 
       INTEGER, PRIVATE, ALLOCATABLE, SAVE :: xcPairsLocal_(:)
       !> @ingroup xcloc_mpi
+      !> Determines the ownernship ranges for each grid.  This has dimension
+      !> [xcGroupSize_+1].
+      INTEGER, PRIVATE, ALLOCATABLE, SAVE :: grdPointsPtr_(:)
+      !> @ingroup xcloc_mpi
       !> Root ID on communicator.
       INTEGER, PRIVATE, SAVE :: root_ = 0
       !> @ingroup xcloc_mpi
@@ -124,7 +128,7 @@ TYPE(C_PTR), SAVE :: dataPtr_ = C_NULL_PTR
       !> Number of XC/DSM groups.
       INTEGER, PRIVATE, SAVE :: nxcdsmGroups_ = 0
       !> @ingroup xcloc_mpi
-      !> Number of processes in each cross-correloation group.
+      !> Number of processes in each cross-correlation group.
       INTEGER, PRIVATE, SAVE :: xcGroupSize_ = 0
 
       !> @ingroup xcloc_mpi
@@ -487,6 +491,7 @@ integer, private, allocatable, save :: nDSMXCsPerGroup_(:)
                WRITE(ERROR_UNIT,992) myid_
                ierrLoc = 1
             ENDIF
+            CALL xcloc_dsmxcMPI_getGridOwnershipRange(grdPointsPtr_)
          ENDIF
          CALL MPI_Barrier(xclocGlobalComm_, mpierr)
       ENDDO
@@ -587,6 +592,7 @@ integer, private, allocatable, save :: nDSMXCsPerGroup_(:)
       IF (ALLOCATED(signalToGroup_))    DEALLOCATE(signalToGroup_)
       IF (ALLOCATED(uniqueSignals_))    DEALLOCATE(uniqueSignals_)
       IF (ALLOCATED(xcPairsLocal_))     DEALLOCATE(xcPairsLocal_)
+      IF (ALLOCATED(grdPointsPtr_))     DEALLOCATE(grdPointsPtr_)
 !     IF (ASSOCIATED(signalsRMA32f_))   CALL MPI_Free_mem(signalsRMA32f_, mpierr)
       IF (ASSOCIATED(signalsRMA64f_))   CALL MPI_Free_mem(signalsRMA64f_, mpierr)
 if (allocated(nDSMXCsPerGroup_)) deallocate(nDSMXCsPerGroup_)
@@ -1065,6 +1071,71 @@ if (allocated(nDSMXCsPerGroup_)) deallocate(nDSMXCsPerGroup_)
 !                                                                                        !
 !========================================================================================!
 !                                                                                        !
+!>    @brief Gets the maximum value of the image.
+!>    @param[out] maxIndex  The index of the maximum.  This is Fortran indexed.
+!>    @param[out] maxValue  Maximum value corresponding to the maxIndex.
+!>    @param[out] ierr      0 indicates success.
+!>    @ingroup xcloc_mpi
+      SUBROUTINE xclocMPI_getImageMax(maxIndex, maxValue, ierr) &
+      BIND(C, NAME='xclocMPI_getImageMax')
+      REAL(C_FLOAT), INTENT(OUT) :: maxValue
+      INTEGER(C_INT), INTENT(OUT) :: maxIndex, ierr
+      REAL, ALLOCATABLE, DIMENSION(:) :: imageWork, xmax, xmaxWork
+      INTEGER, ALLOCATABLE, DIMENSION(:) :: imax, imaxWork
+      REAL, POINTER, CONTIGUOUS, DIMENSION(:) :: localImagePtr(:)
+      INTEGER i, ierrLoc, mpierr, ngrdLocal
+      ierr = 0
+      maxIndex = 1
+      maxValue = 0.0
+      IF (myid_ == MPI_UNDEFINED) RETURN ! I don't belong here
+      ierrLoc = 0
+      IF (.NOT.lhaveImage_) ierrLoc = 1
+      CALL MPI_Allreduce(ierrLoc, ierr, 1, MPI_INTEGER, MPI_MAX, xclocGlobalComm_, mpierr)
+      IF (ierr /= 0) THEN
+         IF (myid_ == root_) WRITE(ERROR_UNIT,900)
+         ierr = 1
+         RETURN
+      ENDIF
+      ! Sum the images onto the root DSM group 
+      NULLIFY(localImagePtr)
+      CALL xcloc_dsmxcMPI_getLocalImagePtr(localImagePtr, ierrLoc)
+      ngrdLocal = SIZE(localImagePtr)
+      IF (xcdsmInterCommID_ == root_) ALLOCATE(imageWork(ngrdLocal))
+      CALL MPI_Reduce(localImagePtr, imageWork, ngrdLocal, MPI_REAL, MPI_SUM, root_, &
+                      xcdsmInterComm_, mpierr) 
+      NULLIFY(localImagePtr)
+      ! Get the max
+      IF (xcdsmInterCommID_ == root_) THEN
+         ALLOCATE(imaxWork(xcGroupSize_)); imaxWork(:) = 0
+         ALLOCATE(xmaxWork(xcGroupSize_)); xmaxWork(:) = 0.0
+         IF (xcdsmIntraCommID_ == root_) THEN
+            ALLOCATE(imax(xcGroupSize_))
+            ALLOCATE(xmax(xcGroupSize_))
+         ENDIF
+         imaxWork(xcdsmIntraCommID_+1) = MAXLOC(imageWork, 1)
+         xmaxWork(xcdsmIntraCommID_+1) = imageWork(imaxWork(xcdsmIntraCommID_+1))
+         CALL MPI_Reduce(imaxWork, imax, xcGroupSize_, MPI_INTEGER, MPI_SUM, root_, &
+                         xcdsmIntraComm_, mpierr)
+         CALL MPI_Reduce(xmaxWork, xmax, xcGroupSize_, MPI_REAL,    MPI_SUM, root_, &
+                         xcdsmIntraComm_, mpierr) 
+         IF (xcdsmIntraCommID_ == root_) THEN
+            i = MAXLOC(xmax, 1)
+            maxIndex = grdPointsPtr_(i) + imax(i) - 1 
+            maxValue = xmax(i)
+print *, maxIndex, maxValue
+         ENDIF
+         IF (ALLOCATED(imaxWork)) DEALLOCATE(imaxWork)
+         IF (ALLOCATED(xmaxWork)) DEALLOCATE(xmaxWork)
+         IF (ALLOCATED(imax)) DEALLOCATE(imax)
+         IF (ALLOCATED(xmax)) DEALLOCATE(xmax)
+      ENDIF
+      IF (ALLOCATED(imageWork)) DEALLOCATE(imageWork)
+  900 FORMAT('xclocMPI_getImageMax: Image not yet computed')
+      RETURN
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
 !>    @brief After setting the travel time tables and signals this will:
 !>           1. Compute the phase or cross-correlograms depending on the signal migration
 !>              policy.
@@ -1188,6 +1259,7 @@ if (allocated(nDSMXCsPerGroup_)) deallocate(nDSMXCsPerGroup_)
          IF (myid_ == root_) WRITE(ERROR_UNIT,950)
       ELSE
          lhaveXCs_ = .TRUE.
+         lhaveImage_ = .TRUE.
       ENDIF
   850 FORMAT('xclocMPI_compute: Module not initialized on rank ', I0)
   855 FORMAT('xclocMPI_compute: Signals not yet set on rank ', I0)

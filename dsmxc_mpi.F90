@@ -68,6 +68,8 @@ MODULE XCLOC_DSMXC_MPI
       PUBLIC :: xcloc_dsmxcMPI_getNumberOGridPointsInTable
       PUBLIC :: xcloc_dsmxcMPI_getNumberOfTables
       PUBLIC :: xcloc_dsmxcMPI_haveAllTables
+      PUBLIC :: xcloc_dsmxcMPI_getLocalImagePtr
+      PUBLIC :: xcloc_dsmxcMPI_getGridOwnershipRange
 
       CONTAINS
 !========================================================================================!
@@ -500,6 +502,51 @@ MODULE XCLOC_DSMXC_MPI
       ENDIF
       CALL MPI_Allreduce(ierrLoc, ierr, 1, MPI_INTEGER, MPI_MAX, comm_, mpierr)
   905 FORMAT('xcloc_dsmxcMPI_compute: Error computing DSMXC on rank ', I0) 
+      RETURN
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Gets the grid ownership range of each 
+!>    @param[out] gridPtr   Maps from the ip'th process to the start index of the
+!>                          grid hence each grid owns gridPtr(ip+1) - gridPtr(ip) 
+!>                          grid points.
+!>    @ingroup dsmxcMPI
+      SUBROUTINE xcloc_dsmxcMPI_getGridOwnershipRange(gridPtr)
+      INTEGER, ALLOCATABLE, INTENT(OUT) :: gridPtr(:)
+      INTEGER i
+      ALLOCATE(gridPtr(nprocs_+1)); gridPtr(:) = 0
+      gridPtr(1) = 1
+      DO i=1,nprocs_
+         gridPtr(i+1) = gridPtr(i) + nGridPtsPerProcess_(i)
+      ENDDO
+      RETURN
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Returns a pointer to the local migration image.
+!>    @param[out] imagePtr   A pointer to the image.
+!>    @param[out] ierr       0 indicates success.
+!>    @ingroup dsmxcMPI
+      SUBROUTINE xcloc_dsmxcMPI_getLocalImagePtr(imagePtr, ierr)
+      REAL, CONTIGUOUS, POINTER, DIMENSION(:), INTENT(OUT) :: imagePtr
+      INTEGER, INTENT(OUT) :: ierr
+      LOGICAL(C_BOOL) lhaveImage
+      ierr = 0
+      CALL xcloc_dsmxc_isImageComputed(lhaveImage) 
+      IF (.NOT.lhaveImage) THEN
+         WRITE(ERROR_UNIT,900) myid_
+         ierr = 1
+         RETURN
+      ENDIF
+      CALL xcloc_dsmxc_getImagePtr(imagePtr, ierr)
+      IF (ierr /= 0) THEN
+         WRITE(ERROR_UNIT,905) myid_
+         ierr = 1
+      ENDIF
+  900 FORMAT('xcloc_dsmxcMPI_getLocalImagePtr: Image not yet computed on rank ', I0)
+  905 FORMAT('xcloc_dsmxcMPI_getLocalImagePtr: Failed to get local image on rank ', I0)
       RETURN
       END
 !                                                                                        !

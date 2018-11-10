@@ -94,6 +94,8 @@ void xcloc_dsmxc_getImage64f(const int nwork,
 void xcloc_dsmxc_getImage32f(const int nwork, 
                              float image[],
                              int *ierr);
+/* Determines if the image is computed. */
+void xcloc_dsmxc_isImageComputed(bool *lhaveImage);
 /* Get maximum of image. */
 void xcloc_dsmxc_getImageMax(int *maxIndex, float *maxValue, int *ierr);
 /* Maps from the signal in the xcPairs table to the */
@@ -222,6 +224,8 @@ void xclocMPI_setTable64f(const int tableNumberIn, const int ngrdIn,
 void xclocMPI_setTable32f(const int tableNumberIn, const int ngrdIn,
                           const int root, const float table[],
                           int *ierr);
+/* Get the max of the image. */
+void xclocMPI_getImageMax(int *maxIndex, float *maxValue, int *ierr);
 /* Performs cross-correlations and computes the xcloc image. */
 void xclocMPI_compute(int *ierr);
 /* Gets the table number corresponding to the signal number. */

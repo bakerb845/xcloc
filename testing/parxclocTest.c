@@ -210,6 +210,11 @@ ERROR1:;
     // Do the heavy lifting
     if (myid == root){fprintf(stdout, "%s: Computing...\n", __func__);}
     xclocMPI_compute(&ierr);
+    // Get the results
+    int maxIndex;
+    float maxValue;
+    xclocMPI_getImageMax(&maxIndex, &maxValue, &ierr);
+
     // Free space
     xclocMPI_finalize();
     if (xcPairs != NULL){free(xcPairs);}
