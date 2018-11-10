@@ -71,7 +71,7 @@ print(xrec)
 # Initialize xcloc
 print("Initializing xcloc...")
 nsignals = nrec  
-xcloc = xcloc(xcloc_path=['/home/bakerb25/C/xcloc/lib'])
+xcloc = xcloc() #xcloc_path=['/home/bakerb25/Fortran/xcloc/lib'])
 xcloc.initialize(dt, npts, ngrd, nsignals=nsignals)
 # Create 2D Acoustic Green's functions assuming a line source in z
 ac2d = Acoustic2D(vel=vel, rho=rho, Q=Q)

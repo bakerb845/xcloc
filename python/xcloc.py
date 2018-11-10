@@ -481,7 +481,7 @@ def unit_test(xcloc_path):
     return 
 
 if __name__ == "__main__":
-    xcloc = xcloc(xcloc_path=['/home/bakerb25/C/xcloc/lib'])
+    xcloc = xcloc() #xcloc_path=['/home/bakerb25/Fortran/xcloc/lib'])
     npts = 10     # Length of signal
     nsignals = 5  # Number of signals
     # Initialize - default is single precision + high accuracy
