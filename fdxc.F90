@@ -144,7 +144,6 @@ MODULE XCLOC_FDXC
                                        nxcs, xcPairs,                 &
                                        verbose, prec, accuracy, ierr) &
       BIND(C, NAME='xcloc_fdxc_initialize')
-      IMPLICIT NONE
       INTEGER(C_INT), VALUE, INTENT(IN) :: accuracy, npts, nptsPad, nxcs, verbose, prec
       INTEGER(C_INT), INTENT(IN) :: xcPairs(2*nxcs)
       INTEGER(C_INT), INTENT(OUT) :: ierr
@@ -229,7 +228,6 @@ MODULE XCLOC_FDXC
 !>    @ingroup fdxc
       SUBROUTINE xcloc_fdxc_setAccuracy(accuracy, ierr)
       USE ISO_C_BINDING
-      IMPLICIT NONE
       INCLUDE 'mkl_vml.f90'
       INTEGER, VALUE, INTENT(IN) :: accuracy
       INTEGER, INTENT(OUT) :: ierr
@@ -262,7 +260,6 @@ MODULE XCLOC_FDXC
 !>    @ingroup fdxc
       SUBROUTINE xcloc_fdxc_finalize( ) & 
       BIND(C, NAME='xcloc_fdxc_finalize')
-      IMPLICIT NONE
       INCLUDE 'fftw/fftw3.f03'
       IF (ASSOCIATED(xc64f))           NULLIFY(xc64f)
       IF (ASSOCIATED(xc32f))           NULLIFY(xc32f)
@@ -310,7 +307,6 @@ MODULE XCLOC_FDXC
 !>    @param[out] ierr    0 indicates success 
 !>    @ingroup fdxc
       SUBROUTINE xcloc_fdxc_setXCTable(nxcs, xcPairs, ierr)
-      IMPLICIT NONE
       INTEGER, INTENT(IN) :: nxcs
       INTEGER, INTENT(IN) :: xcPairs(2*nxcs)
       INTEGER, INTENT(OUT) :: ierr
@@ -355,8 +351,6 @@ MODULE XCLOC_FDXC
 !>    @ingroup fdxc
       SUBROUTINE xcloc_fdxc_setSignals64f(ldx, npts, nsignals, x, ierr)  &
       BIND(C, NAME='xcloc_fdxc_setSignals64f')
-      USE ISO_C_BINDING
-      IMPLICIT NONE
       INTEGER(C_INT), VALUE, INTENT(IN) :: ldx, npts, nsignals
       REAL(C_DOUBLE), INTENT(IN) :: x(ldx*nsignals)
       INTEGER(C_INT), INTENT(OUT) :: ierr 
@@ -397,8 +391,6 @@ MODULE XCLOC_FDXC
 !>    @ingroup fdxc
       SUBROUTINE xcloc_fdxc_setSignals32f(ldx, npts, nsignals, x, ierr)  &
       BIND(C, NAME='xcloc_fdxc_setSignals32f')
-      USE ISO_C_BINDING
-      IMPLICIT NONE
       INTEGER(C_INT), VALUE, INTENT(IN) :: ldx, npts, nsignals
       REAL(C_FLOAT), INTENT(IN) :: x(ldx*nsignals)
       INTEGER(C_INT), INTENT(OUT) :: ierr
@@ -435,7 +427,6 @@ MODULE XCLOC_FDXC
 !>    @ingroup fdxc
       SUBROUTINE xcloc_fdxc_getNumberOfCorrelograms(nxcs, ierr) &
       BIND(C, NAME='xcloc_fdxc_getNumberOfCorrelograms')
-      IMPLICIT NONE
       INTEGER(C_INT), INTENT(OUT) :: nxcs, ierr
       ierr = 0
       nxcs = nxcs_
@@ -455,7 +446,6 @@ MODULE XCLOC_FDXC
 !>    @ingroup fdxc
       SUBROUTINE xcloc_fdxc_getNumberOfSignals(nsignals, ierr) &
       BIND(C, NAME='xcloc_fdxc_getNumberOfSignals')
-      IMPLICIT NONE
       INTEGER(C_INT), INTENT(OUT) :: nsignals, ierr
       ierr = 0 
       nsignals = nsignals_
@@ -475,7 +465,6 @@ MODULE XCLOC_FDXC
 !>    @ingroup fdxc
       SUBROUTINE xcloc_fdxc_getCorrelogramLength(nptsInXCs, ierr) &
       BIND(C, NAME='xcloc_fdxc_getCorrelogramLength')
-      IMPLICIT NONE
       INTEGER(C_INT), INTENT(OUT) :: nptsInXCs, ierr
       ierr = 0
       nptsInXCs = nptsInXCs_
@@ -494,7 +483,6 @@ MODULE XCLOC_FDXC
 !>                       XCLOC_DOUBLE_PRECISION.
 !>    @ingroup fdxc
       SUBROUTINE xcloc_fdxc_getPrecision(prec) BIND(C, NAME='xcloc_fdxc_getPrecision')
-      IMPLICIT NONE
       INTEGER(C_INT), INTENT(OUT) :: prec
       prec = precision_
       RETURN
@@ -521,10 +509,8 @@ MODULE XCLOC_FDXC
 !>    @ingroup fdxc
       SUBROUTINE xcloc_fdxc_getCorrelograms64f(ldxc, nxcs, xcs, ierr)  &
       BIND(C, NAME='xcloc_fdxc_getCorrelograms64f')
-      USE ISO_C_BINDING
-      IMPLICIT NONE
       INTEGER(C_INT), VALUE, INTENT(IN) :: ldxc, nxcs
-      REAL(C_DOUBLE), INTENT(OUT) :: xcs(ldxc*nxcs)
+      REAL(C_DOUBLE), DIMENSION(ldxc*nxcs), INTENT(OUT) :: xcs
       INTEGER(C_INT), INTENT(OUT) :: ierr
       INTEGER i1, i2, ixc 
       ierr = 0 
@@ -559,10 +545,8 @@ MODULE XCLOC_FDXC
 !>    @ingroup fdxc
       SUBROUTINE xcloc_fdxc_getCorrelograms32f(ldxc, nxcs, xcs, ierr)  &
       BIND(C, NAME='xcloc_fdxc_getCorrelograms32f')
-      USE ISO_C_BINDING
-      IMPLICIT NONE
       INTEGER(C_INT), VALUE, INTENT(IN) :: ldxc, nxcs
-      REAL(C_FLOAT), INTENT(OUT) :: xcs(ldxc*nxcs)
+      REAL(C_FLOAT), DIMENSION(ldxc*nxcs), INTENT(OUT) :: xcs
       INTEGER(C_INT), INTENT(OUT) :: ierr
       INTEGER i1, i2, ixc
       ierr = 0
@@ -718,8 +702,6 @@ MODULE XCLOC_FDXC
 !>    @ingroup fdxc
       SUBROUTINE xcloc_fdxc_getCorrelogram64fF(corrNumber, lwork, xc, ierr) &
       BIND(C, NAME='xcloc_fdxc_getCorrelogram64fF')
-      USE ISO_C_BINDING
-      IMPLICIT NONE
       INTEGER(C_INT), VALUE, INTENT(IN) :: corrNumber, lwork
       REAL(C_DOUBLE), DIMENSION(:), INTENT(OUT) :: xc
       INTEGER(C_INT), INTENT(OUT) :: ierr
@@ -760,8 +742,6 @@ MODULE XCLOC_FDXC
 !>    @ingroup fdxc
       SUBROUTINE xcloc_fdxc_getCorrelogram32fF(corrNumber, lwork, xc, ierr) &
       BIND(C, NAME='xcloc_fdxc_getCorrelogram32fF')
-      USE ISO_C_BINDING
-      IMPLICIT NONE
       INTEGER(C_INT), VALUE, INTENT(IN) :: corrNumber, lwork
       REAL(C_FLOAT), DIMENSION(:), INTENT(OUT) :: xc
       INTEGER(C_INT), INTENT(OUT) :: ierr
@@ -800,8 +780,6 @@ MODULE XCLOC_FDXC
 !>    @ingroup fdxc
       SUBROUTINE xcloc_fdxc_setSignal64fF(signalNumber, npts, x, ierr) &
       BIND(C, NAME='xcloc_fdxc_setSignal64fF')
-      USE ISO_C_BINDING
-      IMPLICIT NONE
       INTEGER(C_INT), VALUE, INTENT(IN) :: signalNumber, npts
       REAL(C_DOUBLE), INTENT(IN) :: x(npts)
       INTEGER(C_INT), INTENT(OUT) :: ierr
@@ -846,8 +824,6 @@ MODULE XCLOC_FDXC
 !>    @ingroup fdxc
       SUBROUTINE xcloc_fdxc_setSignal32fF(signalNumber, npts, x, ierr) &
       BIND(C, NAME='xcloc_fdxc_setSignal32fF')
-      USE ISO_C_BINDING
-      IMPLICIT NONE
       INTEGER(C_INT), VALUE, INTENT(IN) :: signalNumber, npts
       REAL(C_FLOAT), INTENT(IN) :: x(npts)
       INTEGER(C_INT), INTENT(OUT) :: ierr
@@ -946,7 +922,6 @@ MODULE XCLOC_FDXC
 !>    @param[out] ierr       0 indicates success.
 !>    @ingroup fdxc
       SUBROUTINE xcloc_fdxc_computeFDCorrelations(lphaseCorr, ierr)
-      IMPLICIT NONE
       INCLUDE 'mkl_vml.f90'
       LOGICAL(C_BOOL), INTENT(IN) :: lphaseCorr
       INTEGER, INTENT(OUT) :: ierr
@@ -1052,7 +1027,6 @@ MODULE XCLOC_FDXC
 !>    @param[out] ierr  0 indicates success.
 !>    @ingroup fdxc
       SUBROUTINE xcloc_fdxc_forwardTransform(ierr) 
-      IMPLICIT NONE
       INCLUDE 'fftw/fftw3.f03'
       INTEGER, INTENT(OUT) :: ierr
       ierr = 0
@@ -1077,7 +1051,6 @@ MODULE XCLOC_FDXC
 !>    @param[out] ierr  0 indicates success.
 !>    @ingroup fdxc
       SUBROUTINE xcloc_fdxc_inverseTransform(ierr)
-      IMPLICIT NONE
       INCLUDE 'fftw/fftw3.f03'
       INTEGER, INTENT(OUT) :: ierr
       REAL(C_DOUBLE), ALLOCATABLE :: work64(:)
@@ -1149,7 +1122,6 @@ MODULE XCLOC_FDXC
 !>    @result 0 indicates success.
 !>    @ingroup fdxc
       SUBROUTINE xcloc_fdxc_initializeFFTW(ierr)
-      IMPLICIT NONE
       INCLUDE 'fftw/fftw3.f03'
       INTEGER, INTENT(OUT) :: ierr
       INTEGER(C_INT) nf(1), ni(1), inembed(1), onembed(1)

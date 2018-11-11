@@ -184,7 +184,7 @@ ERROR1:;
     {
         if (myid == root)
         {
-            acousticGreens2D_computeTravelTimeTable(nx, ny, nz, 
+            acousticGreens2D_computeTravelTimeTable(nx, ny, nz,
                                                     vel, x0, y0, z0, dx, dy, dz,
                                                     xr[3*i],xr[3*i+1],xr[3*i+2],
                                                     ttable);
@@ -200,26 +200,59 @@ ERROR1:;
         {
             fprintf(stderr, "%s: Error setting table %d on process %d\n",
                     __func__, i+1, myid);
-            break;
+            return EXIT_FAILURE;
         }
     }
     MPI_Barrier(comm);
     // Set the signals
     if (myid == root){fprintf(stdout, "%s: Setting signals..\n", __func__);}
     xclocMPI_setSignals64f(npts, npts, nsignals, root, obs, &ierr);
+    if (ierr != 0){return EXIT_FAILURE;}
     // Do the heavy lifting
     if (myid == root){fprintf(stdout, "%s: Computing...\n", __func__);}
     xclocMPI_compute(&ierr);
+    if (ierr != 0){return EXIT_FAILURE;}
     // Get the results
     int maxIndex;
     float maxValue;
     xclocMPI_getImageMax(&maxIndex, &maxValue, &ierr);
-
+    if (ierr != 0){return EXIT_FAILURE;}
+    if (myid == root)
+    {
+        fprintf(stdout, "Est max: %d %.8f\n", maxIndex, maxValue);
+    }
     // Free space
     xclocMPI_finalize();
+    // Do it again
+    if (myid == root)
+    {
+        fprintf(stdout, "%s: Generating serial reference xcloc...\n", __func__);
+        // Create a reference
+        xcloc_initialize(npts, npts, nxcs,
+                         s2m, dt, ngrd,
+                         nfcoeffs, ftype,
+                         xcPairs,
+                         verbose, precision, accuracy, &ierr);
+        for (i=0; i<nrec; i++)
+        {
+            acousticGreens2D_computeTravelTimeTable(nx, ny, nz,
+                                                    vel, x0, y0, z0, dx, dy, dz,
+                                                    xr[3*i],xr[3*i+1],xr[3*i+2],
+                                                    ttable);
+            xcloc_signalToTableIndex(i+1, &it, &ierr);
+            xcloc_setTable64f(it, ngrd, ttable, &ierr);
+        }
+        xcloc_setSignals64f(npts, npts, nsignals, obs, &ierr);
+        xcloc_compute(&ierr);
+        xcloc_getImageMax(&maxIndex, &maxValue, &ierr);
+        printf("True max %d %.8f\n", maxIndex, maxValue);
+        xcloc_finalize();
+    } 
+    MPI_Barrier(comm);
     if (xcPairs != NULL){free(xcPairs);}
     if (xr != NULL){free(xr);}
     if (image != NULL){free(image);}
     if (obs != NULL){free(obs);}
+    if (ttable != NULL){free(ttable);}
     return EXIT_SUCCESS;
 }

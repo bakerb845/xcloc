@@ -39,6 +39,12 @@ void xcloc_setSignals64f(const int ldx, const int npts, const int nsignals,
                          const double x[], int *ierr);
 void xcloc_setSignals32f(const int ldx, const int npts, const int nsignals,
                          const float x[], int *ierr);
+/* Gets the correlograms. */
+/* Gets all the cross-correlograms. */
+void xcloc_getCorrelograms64f(const int ldxc, const int nxcs,
+                              double xcs[], int *ierr);
+void xcloc_getCorrelograms32f(const int ldxc, const int nxcs,
+                              float xcs[], int *ierr);
 /* Gets the migrated image. */
 void xcloc_getImage64f(const int nwork, const double image[], int *ierr);
 void xcloc_getImage32f(const int nwork, const float image[], int *ierr);

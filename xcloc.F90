@@ -56,6 +56,10 @@ MODULE XCLOC
 
       PUBLIC :: xcloc_initialize
       PUBLIC :: xcloc_finalize
+      PUBLIC :: xcloc_getNumberOfCorrelograms
+      PUBLIC :: xcloc_getCorrelogramLength
+      PUBLIC :: xcloc_getCorrelograms64f
+      PUBLIC :: xcloc_getCorrelograms32f
       PUBLIC :: xcloc_getImage64f
       PUBLIC :: xcloc_getImage32f
       PUBLIC :: xcloc_getNumberOfGridPointsInImage
@@ -284,6 +288,105 @@ MODULE XCLOC
       ENDIF
       xcTypeToMigrate_ = xcTypeToMigrate
   900 FORMAT('xcloc_setXCTypeToMigrate: Invalid type of xc signal to migrate')
+      RETURN
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Returns the number of correlograms to be computed.
+!>    @param[out] nxcs   The number of correlograms.
+!>    @param[out] ierr   0 indicates success.
+!>    @ingorup xcloc_xcloc
+      SUBROUTINE xcloc_getNumberOfCorrelograms(nxcs, ierr) &
+      BIND(C, NAME='xcloc_getNumberOfCorrelograms')
+      INTEGER(C_INT), INTENT(OUT) :: nxcs, ierr
+      CALL xcloc_fdxc_getNumberOfCorrelograms(nxcs, ierr)
+      IF (ierr /= 0) THEN
+         WRITE(ERROR_UNIT,900)
+         ierr = 1
+         RETURN
+      ENDIF
+      IF (nxcs /= nxcs_) THEN
+         WRITE(ERROR_UNIT,901)
+         ierr = 1
+      ENDIF
+  900 FORMAT('xcloc_getNumberOfCorrelograms: Failed to get number of xcs')
+  901 FORMAT('xcloc_getNumberOfCorrelograms: Internal error')
+      RETURN
+      END
+!>    @brief Returns the number of points in the time domain correlations.
+!>    @param[out] nptsInXCs  Number of points in the correlograms.
+!>    @param[out] ierr       0 indicates success.
+!>    @ingroup xcloc_xcloc 
+      SUBROUTINE xcloc_getCorrelogramLength(nptsInXCs, ierr) &
+      BIND(C, NAME='xcloc_getCorrelogramLength')
+      INTEGER(C_INT), INTENT(OUT) :: nptsInXCs, ierr
+      CALL xcloc_fdxc_getCorrelogramLength(nptsInXCs, ierr)
+      IF (ierr /= 0) THEN
+         WRITE(ERROR_UNIT,900)
+         ierr = 1
+         RETURN
+      ENDIF
+      IF (nptsInXCs /= nptsInXCs_) THEN
+         WRITE(ERROR_UNIT,901)
+         ierr = 1
+      ENDIF
+  900 FORMAT('xcloc_getCorrelogramLength: Failed to get correlogram length')
+  901 FORMAT('xcloc_getCorrelogramLength: Internal error')
+      RETURN
+      END
+!>    @brief Gets all the correlograms.
+!>    @param[in] ldxc   Leading dimension of xcs.  This must be at least nptsInXCs_
+!>    @param[in] nxcs   Number of cross corrrelations.  This must be nxcs_.
+!>    @param[out] xcs   Cross-correlograms.  This is an array of dimension [ldxc x nxcs]
+!>                      with leading dimension ldxc.
+!>    @param[out] ierr  0 indicates success.
+!>    @ingroup xcloc_xcloc
+      SUBROUTINE xcloc_getCorrelograms64f(ldxc, nxcs, xcs, ierr) &
+      BIND(C, NAME='xcloc_getCorrelograms64f')
+      INTEGER(C_INT), VALUE, INTENT(IN) :: ldxc, nxcs
+      REAL(C_DOUBLE), DIMENSION(ldxc*nxcs), INTENT(OUT) :: xcs 
+      INTEGER(C_INT), INTENT(OUT) :: ierr
+      ierr = 0
+      IF (.NOT.lhaveXCs_) THEN
+         WRITE(ERROR_UNIT,900)
+         ierr = 1
+         RETURN
+      ENDIF
+      CALL xcloc_fdxc_getCorrelograms64f(ldxc, nxcs, xcs, ierr)
+      IF (ierr /= 0) THEN
+         WRITE(ERROR_UNIT,901)
+         ierr = 1
+      ENDIF
+  900 FORMAT('xcloc_getCorrelograms64f: Correlograms not yet computed')
+  901 FORMAT('xcloc_getCorrelograms64f: Failed to get correlograms')
+      RETURN
+      END
+!>    @brief Gets all the correlograms.
+!>    @param[in] ldxc   Leading dimension of xcs.  This must be at least nptsInXCs_
+!>    @param[in] nxcs   Number of cross corrrelations.  This must be nxcs_.
+!>    @param[out] xcs   Cross-correlograms.  This is an array of dimension [ldxc x nxcs]
+!>                      with leading dimension ldxc.
+!>    @param[out] ierr  0 indicates success.
+!>    @ingroup xcloc_xcloc 
+      SUBROUTINE xcloc_getCorrelograms32f(ldxc, nxcs, xcs, ierr) &
+      BIND(C, NAME='xcloc_getCorrelograms32f')
+      INTEGER(C_INT), VALUE, INTENT(IN) :: ldxc, nxcs
+      REAL(C_FLOAT), DIMENSION(ldxc*nxcs), INTENT(OUT) :: xcs
+      INTEGER(C_INT), INTENT(OUT) :: ierr
+      ierr = 0
+      IF (.NOT.lhaveXCs_) THEN
+         WRITE(ERROR_UNIT,900)
+         ierr = 1
+         RETURN
+      ENDIF
+      CALL xcloc_fdxc_getCorrelograms32f(ldxc, nxcs, xcs, ierr)
+      IF (ierr /= 0) THEN
+         WRITE(ERROR_UNIT,901)
+         ierr = 1
+      ENDIF
+  900 FORMAT('xcloc_getCorrelograms32f: Correlograms not yet computed')
+  901 FORMAT('xcloc_getCorrelograms32f: Failed to get correlograms')
       RETURN
       END
 !                                                                                        !

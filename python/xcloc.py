@@ -96,6 +96,22 @@ class xcloc:
         xcloc_lib.xcloc_getImageMax.argtypes = [POINTER(c_int), # Max index
                                                 POINTER(c_float), # Max value
                                                 POINTER(c_int)]
+        xcloc_lib.xcloc_getNumberOfCorrelograms.argtypes = [POINTER(c_int), #nxcs
+                                                            POINTER(c_int)]
+        xcloc_lib.xcloc_getNumberOfCorrelograms.restype = None
+        xcloc_lib.xcloc_getCorrelogramLength.argtypes = [POINTER(c_int), #nptsInXCs
+                                                         POINTER(c_int)] 
+        xcloc_lib.xcloc_getCorrelogramLength.restype = None
+        xcloc_lib.xcloc_getCorrelograms64f.argtypes = [c_int, # ldxc
+                                                       c_int, # nxcs
+                                                       POINTER(c_double), # Correlograms
+                                                       POINTER(c_int)]
+        xcloc_lib.xcloc_getCorrelograms64f.restype = None
+        xcloc_lib.xcloc_getCorrelograms32f.argtypes = [c_int, # ldxc
+                                                       c_int, # nxcs
+                                                       POINTER(c_float), # Correlograms
+                                                       POINTER(c_int)]
+        xcloc_lib.xcloc_getCorrelograms32f.restype = None
         xcloc_lib.xcloc_getImageMax.restype = None
         xcloc_lib.xcloc_setSignals32f.argtypes = [c_int, # ldx
                                                   c_int, # npts
@@ -385,6 +401,58 @@ class xcloc:
             return -1
         ierr = ierr.value
         return ierr
+
+    def getCorrelograms(self, dtype=float64):
+        """!
+        @brief Gets the correlograms which were used to create the migrated
+               image.  These will correspond to phase correlograms or 
+               cross-correlograms as dictated by the initialization.
+        @param[out] xcs   On successful exit this contains the correlograms in
+                          a matrix with shape [nxcs x nptsInXCs].
+        @param[out] xcs   On failure this is None.
+        @ingroup pyxcloc_xcloc
+        """
+        fname = '%s::%s'%(self.__class__.__name__, self.getCorrelograms.__name__)
+        if (not self.lhaveImage):
+            print("%s: DSM image not yet computed"%fname)
+            return None
+        # Get number of correlograms
+        nxcs = c_int(1)
+        ierr = c_int(1)
+        self.lib.xcloc_getNumberOfCorrelograms(nxcs, ierr)
+        if (ierr.value != 0):
+            print("%s: Failed to get number of correlograms"%fname)
+            return None
+        nxcs = nxcs.value
+        # Get correlogram length
+        nptsInXCs = c_int(1)
+        self.lib.xcloc_getCorrelogramLength(nptsInXCs, ierr)
+        if (ierr.value != 0):
+            print("%s: Failed to get correlogram length"%fname)
+            return None
+        nptsInXCs = nptsInXCs.value
+        # Get the correlograms
+        if (dtype == xctypes.XCLOC_SINGLE_PRECISION):
+            xcs = ascontiguousarray(zeros(nxcs*nptsInXCs, dtype=c_float))
+            xcsPtr = xcs.ctypes.data_as(POINTER(c_float))
+            self.lib.xcloc_getCorrelograms64f(nptsInXCs, nxcs, xcsPtr,
+                                              byref(ierr))
+            if (ierr.value != 0):
+                print("%s: Error getting float correlograms"%fname)
+                return None
+        elif (dtype == xctypes.XCLOC_DOUBLE_PRECISION):
+            xcs = ascontiguousarray(zeros(nxcs*nptsInXCs, dtype=c_double))
+            xcsPtr = xcs.ctypes.data_as(POINTER(c_double))
+            self.lib.xcloc_getCorrelograms64f(nptsInXCs, nxcs, xcsPtr,
+                                              byref(ierr))
+            if (ierr.value != 0):
+                print("%s: Error getting double correlograms"%fname)
+                return None
+        else:
+            print("%s: Unknown precision %d"%(fname, precision))
+            return None
+        xcs = xcs.reshape([nxcs, nptsInXCs], order='C')
+        return xcs
    
     def getImage(self, dtype=float64):
         """!
