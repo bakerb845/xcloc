@@ -450,7 +450,7 @@ MODULE XCLOC_DSMXC
          indx = (i - 1)*ldxc + 1 
          CALL xcloc_dsmxc_setCorrelogram64fF(i, nptsInXCs, xcs(indx), ierr)
          IF (ierr /= 0) THEN
-            WRITE(ERROR_UNIT,902) i
+            WRITE(ERROR_UNIT,903) i
             RETURN
          ENDIF
       ENDDO
