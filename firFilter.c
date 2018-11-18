@@ -3,7 +3,10 @@
 #include <string.h>
 #include <math.h>
 #include <ipps.h>
-#include <lapacke_utils.h>
+
+#ifndef MIN
+#define MIN(x,y) (((x) < (y)) ? (x) : (y))
+#endif
 
 /*!
  * @brief Computes the envelope of a set of signals.  It is assumed that the
