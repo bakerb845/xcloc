@@ -316,17 +316,17 @@ MODULE XCLOC_DSMXC
          ierr = 1
          RETURN
       ENDIF
-      ierr = ippsMaxIndx_32f(image32f_, ngrd_, maxValue, maxIndex)
-      IF (ierr /= ippStsNoErr) THEN
-         WRITE(ERROR_UNIT,905)
-         ierr = 1
-         RETURN
-      ENDIF
-      maxIndex = maxIndex + 1 ! C to Fortran
-      !maxIndex = MAXLOC(image32f_(1:ngrd_), 1)
-      !maxValue = image32f_(maxIndex)      
+      !ierr = ippsMaxIndx_32f(image32f_, ngrd_, maxValue, maxIndex)
+      !IF (ierr /= ippStsNoErr) THEN
+      !   WRITE(ERROR_UNIT,905)
+      !   ierr = 1
+      !   RETURN
+      !ENDIF
+      !maxIndex = maxIndex + 1 ! C to Fortran
+      maxIndex = MAXLOC(image32f_(1:ngrd_), 1)
+      maxValue = image32f_(maxIndex)      
   900 FORMAT('xcloc_dsmxc_getImageMax: Image not yet computed')
-  905 FORMAT('xcloc_dsmxc_getImageMax: Failed to get image max')
+! 905 FORMAT('xcloc_dsmxc_getImageMax: Failed to get image max')
       RETURN
       END
 !                                                                                        !
