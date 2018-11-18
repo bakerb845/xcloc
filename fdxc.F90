@@ -941,8 +941,7 @@ MODULE XCLOC_FDXC
          !$OMP PARALLEL DEFAULT(NONE) &
          !$OMP SHARED(accuracyMKL_, ftOffset_, inputFTs32f_, lphaseCorr, nxcs_) &
          !$OMP SHARED(nptsInFTs_, xcFTs32f_, xcPairs_) &
-         !$OMP PRIVATE(i, indx, iw, ixc, j, jndx, kndx, mag32f_, n) &
-         !$OMP FIRSTPRIVATE(xcPtr32c)
+         !$OMP PRIVATE(i, indx, iw, ixc, j, jndx, kndx, mag32f_, n, xcPtr32c)
          n = nptsInFTs_
          IF (lphaseCorr) THEN
             ALLOCATE(mag32f_(n))

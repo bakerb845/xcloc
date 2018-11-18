@@ -436,8 +436,8 @@ MODULE XCLOC_SPXC
          ! Sparsify coefficients
          nnzReCoeffs_ = 1
          nnzImCoeffs_ = (nCoeffs_ + 1)/2 - 1
-         ALLOCATE(nzReIndices_(nnzReCoeffs_))
-         ALLOCATE(nzImIndices_(nnzImCoeffs_))
+         ALLOCATE(nzReIndices_(nnzReCoeffs_)); nzReIndices_(:) = 0
+         ALLOCATE(nzImIndices_(nnzImCoeffs_)); nzImIndices_(:) = 0
          nzReIndices_(1) = (nCoeffs_+1)/2
          DO i=1,nnzImCoeffs_
             nzImIndices_(i) = 2*i
