@@ -230,6 +230,18 @@ void xclocMPI_setTable64f(const int tableNumberIn, const int ngrdIn,
 void xclocMPI_setTable32f(const int tableNumberIn, const int ngrdIn,
                           const int root, const float table[],
                           int *ierr);
+/* Get the total number of correlograms. */
+void xclocMPI_getNumberOfCorrelograms(int *nxcs, int *ierr);
+/* Get the number of samples in each correlogram. */
+void xclocMPI_getCorrelogramLength(int *nptsInXCs, int *ierr);
+/* Get the correlograms onto the root process. */
+void xclocMPI_getCorrelograms64f(const int ldxcIn, const int nxcs,
+                                 const int root, double xcs[], int *ierr);
+void xclocMPI_getCorrelograms32f(const int ldxcIn, const int nxcs,
+                                 const int root, float xcs[], int *ierr);
+/* Get the image. */
+void xclocMPI_getImage32f(const int ngrd, const int root, float image[],
+                          int *ierr);
 /* Get the max of the image. */
 void xclocMPI_getImageMax(int *maxIndex, float *maxValue, int *ierr);
 /* Performs cross-correlations and computes the xcloc image. */

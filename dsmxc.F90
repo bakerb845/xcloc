@@ -153,7 +153,7 @@ MODULE XCLOC_DSMXC
       ldg_ = xcloc_memory_padLength(dataAlignment, sizeof_int, ngrd_)
       ALLOCATE(lhaveTable_(ntables_)); lhaveTable_(:) = .FALSE.
       ALLOCATE(xcs32f_(dataOffset_*nptsInXCs_)); xcs32f_(:) = 0.0
-      ALLOCATE(image32f_(ldg_)); image32f_(:) = 0.0
+      ALLOCATE(image32f_(ldg_)); image32f_(1:ldg_) = 0.0
       ALLOCATE(ttimes_(ldg_*ntables_)); ttimes_(:) = 0
       ALLOCATE(xcPairs_(2*nxcPairs_)); xcPairs_(:) = 0
       ALLOCATE(xcTablePairs_(2*nxcPairs_)); xcTablePairs_(:) = 0
@@ -750,7 +750,7 @@ MODULE XCLOC_DSMXC
       IF (.NOT.lhaveAllTables_) WRITE(OUTPUT_UNIT,905)
   905 FORMAT('xcloc_dsmxc_compute: Only a subset of tables were set')
       ! Compute
-      lxc2 = nptsInXCs_/2 
+      lxc2 = nptsInXCs_/2
       !$OMP PARALLEL DO DEFAULT(NONE) &
       !$OMP SHARED(blockSize_, dataOffset_, image32f_, ldg_, ngrd_) &
       !$OMP SHARED(nptsInXCs_, nxcPairs_, ttimes_, xcTablePairs_, xcs32f_) &

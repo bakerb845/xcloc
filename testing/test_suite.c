@@ -15,7 +15,7 @@ int main(int argc, char *argv[])
     ierr = EXIT_SUCCESS;
     const int root = 0;
 #ifdef XCLOC_USE_MPI
-    int provided;
+    int ierrLoc, provided;
     MPI_Comm comm = MPI_COMM_WORLD;
     MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED, &provided);
     //MPI_Init(&argc, &argv);
@@ -61,7 +61,6 @@ BCAST_ERROR_1:;
     {
         fprintf(stdout, "%s: Performing parallel fdxc test\n", __func__);
     }
-    int ierrLoc;
     ierrLoc = test_parallel_fdxc(comm, root);
     if (ierrLoc != 0){ierrLoc = 1;}
     MPI_Allreduce(&ierrLoc, &ierr, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD);

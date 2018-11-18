@@ -215,8 +215,7 @@ MODULE XCLOC_DSMXC_MPI
 !>    @param[out] it    The table index corresponding to is.
 !>    @param[out] ierr  0 indicates success.
 !>    @ingroup dsmxc
-      SUBROUTINE xcloc_dsmxcMPI_signalToTableIndex(is, it, ierr) &
-      BIND(C, NAME='xcloc_dsmxcMPI_signalToTableIndex')
+      SUBROUTINE xcloc_dsmxcMPI_signalToTableIndex(is, it, ierr)
       INTEGER, INTENT(IN) :: is
       INTEGER, INTENT(OUT) :: it, ierr
       CALL xcloc_dsmxc_signalToTableIndex(is, it, ierr)
@@ -495,6 +494,8 @@ MODULE XCLOC_DSMXC_MPI
       BIND(C, NAME='xcloc_dsmxcMPI_compute')
       INTEGER(C_INT), INTENT(OUT) :: ierr
       INTEGER ierrLoc, mpierr
+      ierr = 0
+      ierrLoc = 0
       CALL xcloc_dsmxc_compute(ierrLoc)
       IF (ierrLoc /= 0) THEN
          WRITE(ERROR_UNIT,905) myid_
@@ -570,6 +571,8 @@ MODULE XCLOC_DSMXC_MPI
       INTEGER, ALLOCATABLE :: displs(:), recvCount(:)
       INTEGER ierrLoc, irecv, mpierr
       ierr = 0
+      ierrLoc = 0
+print *, 'yeah'
       IF (myid_ == root) THEN
          IF (nwork < ngrdTotal_) THEN
             WRITE(ERROR_UNIT,900) nwork, ngrdTotal_ 
@@ -592,9 +595,11 @@ MODULE XCLOC_DSMXC_MPI
          ALLOCATE(displs(nprocs_)); displs(:) = 0
          displs(1) = 0 ! This is C indexed
          DO irecv=1,nprocs_
-            recvCount(irecv) = nGridPtsPerProcess_(irecv) 
+            recvCount(irecv) = nGridPtsPerProcess_(irecv)
             IF (irecv < nprocs_) displs(irecv+1) = displs(irecv) + recvCount(irecv) 
          ENDDO
+print *, recvCount
+print *, displs
       ENDIF
       ! Gather the image onto the root
       CALL MPI_Gatherv(image, ngrdLocal_, MPI_REAL, & 
@@ -602,7 +607,8 @@ MODULE XCLOC_DSMXC_MPI
                        MPI_REAL, root, comm_, mpierr) 
       ! Dereference pointers and free workspace
       NULLIFY(imagePtr)
-      IF (ALLOCATED(displs)) DEALLOCATE(displs)
+      IF (ALLOCATED(displs))    DEALLOCATE(displs)
+      IF (ALLOCATED(recvCount)) DEALLOCATE(recvCount)
   900 FORMAT('xcloc_dsmxcMPI_getImage32f: nwork=', I6, ' must be at least =', I6)
   905 FORMAT('xcloc_dsmxcMPI_getImage32f: Failed to get local image on rank', I4)
       RETURN

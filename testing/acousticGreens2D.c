@@ -120,7 +120,8 @@ int acousticGreens2D_computeRickerWavelet(const int npts,
                                           const bool lshift,
                                           double *__restrict__ ricker)
 {
-    double *work, area, pi2f2, pi2f2t2, t, t2, xmax;
+    double *work = NULL;
+    double area, pi2f2, pi2f2t2, t, t2, xmax;
     int i, ncopy, npts2;
     const double tol = 1.0 - 0.995; //1.e-2; //FLT_EPSILON*1000.0; //1.e-6;
     xmax = 0.0;
@@ -139,7 +140,7 @@ int acousticGreens2D_computeRickerWavelet(const int npts,
     // pct of 1 b/c the wavelet has max value of 1
     if (lshift)
     {
-        work = (double *) calloc((size_t) npts, sizeof(double));
+        work = ippsMalloc_64f(npts);
         for (i=0; i<npts; i++)
         {
             if (fabs(ricker[i]) > tol*xmax)
@@ -151,7 +152,7 @@ int acousticGreens2D_computeRickerWavelet(const int npts,
         }
         memset(ricker, 0, (size_t) npts*sizeof(double));
         ippsCopy_64f(work, ricker, npts);
-        free(work);
+        ippsFree(work);
     }
     // Normalize the area energy in the signal 
     if (lnorm)

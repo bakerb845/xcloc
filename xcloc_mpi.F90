@@ -179,6 +179,8 @@ TYPE(C_PTR), SAVE :: dataPtr_ = C_NULL_PTR
 integer, private, allocatable, save :: nDSMXCsPerGroup_(:)
 
       PUBLIC :: xclocMPI_initialize
+      PUBLIC :: xclocMPI_getCorrelogramLength
+      PUBLIC :: xclocMPI_getNumberOfCorrelograms
       PUBLIC :: xclocMPI_setXCTypeToMigrate
       PUBLIC :: xclocMPI_setTable64f
       PUBLIC :: xclocMPI_setSignals64f
@@ -234,6 +236,7 @@ integer, private, allocatable, save :: nDSMXCsPerGroup_(:)
       INTEGER arrayShape(1), sizeDouble
       comm%MPI_VAL = INT(fcomm, KIND(comm%MPI_VAL))
       ierr = 0
+      CALL xclocMPI_finalize()
       root_ = root
       CALL MPI_Comm_rank(comm, myid_,   mpierr) 
       CALL MPI_Comm_size(comm, nprocs_, mpierr)
@@ -607,6 +610,7 @@ if (allocated(nDSMXCsPerGroup_)) deallocate(nDSMXCsPerGroup_)
       lhaveXCs_ = .FALSE.
       lhaveImage_ = .FALSE.
       linit_ = .FALSE.
+      dataPtr_ = C_NULL_PTR
       RETURN
       END
 !                                                                                        !
@@ -671,6 +675,246 @@ if (allocated(nDSMXCsPerGroup_)) deallocate(nDSMXCsPerGroup_)
       ENDIF
       root_ = root
   900 FORMAT("xclocMPI_getGlobalRootProcessID: Module not initialized")
+      RETURN
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Returns the number of correlograms to be computed.
+!>    @param[out] nxcs   The number of correlograms.
+!>    @param[out] ierr   0 indicates success.
+!>    @ingroup xcloc_mpi
+      SUBROUTINE xclocMPI_getNumberOfCorrelograms(nxcs, ierr) &
+      BIND(C, NAME='xclocMPI_getNumberOfCorrelograms')
+      INTEGER(C_INT), INTENT(OUT) :: nxcs, ierr
+      INTEGER ierrLoc, mpierr, nxcsLoc
+      nxcs = 0
+      ierr = 0
+      ierrLoc = 0
+      IF (myid_ == MPI_UNDEFINED) RETURN ! I don't belong here
+      CALL xcloc_fdxcMPI_getNumberOfCorrelograms(nxcsLoc, ierr)
+      IF (ierr /= 0) THEN
+         WRITE(ERROR_UNIT,900)
+         ierrLoc = 1
+      ENDIF
+      IF (xcdsmIntraCommID_ == root_) THEN
+         CALL MPI_Reduce(nxcsLoc, nxcs, 1, MPI_INTEGER, MPI_SUM, root_, &
+                         xcdsmInterComm_, mpierr)
+         IF (myid_ == root_ .AND. nxcs /= nxcsTotal_) THEN
+            WRITE(ERROR_UNIT,901)
+            ierrLoc = 1
+            nxcs = 0
+         ENDIF
+      ENDIF
+      CALL MPI_Bcast(nxcs, 1, MPI_INTEGER, root_, xclocGlobalComm_, mpierr)
+      CALL MPI_Allreduce(ierrLoc, ierr, 1, MPI_INTEGER, MPI_MAX, xclocGlobalComm_, mpierr)
+  900 FORMAT('xclocMPI_getNumberOfCorrelograms: Failed to get number of local xcs')
+  901 FORMAT('xclocMPI_getNumberOfCorrelograms: Internal error')
+      RETURN
+      END
+!>    @brief Returns the number of points in the time domain correlations.
+!>    @param[out] nptsInXCs  Number of points in the correlograms.
+!>    @param[out] ierr       0 indicates success.
+!>    @ingroup xcloc_mpi
+      SUBROUTINE xclocMPI_getCorrelogramLength(nptsInXCs, ierr) &
+      BIND(C, NAME='xclocMPI_getCorrelogramLength')
+      INTEGER(C_INT), INTENT(OUT) :: nptsInXCs, ierr
+      INTEGER ierrLoc, mpierr
+      nptsInXCs = 0
+      ierr = 0
+      ierrLoc = 0
+      IF (myid_ == MPI_UNDEFINED) RETURN ! I don't belong here 
+      CALL xcloc_fdxcMPI_getCorrelogramLength(nptsInXCs, ierr)
+      IF (ierr /= 0) THEN
+         WRITE(ERROR_UNIT,900)
+         ierrLoc = 1
+      ENDIF
+      IF (nptsInXCs /= nptsInXCs_) THEN
+         WRITE(ERROR_UNIT,901)
+         ierrLoc = 1 
+      ENDIF
+      CALL MPI_Allreduce(ierrLoc, ierr, 1, MPI_INTEGER, MPI_MAX, xclocGlobalComm_, mpierr)
+  900 FORMAT('xclocMPI_getCorrelogramLength: Failed to get correlogram length')
+  901 FORMAT('xclocMPI_getCorrelogramLength: Internal error')
+      RETURN
+      END
+!                                                                                        !
+!========================================================================================!
+!                                                                                        !
+!>    @brief Gathers all the correlograms onto the root process on the global 
+!>           xcloc communicator.
+!>    @param[in] ldxcIn  The leading dimension of xcs.  This is defined on the root
+!>                       process and must be at least nptsInXCs_.
+!>    @param[in] nxcs    The number of correlograms.  This is defined on the root
+!>                       process and should equal nxcsTotal_.
+!>    @param[in] root    The root process ID on the xcloc global communicator.
+!>                       This must be defined on all processes.
+!>    @param[out] xcs    The [ldxcIn x nxcs] matrix of correlograms stored in column 
+!>                       major format.  This is only accessed on the root process.
+!>    @param[out] ierr   0 indicates success.
+!>    @result 0 indicates success.
+!>    @ingroup xcloc_mpi
+      SUBROUTINE xclocMPI_getCorrelograms64f(ldxcIn, nxcs, root, xcs, ierr) &
+      BIND(C, NAME='xclocMPI_getCorrelograms64f')
+      INTEGER(C_INT), VALUE, INTENT(IN) :: ldxcIn, nxcs, root
+      REAL(C_DOUBLE), DIMENSION(ldxcIn*nxcs), INTENT(OUT) :: xcs 
+      INTEGER(C_INT), INTENT(OUT) :: ierr
+      DOUBLE PRECISION, ALLOCATABLE :: xcsLocal(:)
+      INTEGER, DIMENSION(:), ALLOCATABLE :: displs, recvCount
+      INTEGER ierrLoc, interCommTarget, intraCommTarget, irecv, ldxc, mpierr, &
+              nxcsInGroup, sendCount
+      ierr = 0 
+      ierrLoc = 0
+      IF (myid_ == MPI_UNDEFINED) RETURN ! I don't belong here
+      ! Did I compute the XCs yet?
+      IF (.NOT.lhaveXCs_) THEN
+         IF (myid_ == root_) WRITE(ERROR_UNIT,900)
+         ierrLoc = 1
+      ENDIF
+      ! Verify the input arguments and set dest info 
+      IF (myid_ == root) THEN
+         IF (ldxcIn < nptsInXCs_ .AND. nxcs /= nxcsTotal_) THEN
+            IF (ldxcIn < nptsInXCs_) WRITE(ERROR_UNIT,901) nptsInXCs_
+            IF (nxcs /= nxcsTotal_) WRITE(ERROR_UNIT,902) nxcsTotal_
+            ierrLoc = 1
+         ENDIF
+         ! Set the destination information and initialize the result to nothing 
+         xcs(:) = 0.d0
+         interCommTarget = xcdsmInterCommID_
+         intraCommTarget = xcdsmIntraCommID_
+         ldxc = ldxcIn
+      ENDIF
+      ! Leave now if there is an error
+      CALL MPI_Allreduce(ierrLoc, ierr, 1, MPI_INTEGER, MPI_MAX, xclocGlobalComm_, mpierr)
+      IF (ierr /= 0) RETURN
+      ! Send around target information
+      CALL MPI_Bcast(interCommTarget, 1, MPI_INTEGER, root, xclocGlobalComm_, mpierr)
+      CALL MPI_Bcast(intraCommTarget, 1, MPI_INTEGER, root, xclocGlobalComm_, mpierr)
+      CALL MPI_Bcast(ldxc,            1, MPI_INTEGER, root, xclocGlobalComm_, mpierr)
+      ! Gather the correlograms into this group's `root' process
+      IF (xcdsmIntraCommID_ == intraCommTarget) ALLOCATE(xcsLocal(MAX(1,ldxc*nxcsLocal_)))
+      CALL xcloc_fdxcMPI_gatherCorrelograms64f(ldxc, nxcsLocal_, intraCommTarget, &
+                                               xcsLocal, ierrLoc)
+      IF (ierrLoc /= 0) THEN
+         IF (xcdsmIntraCommID_ == intraCommTarget) WRITE(ERROR_UNIT,903) xcdsmInterCommID_
+         ierrLoc = 1
+      ENDIF
+      CALL MPI_Allreduce(ierrLoc, ierr, 1, MPI_INTEGER, MPI_MAX, xclocGlobalComm_, mpierr)
+      IF (ierr /= 0) RETURN
+      ! Gather the correlograms onto the root. 
+      IF (xcdsmIntraCommID_ == interCommTarget) THEN
+         sendCount = ldxc*nxcsLocal_
+         IF (xcdsmIntraCommID_ == intraCommTarget) THEN
+            ALLOCATE(recvCount(nxcdsmGroups_)); recvCount(:) = 0
+            ALLOCATE(displs(nxcdsmGroups_)); displs(:) = 0
+            displs(1) = 0 ! This is C indexed
+            DO irecv=1,nxcdsmGroups_
+               nxcsInGroup = myDSMXCPtr_(irecv+1) - myDSMXCPtr_(irecv)
+               recvCount(irecv) = nxcsInGroup*nptsInXCs_
+               IF (irecv < nxcdsmGroups_) THEN
+                  displs(irecv+1) = displs(irecv) + recvCount(irecv)
+               ENDIF
+            ENDDO
+         ENDIF
+         CALL MPI_Gatherv(xcsLocal, sendCount, MPI_DOUBLE_PRECISION,                    &
+                          xcs, recvCount, displs,                                       &
+                          MPI_DOUBLE_PRECISION, interCommTarget, xcdsmInterComm_, mpierr) 
+         IF (ALLOCATED(displs))    DEALLOCATE(displs)
+         IF (ALLOCATED(recvCount)) DEALLOCATE(recvCount) 
+      ENDIF
+      IF (ALLOCATED(xcsLocal)) DEALLOCATE(xcsLocal)
+  900 FORMAT('xclocMPI_getCorrelograms64f: xcs not yet computed')
+  901 FORMAT('xclocMPI_getCorrelograms64f: ldxcIn must be at least ', I0)
+  902 FORMAT('xclocMPI_getCorrelograms64f: nxcs must be ', I0)
+  903 FORMAT('xclocMPI_getCorrelograms64f: Failed to get xcs on group ', I0)
+      RETURN
+      END
+!>    @brief Gathers all the correlograms onto the root process on the global 
+!>           xcloc communicator.
+!>    @param[in] ldxcIn  The leading dimension of xcs.  This is defined on the root
+!>                       process and must be at least nptsInXCs_.
+!>    @param[in] nxcs    The number of correlograms.  This is defined on the root
+!>                       process and should equal nxcsTotal_.
+!>    @param[in] root    The root process ID on the xcloc global communicator.
+!>                       This must be defined on all processes.
+!>    @param[out] xcs    The [ldxcIn x nxcs] matrix of correlograms stored in column 
+!>                       major format.  This is only accessed on the root process.
+!>    @param[out] ierr   0 indicates success.
+!>    @result 0 indicates success.
+!>    @ingroup xcloc_mpi
+      SUBROUTINE xclocMPI_getCorrelograms32f(ldxcIn, nxcs, root, xcs, ierr) &
+      BIND(C, NAME='xclocMPI_getCorrelograms32f')
+      INTEGER(C_INT), VALUE, INTENT(IN) :: ldxcIn, nxcs, root
+      REAL(C_FLOAT), DIMENSION(ldxcIn*nxcs), INTENT(OUT) :: xcs
+      INTEGER(C_INT), INTENT(OUT) :: ierr
+      REAL, ALLOCATABLE :: xcsLocal(:)
+      INTEGER, DIMENSION(:), ALLOCATABLE :: displs, recvCount
+      INTEGER ierrLoc, interCommTarget, intraCommTarget, irecv, ldxc, mpierr, &
+              nxcsInGroup, sendCount
+      ierr = 0
+      ierrLoc = 0
+      IF (myid_ == MPI_UNDEFINED) RETURN ! I don't belong here
+      ! Did I compute the XCs yet?
+      IF (.NOT.lhaveXCs_) THEN
+         IF (myid_ == root_) WRITE(ERROR_UNIT,900)
+         ierrLoc = 1
+      ENDIF
+      ! Verify the input arguments and set dest info 
+      IF (myid_ == root) THEN
+         IF (ldxcIn < nptsInXCs_ .AND. nxcs /= nxcsTotal_) THEN
+            IF (ldxcIn < nptsInXCs_) WRITE(ERROR_UNIT,901) nptsInXCs_
+            IF (nxcs /= nxcsTotal_) WRITE(ERROR_UNIT,902) nxcsTotal_
+            ierrLoc = 1
+         ENDIF
+         ! Set the destination information and initialize the result to nothing 
+         xcs(:) = 0.0
+         interCommTarget = xcdsmInterCommID_
+         intraCommTarget = xcdsmIntraCommID_
+         ldxc = ldxcIn
+      ENDIF
+      ! Leave now if there is an error
+      CALL MPI_Allreduce(ierrLoc, ierr, 1, MPI_INTEGER, MPI_MAX, xclocGlobalComm_, mpierr)
+      IF (ierr /= 0) RETURN
+      ! Send around target information
+      CALL MPI_Bcast(interCommTarget, 1, MPI_INTEGER, root, xclocGlobalComm_, mpierr)
+      CALL MPI_Bcast(intraCommTarget, 1, MPI_INTEGER, root, xclocGlobalComm_, mpierr)
+      CALL MPI_Bcast(ldxc,            1, MPI_INTEGER, root, xclocGlobalComm_, mpierr)
+      ! Gather the correlograms into this group's `root' process
+      IF (xcdsmIntraCommID_ == intraCommTarget) ALLOCATE(xcsLocal(MAX(1,ldxc*nxcsLocal_)))
+      CALL xcloc_fdxcMPI_gatherCorrelograms32f(ldxc, nxcsLocal_, intraCommTarget, &
+                                               xcsLocal, ierrLoc)
+      IF (ierrLoc /= 0) THEN
+         IF (xcdsmIntraCommID_ == intraCommTarget) WRITE(ERROR_UNIT,903) xcdsmInterCommID_
+         ierrLoc = 1
+      ENDIF
+      CALL MPI_Allreduce(ierrLoc, ierr, 1, MPI_INTEGER, MPI_MAX, xclocGlobalComm_, mpierr)
+      IF (ierr /= 0) RETURN
+      ! Gather the correlograms onto the root. 
+      IF (xcdsmIntraCommID_ == interCommTarget) THEN
+         sendCount = ldxc*nxcsLocal_
+         IF (xcdsmIntraCommID_ == intraCommTarget) THEN
+            ALLOCATE(recvCount(nxcdsmGroups_)); recvCount(:) = 0
+            ALLOCATE(displs(nxcdsmGroups_)); displs(:) = 0
+            displs(1) = 0 ! This is C indexed
+            DO irecv=1,nxcdsmGroups_
+               nxcsInGroup = myDSMXCPtr_(irecv+1) - myDSMXCPtr_(irecv)
+               recvCount(irecv) = nxcsInGroup*nptsInXCs_
+               IF (irecv < nxcdsmGroups_) THEN
+                  displs(irecv+1) = displs(irecv) + recvCount(irecv)
+               ENDIF
+            ENDDO
+         ENDIF
+         CALL MPI_Gatherv(xcsLocal, sendCount, MPI_REAL,                    &
+                          xcs, recvCount, displs,                           &
+                          MPI_REAL, interCommTarget, xcdsmInterComm_, mpierr)
+         IF (ALLOCATED(displs))    DEALLOCATE(displs)
+         IF (ALLOCATED(recvCount)) DEALLOCATE(recvCount)
+      ENDIF
+      IF (ALLOCATED(xcsLocal)) DEALLOCATE(xcsLocal)
+  900 FORMAT('xclocMPI_getCorrelograms32f: xcs not yet computed')
+  901 FORMAT('xclocMPI_getCorrelograms32f: ldxcIn must be at least ', I0)
+  902 FORMAT('xclocMPI_getCorrelograms32f: nxcs must be ', I0)
+  903 FORMAT('xclocMPI_getCorrelograms32f: Failed to get xcs on group ', I0)
       RETURN
       END
 !                                                                                        !
@@ -1068,9 +1312,80 @@ if (allocated(nDSMXCsPerGroup_)) deallocate(nDSMXCsPerGroup_)
   920 FORMAT("xclocMPI_setTable64f: All tables set")
       RETURN
       END
+
 !                                                                                        !
 !========================================================================================!
 !                                                                                        !
+      SUBROUTINE xclocMPI_getImage32f(ngrd, root, image, ierr) &
+      BIND(C, NAME='xclocMPI_getImage32f')
+      INTEGER(C_INT), VALUE, INTENT(IN) :: ngrd, root
+      REAL(C_FLOAT), DIMENSION(ngrd), INTENT(OUT) :: image
+      INTEGER(C_INT), INTENT(OUT) :: ierr
+      REAL, POINTER, CONTIGUOUS, DIMENSION(:) :: localImagePtr
+      REAL, ALLOCATABLE, DIMENSION(:) :: imageWork
+      INTEGER, DIMENSION(:), ALLOCATABLE :: displs(:), recvcount(:)
+      INTEGER ierrLoc, intraCommTarget, interCommTarget, irecv, mpierr, ngrdLocal, &
+              sendCount
+      
+      ierr = 0
+      ierrLoc = 0
+      IF (myid_ == MPI_UNDEFINED) RETURN ! I don't belong here
+      IF (.NOT.lhaveImage_) ierrLoc = 1
+      CALL MPI_Allreduce(ierrLoc, ierr, 1, MPI_INTEGER, MPI_MAX, xclocGlobalComm_, mpierr)
+      IF (ierr /= 0) THEN 
+         IF (myid_ == root_) WRITE(ERROR_UNIT,900)
+         ierr = 1
+         RETURN
+      ENDIF
+      IF (myid_ == root) THEN
+         IF (ngrd < ngrdTotal_) THEN
+            WRITE(ERROR_UNIT,901) ngrd
+            ierrLoc = 1
+         ENDIF
+         image(:) = 0.0
+         interCommTarget = xcdsmInterCommID_
+         intraCommTarget = xcdsmIntraCommID_
+      ENDIF
+      CALL MPI_Allreduce(ierrLoc, ierr, 1, MPI_INTEGER, MPI_MAX, xclocGlobalComm_, mpierr)
+      IF (ierr /= 0) RETURN
+      ! Get the pointer to the local image
+      CALL MPI_Bcast(intraCommTarget, 1, MPI_INTEGER, root, xclocGlobalComm_, mpierr)
+      CALL MPI_Bcast(interCommTarget, 1, MPI_INTEGER, root, xclocGlobalComm_, mpierr)
+      NULLIFY(localImagePtr)
+      CALL xcloc_dsmxcMPI_getLocalImagePtr(localImagePtr, ierrLoc)
+      ngrdLocal = SIZE(localImagePtr)
+      IF (xcdsmInterCommID_ == interCommTarget) THEN
+         ALLOCATE(imageWork(ngrdLocal)); imageWork(:) = 0.0
+      ENDIF
+      CALL MPI_Reduce(localImagePtr, imageWork, ngrdLocal, MPI_REAL, MPI_SUM, root_, &
+                      xcdsmInterComm_, mpierr)
+      NULLIFY(localImagePtr)
+      ! Gather onto master
+      IF (xcdsmInterCommID_ == interCommTarget) THEN
+         sendCount = ngrdLocal
+         IF (xcdsmIntraCommID_ == intraCommTarget) THEN
+            ALLOCATE(displs(xcGroupSize_));    displs(:) = 0
+            ALLOCATE(recvcount(xcGroupSize_)); recvcount(:) = 0
+            displs(1) = 0 ! C indexed
+            DO irecv=1,xcGroupSize_
+               recvcount(irecv) = grdPointsPtr_(irecv+1) - grdPointsPtr_(irecv)
+               IF (irecv < xcGroupSize_) &
+               displs(irecv+1) = displs(irecv) + recvcount(irecv)
+            ENDDO
+         ENDIF
+         CALL MPI_Gatherv(imageWork, sendCount, MPI_REAL,                   &
+                          image, recvCount, displs,                         &
+                          MPI_REAL, intraCommTarget, xcdsmIntraComm_, mpierr)
+         IF (ALLOCATED(displs))    DEALLOCATE(displs)
+         IF (ALLOCATED(recvcount)) DEALLOCATE(recvcount)
+if (xcdsmIntraCommID_ == intraCommTarget) print *, maxloc(image), maxval(image)
+      ENDIF
+
+  900 FORMAT('xclocMPI_getImage32f: Image not yet computed')
+  901 FORMAT('xclocMPI_getImage32f: ngrd must be at least ', I0)
+      RETURN
+      END
+
 !>    @brief Gets the maximum value of the image.
 !>    @param[out] maxIndex  The index of the maximum.  This is Fortran indexed.
 !>    @param[out] maxValue  Maximum value corresponding to the maxIndex.
@@ -1082,7 +1397,7 @@ if (allocated(nDSMXCsPerGroup_)) deallocate(nDSMXCsPerGroup_)
       INTEGER(C_INT), INTENT(OUT) :: maxIndex, ierr
       REAL, ALLOCATABLE, DIMENSION(:) :: imageWork, xmax, xmaxWork
       INTEGER, ALLOCATABLE, DIMENSION(:) :: imax, imaxWork
-      REAL, POINTER, CONTIGUOUS, DIMENSION(:) :: localImagePtr(:)
+      REAL, POINTER, CONTIGUOUS, DIMENSION(:) :: localImagePtr
       INTEGER i, ierrLoc, mpierr, ngrdLocal
       ierr = 0
       maxIndex = 1
@@ -1100,7 +1415,12 @@ if (allocated(nDSMXCsPerGroup_)) deallocate(nDSMXCsPerGroup_)
       NULLIFY(localImagePtr)
       CALL xcloc_dsmxcMPI_getLocalImagePtr(localImagePtr, ierrLoc)
       ngrdLocal = SIZE(localImagePtr)
-      IF (xcdsmInterCommID_ == root_) ALLOCATE(imageWork(ngrdLocal))
+ print *, maxval(localImagePtr)
+      IF (xcdsmInterCommID_ == root_) THEN
+         ALLOCATE(imageWork(ngrdLocal))
+      ELSE
+         ALLOCATE(imageWork(1))
+      ENDIF
       CALL MPI_Reduce(localImagePtr, imageWork, ngrdLocal, MPI_REAL, MPI_SUM, root_, &
                       xcdsmInterComm_, mpierr) 
       NULLIFY(localImagePtr)
@@ -1108,12 +1428,11 @@ if (allocated(nDSMXCsPerGroup_)) deallocate(nDSMXCsPerGroup_)
       IF (xcdsmInterCommID_ == root_) THEN
          ALLOCATE(imaxWork(xcGroupSize_)); imaxWork(:) = 0
          ALLOCATE(xmaxWork(xcGroupSize_)); xmaxWork(:) = 0.0
-         IF (xcdsmIntraCommID_ == root_) THEN
-            ALLOCATE(imax(xcGroupSize_))
-            ALLOCATE(xmax(xcGroupSize_))
-         ENDIF
+         ALLOCATE(imax(xcGroupSize_))
+         ALLOCATE(xmax(xcGroupSize_))
          imaxWork(xcdsmIntraCommID_+1) = MAXLOC(imageWork, 1)
          xmaxWork(xcdsmIntraCommID_+1) = imageWork(imaxWork(xcdsmIntraCommID_+1))
+print *, 'look', xmaxWork
          CALL MPI_Reduce(imaxWork, imax, xcGroupSize_, MPI_INTEGER, MPI_SUM, root_, &
                          xcdsmIntraComm_, mpierr)
          CALL MPI_Reduce(xmaxWork, xmax, xcGroupSize_, MPI_REAL,    MPI_SUM, root_, &
@@ -1193,7 +1512,7 @@ print *, maxIndex, maxValue
             WRITE(ERROR_UNIT,870) myid_
             GOTO 500
          ENDIF
-         IF (xcdsmIntraCommID_ == root_) THEN 
+         IF (xcdsmIntraCommID_ == root_) THEN
             CALL xcloc_spxc_filterXCsInPlace32f(nptsInXCs_, nptsInXCs_, nxcsLocal_, &
                                                 xcs32f, ierrLoc)
             IF (ierrLoc /= 0) THEN 
@@ -1243,7 +1562,7 @@ print *, maxIndex, maxValue
       timer_end = MPI_Wtime()
       IF (verbose_ > XCLOC_PRINT_WARNINGS .AND. myid_ == root_) &
       WRITE(OUTPUT_UNIT,910) timer_end - timer_start
-      ! Compute the DSM
+      ! Compute the DSM but leave the image distributed across all processes
       timer_start = MPI_Wtime()
       CALL xcloc_dsmxcMPI_compute(ierrLoc)
       IF (ierrLoc /= 0) THEN

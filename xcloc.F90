@@ -60,6 +60,7 @@ MODULE XCLOC
       PUBLIC :: xcloc_getCorrelogramLength
       PUBLIC :: xcloc_getCorrelograms64f
       PUBLIC :: xcloc_getCorrelograms32f
+      PUBLIC :: xcloc_getImageMax
       PUBLIC :: xcloc_getImage64f
       PUBLIC :: xcloc_getImage32f
       PUBLIC :: xcloc_getNumberOfGridPointsInImage
@@ -296,7 +297,7 @@ MODULE XCLOC
 !>    @brief Returns the number of correlograms to be computed.
 !>    @param[out] nxcs   The number of correlograms.
 !>    @param[out] ierr   0 indicates success.
-!>    @ingorup xcloc_xcloc
+!>    @ingroup xcloc_xcloc
       SUBROUTINE xcloc_getNumberOfCorrelograms(nxcs, ierr) &
       BIND(C, NAME='xcloc_getNumberOfCorrelograms')
       INTEGER(C_INT), INTENT(OUT) :: nxcs, ierr

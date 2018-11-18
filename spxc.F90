@@ -13,40 +13,40 @@ MODULE XCLOC_SPXC
       IMPLICIT NONE
       !> @ingroup spxc
       !> Sparse real Hilbert transform coefficients.
-      REAL(C_DOUBLE), PRIVATE, ALLOCATABLE, SAVE :: sparseHfiltR64f_(:)
+      REAL(C_DOUBLE), PRIVATE, ALLOCATABLE, DIMENSION(:), SAVE :: sparseHfiltR64f_
       !> @ingroup spxc
       !> Sparse imaginary Hilbert transform coefficients.
-      REAL(C_DOUBLE), PRIVATE, ALLOCATABLE, SAVE :: sparseHfiltI64f_(:)
+      REAL(C_DOUBLE), PRIVATE, ALLOCATABLE, DIMENSION(:), SAVE :: sparseHfiltI64f_
       !> @ingroup spxc
       !> Sparse real Hilbert transform coefficients for single precision.
-      REAL(C_FLOAT), PRIVATE, ALLOCATABLE, SAVE :: sparseHfiltR32f_(:)
+      REAL(C_FLOAT), PRIVATE, ALLOCATABLE, DIMENSION(:), SAVE :: sparseHfiltR32f_
       !> @ingroup spxc
       !> Sparse imaginary Hilbert transform coefficients for single precision.
-      REAL(C_FLOAT), PRIVATE, ALLOCATABLE, SAVE :: sparseHfiltI32f_(:)
+      REAL(C_FLOAT), PRIVATE, ALLOCATABLE, DIMENSION(:), SAVE :: sparseHfiltI32f_
       !> @ingroup spxc
       !> Real Hilbert transformer coefficients.
-      REAL(C_DOUBLE), PRIVATE, ALLOCATABLE, SAVE :: hfiltR64f_(:)
+      REAL(C_DOUBLE), PRIVATE, ALLOCATABLE, DIMENSION(:), SAVE :: hfiltR64f_
       !> @ingroup spxc
       !> Imaginary Hilbert transformer coefficients.
-      REAL(C_DOUBLE), PRIVATE, ALLOCATABLE, SAVE :: hfiltI64f_(:)
+      REAL(C_DOUBLE), PRIVATE, ALLOCATABLE, DIMENSION(:), SAVE :: hfiltI64f_
       !> @ingroup spxc
       !> Real Hilbert transformer coefficients for single precision.
-      REAL(C_FLOAT), PRIVATE, ALLOCATABLE, SAVE :: hfiltR32f_(:)
+      REAL(C_FLOAT), PRIVATE, ALLOCATABLE, DIMENSION(:), SAVE :: hfiltR32f_
       !> @ingroup spxc
       !> Imaginary Hilbert transformer coefficients for single precision.
-      REAL(C_FLOAT), PRIVATE, ALLOCATABLE, SAVE :: hfiltI32f_(:)
+      REAL(C_FLOAT), PRIVATE, ALLOCATABLE, DIMENSION(:), SAVE :: hfiltI32f_
       !> @ingroup spxc
       !> FIR averaging filter coefficients.
-      REAL(C_DOUBLE), PRIVATE, ALLOCATABLE, SAVE :: rms64f_(:)
+      REAL(C_DOUBLE), PRIVATE, ALLOCATABLE, DIMENSION(:), SAVE :: rms64f_
       !> @ingroup spxc
       !> FIR averaging filter for single precision. 
-      REAL(C_FLOAT), PRIVATE, ALLOCATABLE, SAVE :: rms32f_(:)
+      REAL(C_FLOAT), PRIVATE, ALLOCATABLE, DIMENSION(:), SAVE :: rms32f_
       !> @ingroup spxc
       !> Non-zero indices (C indexed) of real FIR coefficients.
-      INTEGER(C_INT), PRIVATE, ALLOCATABLE, SAVE :: nzReIndices_(:)
+      INTEGER(C_INT), PRIVATE, ALLOCATABLE, DIMENSION(:), SAVE :: nzReIndices_
       !> @ingroup spxc
       !> Non-zero indices (C indexed) of imaginary FIR coefficients.
-      INTEGER(C_INT), PRIVATE, ALLOCATABLE, SAVE :: nzImIndices_(:)
+      INTEGER(C_INT), PRIVATE, ALLOCATABLE, DIMENSION(:), SAVE :: nzImIndices_
       !!> Accuracy.
       !INTEGER(C_INT), PRIVATE, SAVE :: accuracy_ = XCLOC_HIGH_ACCURACY
       !> @ingroup spxc

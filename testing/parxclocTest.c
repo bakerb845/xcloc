@@ -63,7 +63,7 @@ int test_parallel_xcloc(const MPI_Comm comm, const int root)
     int ftype     = (int) XCLOC_SPXC_ENVELOPE_FILTER;
     int s2m       = (int) XCLOC_MIGRATE_PHASE_XCS;
     // Set the receiver location to the center of the model
-    const int nsrc = 2;
+    const int nsrc = 1; // TODO change here
     const double srcScale[2] = {1, 1.1};
     double xs[6] = {x0 + (double) (1*nx/4)*dx,
                     y0 + (double) (5*ny/6)*dy,
@@ -74,6 +74,7 @@ int test_parallel_xcloc(const MPI_Comm comm, const int root)
     double *xr = NULL;
     double *obs = NULL;
     float *image = NULL;
+    float *imageRef = NULL;
     bool lfound;
     int nxcdsmGroups = 1;
     int i, it;
@@ -81,6 +82,7 @@ int test_parallel_xcloc(const MPI_Comm comm, const int root)
     MPI_Fint fcomm = MPI_Comm_c2f(comm); // why is this necessary openMPI?
     MPI_Comm_rank(comm, &myid);
     MPI_Comm_size(comm, &nprocs);
+    srand(4096);
     if (myid == root)
     {
         // Define the number of xc/dsm groups
@@ -88,6 +90,10 @@ int test_parallel_xcloc(const MPI_Comm comm, const int root)
         if (nprocs == 4)
         {
             nxcdsmGroups = 2;
+        }
+        else if (nprocs == 2)
+        {
+            nxcdsmGroups = 1;
         }
         else if (nprocs == 6)
         {
@@ -212,9 +218,39 @@ ERROR1:;
     if (myid == root){fprintf(stdout, "%s: Computing...\n", __func__);}
     xclocMPI_compute(&ierr);
     if (ierr != 0){return EXIT_FAILURE;}
-    // Get the results
+    // Get the results - verify correlogram lengths
+    int nptsInXCs, nxcsTotal;
+    xclocMPI_getCorrelogramLength(&nptsInXCs, &ierr);
+    if (ierr != 0){return EXIT_FAILURE;}
+    xclocMPI_getNumberOfCorrelograms(&nxcsTotal, &ierr);
+    if (ierr != 0){return EXIT_FAILURE;}
+    if (nptsInXCs != 2*npts - 1)
+    {
+        fprintf(stderr, "%s: Incorrect number of pts in xcs\n", __func__);
+        return EXIT_FAILURE;
+    }
+    if (nxcsTotal != (nrec*(nrec-1))/2)
+    {
+        fprintf(stderr, "%s: Incorrect number of xcs\n", __func__);
+        return EXIT_FAILURE;
+    }
+    // Get the results - the xcs
+    double *xcs = NULL;
+    if (myid == root)
+    {
+        xcs = (double *) calloc((size_t) (nptsInXCs*nxcsTotal), sizeof(double));
+        image = (float *) calloc((size_t) ngrd, sizeof(float));
+        imageRef = (float *) calloc((size_t) ngrd, sizeof(float));
+    }
+    xclocMPI_getCorrelograms64f(nptsInXCs, nxcsTotal, root, xcs, &ierr);
+    if (ierr != 0)
+    {
+        fprintf(stderr, "%s: Failed to get correlograms\n", __func__);
+        return EXIT_FAILURE;
+    }
     int maxIndex;
     float maxValue;
+    xclocMPI_getImage32f(ngrd, root, image, &ierr); 
     xclocMPI_getImageMax(&maxIndex, &maxValue, &ierr);
     if (ierr != 0){return EXIT_FAILURE;}
     if (myid == root)
@@ -227,6 +263,8 @@ ERROR1:;
     if (myid == root)
     {
         fprintf(stdout, "%s: Generating serial reference xcloc...\n", __func__);
+        double *xcsRef = (double *)
+                         calloc((size_t) (nptsInXCs*nxcsTotal), sizeof(double));
         // Create a reference
         xcloc_initialize(npts, npts, nxcs,
                          s2m, dt, ngrd,
@@ -243,16 +281,46 @@ ERROR1:;
             xcloc_setTable64f(it, ngrd, ttable, &ierr);
         }
         xcloc_setSignals64f(npts, npts, nsignals, obs, &ierr);
-        xcloc_compute(&ierr);
+        xcloc_compute(&ierr); if (ierr != 0){goto EXIT;}
+        xcloc_getCorrelograms64f(nptsInXCs, nxcsTotal, xcsRef, &ierr);
         xcloc_getImageMax(&maxIndex, &maxValue, &ierr);
+        xcloc_getImage32f(ngrd, imageRef, &ierr);
         printf("True max %d %.8f\n", maxIndex, maxValue);
+        double resMax = 0;
+        ierr = 0;
+        ippsNormDiff_L1_64f(xcs, xcsRef, nptsInXCs*nxcsTotal, &resMax);
+        if (resMax > 1.e-10)
+        {
+            fprintf(stderr, "%s: Correlograms inconsistent with error %lf\n",
+                    __func__, resMax);
+            ierr = 1;
+        }
         xcloc_finalize();
-    } 
-    MPI_Barrier(comm);
+        free(xcsRef);
+        FILE *fwork = fopen("image_mpi.txt", "w");
+        for (int iy=0; iy<ny; iy++)
+        {
+            for (int ix=0; ix<nx; ix++)
+            {
+                fprintf(fwork, "%lf %lf %f %f %f\n",
+                        x0 + (double) ix*dx,
+                        y0 + (double) iy*dy,
+                        image[iy*nx+ix], imageRef[iy*nx+ix],
+                        fabsf(image[iy*nx+ix] - imageRef[iy*nx+ix]));
+            }
+            fprintf(fwork, "\n");
+        }
+        fclose(fwork);
+    }
+EXIT:;
+    MPI_Bcast(&ierr, 1, MPI_INTEGER, root, comm);
     if (xcPairs != NULL){free(xcPairs);}
     if (xr != NULL){free(xr);}
     if (image != NULL){free(image);}
+    if (imageRef != NULL){free(imageRef);}
     if (obs != NULL){free(obs);}
+    if (xcs != NULL){free(xcs);}
     if (ttable != NULL){free(ttable);}
+    if (ierr != 0){return EXIT_FAILURE;}
     return EXIT_SUCCESS;
 }
