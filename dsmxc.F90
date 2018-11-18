@@ -750,19 +750,19 @@ MODULE XCLOC_DSMXC
       IF (.NOT.lhaveAllTables_) WRITE(OUTPUT_UNIT,905)
   905 FORMAT('xcloc_dsmxc_compute: Only a subset of tables were set')
       ! Compute
-      lxc2 = nptsInXCs_/2
-      !$OMP PARALLEL DO DEFAULT(NONE) &
+      !$OMP PARALLEL DEFAULT(NONE) &
       !$OMP SHARED(blockSize_, dataOffset_, image32f_, ldg_, ngrd_) &
       !$OMP SHARED(nptsInXCs_, nxcPairs_, ttimes_, xcTablePairs_, xcs32f_) &
       !$OMP PRIVATE(i, igrd, igrd1, ixc, ixc1, ixc2, igrd2, it1, it2, indxXC) &
       !$OMP PRIVATE(jgrd1, jgrd2, kgrd1, kgrd2, imagePtr32f, ngrdLoc)   &
-      !$OMP PRIVATE(tt1, tt2, xcPtr32f) &
-      !$OMP FIRSTPRIVATE(lxc2)
+      !$OMP PRIVATE(lxc2, tt1, tt2, xcPtr32f)
+      lxc2 = nptsInXCs_/2
+      !$OMP DO
       DO igrd=1,ngrd_,blockSize_
          ngrdLoc = MIN(ngrd_ - igrd + 1, blockSize_)
          igrd1 = igrd
          igrd2 = igrd + ngrdLoc - 1
-         imagePtr32f => image32f_(igrd1:igrd2)
+         imagePtr32f(1:ngrdLoc) => image32f_(igrd1:igrd2)
          imagePtr32f(1:ngrdLoc) = 0.0 ! 0 out block prior to stack
          ! Loop on correlation pairs
          DO ixc=1,nxcPairs_
@@ -770,7 +770,7 @@ MODULE XCLOC_DSMXC
             it2 = xcTablePairs_(2*(ixc-1)+2)
             jgrd1 = (it1 - 1)*ldg_ + igrd1
             jgrd2 = (it1 - 1)*ldg_ + igrd2
-            kgrd1 = (it2 - 1)*ldg_ + igrd1 
+            kgrd1 = (it2 - 1)*ldg_ + igrd1
             kgrd2 = (it2 - 1)*ldg_ + igrd2
             ixc1 = (ixc - 1)*dataOffset_ + 1
             ixc2 = (ixc - 1)*dataOffset_ + nptsInXCs_
@@ -788,6 +788,7 @@ MODULE XCLOC_DSMXC
          ENDDO
          NULLIFY(imagePtr32f)
       ENDDO
+      !$OMP END PARALLEL
       lhaveImage_ = .TRUE.
       RETURN
       END

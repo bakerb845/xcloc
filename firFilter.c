@@ -3,6 +3,7 @@
 #include <string.h>
 #include <math.h>
 #include <ipps.h>
+#include <lapacke_utils.h>
 
 /*!
  * @brief Computes the envelope of a set of signals.  It is assumed that the
@@ -151,6 +152,7 @@ int xcloc_firFilter_envelope32f(const int lds,
                                 float x[])
 {
     int ierr = 0;
+    int i;
     if (nsignals == 0 || npts == 0){return 0;} // Nothing to do
     if (x == NULL || nzReCoeffs == NULL || nzImCoeffs == NULL ||
         reCoeffs == NULL || imCoeffs == NULL)
@@ -190,7 +192,10 @@ int xcloc_firFilter_envelope32f(const int lds,
         return -1;
     }
     int winLen, winLen2;
-    ippsMax_32s(nzImCoeffs, nnzImCoeffs, &winLen);
+    winLen = 0;
+    #pragma omp simd reduction(min: winLen)
+    for (i=0; i<nnzImCoeffs; i++){winLen = MIN(winLen, nzImCoeffs[i]);}
+    //ippsMax_32s(nzImCoeffs, nnzImCoeffs, &winLen);
     winLen2 = winLen/2 + 1; // Filter is symmetric so remove first half
     // Begin the parallel computation
     #pragma omp parallel default(none) \
