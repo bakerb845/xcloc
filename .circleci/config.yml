@@ -52,6 +52,8 @@ jobs:
           name: Run cmake test
           #command: make test
           command: ./xcf_tests
+      - run:
+          name: leave_dir
           command: cd ..
       - run:
           name: Test intsall

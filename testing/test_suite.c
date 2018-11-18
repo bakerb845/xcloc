@@ -54,7 +54,7 @@ BCAST_ERROR_1:;
 #ifdef XCLOC_USE_MPI
     MPI_Bcast(&ierr, 1, MPI_INTEGER, root, MPI_COMM_WORLD);
 #endif
-    if (ierr !=0 ){goto END;}
+    if (ierr != EXIT_SUCCESS){goto END;}
 #ifdef XCLOC_USE_MPI
     // Start the parallel tests
     if (myid == root)
