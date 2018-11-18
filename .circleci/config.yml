@@ -49,6 +49,9 @@ jobs:
           name: change_dir
           command: cd testing
       - run:
+          name: list_files
+          command: ls
+      - run:
           name: Run cmake test
           #command: make test
           command: ./xcf_tests
