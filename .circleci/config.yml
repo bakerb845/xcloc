@@ -48,16 +48,12 @@ jobs:
       - run:
           name: change_dir
           command: cd testing
-      - run:
-          name: list_files
           command: ls
-      - run:
-          name: Run cmake test
-          #command: make test
           command: ./xcf_tests
-      - run:
-          name: leave_dir
-          command: cd ..
+      #- run:
+      #    name: Run cmake test
+      #    #command: make test
+      #    command: ./xcf_tests
       - run:
           name: Test intsall
           command: make install
