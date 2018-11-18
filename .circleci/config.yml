@@ -46,14 +46,9 @@ jobs:
           name: Build
           command: make
       - run:
-          name: change_dir
-          command: cd testing
-          command: ls
-          command: ./xcf_tests
-      #- run:
-      #    name: Run cmake test
-      #    #command: make test
-      #    command: ./xcf_tests
+          name: Run cmake test
+          #command: make test
+          command: ctest --verbose
       - run:
           name: Test intsall
           command: make install
