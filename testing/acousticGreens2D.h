@@ -28,7 +28,7 @@ int acousticGreens2D_computeRickerWavelet(const int npts,
                                           const double peakFreq,
                                           const bool lnorm,
                                           const bool lshift,
-                                          double *__restrict__ ricker);
+                                          double ricker[]);
 int acousticGreens2D_computeGreensLineSource(
     const int nrec,
     const double vel,
@@ -36,10 +36,10 @@ int acousticGreens2D_computeGreensLineSource(
     const double Q,
     const int npts,
     const double dt, 
-    const double *__restrict__ xs, 
-    const double *__restrict__ xr, 
-    const double *__restrict__ stf,
-    double *__restrict__ G);
+    const double xs[],
+    const double xr[],
+    const double stf[],
+    double G[]);
 int acousticGreens2D_computeLineSourceFD(
     //const bool lverb,
     const double vel,
@@ -48,9 +48,9 @@ int acousticGreens2D_computeLineSourceFD(
     const double xs[3],
     const double xr[3],
     const int nomega,
-    const double *__restrict__ omega,
-    const double complex *__restrict__ stf,
-    double complex *__restrict__ G);
+    const double omega[],
+    const double complex stf[],
+    double complex G[]);
 int acousticGreens2D_computeTravelTimeTable(
     const int nx, const int ny, const int nz, 
     const double vel,

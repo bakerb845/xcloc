@@ -928,8 +928,8 @@ MODULE XCLOC_FDXC
       INTEGER i, indx, ixc, iw, j, jndx, kndx, n
       COMPLEX(C_DOUBLE_COMPLEX), CONTIGUOUS, POINTER :: xcPtr64z(:)
       COMPLEX(C_FLOAT_COMPLEX), CONTIGUOUS, POINTER :: xcPtr32c(:)
-      REAL(C_DOUBLE), ALLOCATABLE :: mag64f_(:)
-      REAL(C_FLOAT), ALLOCATABLE :: mag32f_(:)
+      REAL(C_DOUBLE), ALLOCATABLE :: mag64f(:)
+      REAL(C_FLOAT), ALLOCATABLE :: mag32f(:)
       REAL(C_FLOAT), PARAMETER ::  tol32 = TINY(1.0)*10000.0   !EPSILON(1.0)*10.0
       REAL(C_DOUBLE), PARAMETER :: tol64 = TINY(1.d0)*10000.d0 !EPSILON(1.d0)*10.d0 
       ierr = 0
@@ -941,13 +941,13 @@ MODULE XCLOC_FDXC
          !$OMP PARALLEL DEFAULT(NONE) &
          !$OMP SHARED(accuracyMKL_, ftOffset_, inputFTs32f_, lphaseCorr, nxcs_) &
          !$OMP SHARED(nptsInFTs_, xcFTs32f_, xcPairs_) &
-         !$OMP PRIVATE(i, indx, iw, ixc, j, jndx, kndx, mag32f_, n, xcPtr32c)
+         !$OMP PRIVATE(i, indx, iw, ixc, j, jndx, kndx, mag32f, n, xcPtr32c)
          n = nptsInFTs_
          IF (lphaseCorr) THEN
-            ALLOCATE(mag32f_(n))
+            ALLOCATE(mag32f(n)); mag32f(:) = 0.0
             NULLIFY(xcPtr32c)
          ELSE
-            ALLOCATE(mag32f_(1))
+            ALLOCATE(mag32f(1))
          ENDIF
          ! Loop on the number of cross-correlations
          !$OMP DO
@@ -958,36 +958,39 @@ MODULE XCLOC_FDXC
             jndx = (j - 1)*ftOffset_ + 1
             kndx = (ixc - 1)*ftOffset_ + 1
             ! Compute u1*conj(u2)
+            !xcFTs32f_(kndx:kndx+n-1) = inputFTs32f_(indx:indx+n-1) &
+            !                          *CONJG(inputFTs32f_(jndx:jndx+n-1))
             CALL vmcMulByConj(n, inputFTs32f_(indx), inputFTs32f_(jndx), &
                               xcFTs32f_(kndx), accuracyMKL_)
             ! Normalize by the magnitude at each frequency
             IF (lphaseCorr) THEN
-               CALL vmcAbs(n, xcFTs32f_(kndx), mag32f_, accuracyMKL_)
+               !mag32f(1:n) = CABS(xcFTs32f_(kndx:kndx+n-1) )
+               CALL vmcAbs(n, xcFTs32f_(kndx), mag32f, accuracyMKL_)
                ! Avoid division by zero
-               mag32f_(1:n) = MAX(mag32f_(1:n), tol32)
+               mag32f(1:n) = MAX(mag32f(1:n), tol32)
                ! Safely normalize
-               xcPtr32c => xcFTs32f_(kndx:kndx+n-1)
-               !$OMP SIMD ALIGNED(xcPtr32c, mag32f_: 16)
+               xcPtr32c(1:n) => xcFTs32f_(kndx:kndx+n-1)
+               !$OMP SIMD ALIGNED(xcPtr32c, mag32f: 16)
                DO iw=1,n
-                  xcPtr32c(iw) = xcPtr32c(iw)/mag32f_(iw)
-                  !xcFTs32f_(kndx-1+iw) = xcFTs32f_(kndx-1+iw)/mag32f_(iw)
+                  xcPtr32c(iw) = xcPtr32c(iw)/mag32f(iw)
+                  !xcFTs32f_(kndx-1+iw) = xcFTs32f_(kndx-1+iw)/mag32f(iw)
                ENDDO
                NULLIFY(xcPtr32c)
             ENDIF
          ENDDO ! Loop on number of cross-correlations
-         IF (ALLOCATED(mag32f_)) DEALLOCATE(mag32f_)
+         IF (ALLOCATED(mag32f)) DEALLOCATE(mag32f)
          !$OMP END PARALLEL
       ELSE
          !$OMP PARALLEL DEFAULT(NONE) &
          !$OMP SHARED(accuracyMKL_, ftOffset_, inputFTs64f_, lphaseCorr, nxcs_) &
          !$OMP SHARED(nptsInFTs_, xcFTs64f_, xcPairs_) &
-         !$OMP PRIVATE(i, indx, iw, ixc, j, jndx, kndx, mag64f_, n, xcPtr64z)
+         !$OMP PRIVATE(i, indx, iw, ixc, j, jndx, kndx, mag64f, n, xcPtr64z)
          n = nptsInFTs_
          IF (lphaseCorr) THEN
-            ALLOCATE(mag64f_(n))
+            ALLOCATE(mag64f(n)); mag64f(:) = 0.d0
             NULLIFY(xcPtr64z)
          ELSE
-            ALLOCATE(mag64f_(1))
+            ALLOCATE(mag64f(1))
          ENDIF
          ! Loop on the number of cross-correlations
          !$OMP DO
@@ -998,23 +1001,26 @@ MODULE XCLOC_FDXC
             jndx = (j - 1)*ftOffset_ + 1 
             kndx = (ixc - 1)*ftOffset_ + 1 
             ! Compute u1*conj(u2)
+            !xcFTs64f_(kndx:kndx+n-1) = inputFTs64f_(indx:indx+n-1) &
+            !                          *DCONJG(inputFTs64f_(jndx:jndx+n-1))
             CALL vmzMulByConj(n, inputFTs64f_(indx), inputFTs64f_(jndx), &
                               xcFTs64f_(kndx), accuracyMKL_)
             ! Normalize by the magnitude at each frequency
             IF (lphaseCorr) THEN
-               CALL vmzAbs(n, xcFTs64f_(kndx), mag64f_, accuracyMKL_)
+               !mag64f(1:n) = CDABS(xcFTs64f_(kndx:kndx+n-1))
+               CALL vmzAbs(n, xcFTs64f_(kndx), mag64f, accuracyMKL_)
                ! Avoid division by zero
-               mag64f_(1:n) = MAX(mag64f_(1:n), tol64)
+               mag64f(1:n) = MAX(mag64f(1:n), tol64)
                ! Safely normalize
-               xcPtr64z => xcFTs64f_(kndx:kndx+n-1) 
-               !$OMP SIMD ALIGNED(xcPtr64z, mag64f_: 16)
+               xcPtr64z(1:n) => xcFTs64f_(kndx:kndx+n-1) 
+               !$OMP SIMD ALIGNED(xcPtr64z, mag64f: 16)
                DO iw=1,n
-                  xcPtr64z(iw) = xcPtr64z(iw)/mag64f_(iw)
+                  xcPtr64z(iw) = xcPtr64z(iw)/mag64f(iw)
                ENDDO
                NULLIFY(xcPtr64z)
             ENDIF
          ENDDO ! Loop on number of cross-correlations
-         IF (ALLOCATED(mag64f_)) DEALLOCATE(mag64f_)
+         IF (ALLOCATED(mag64f)) DEALLOCATE(mag64f)
          !$OMP END PARALLEL
       ENDIF
       RETURN

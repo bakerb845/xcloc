@@ -118,13 +118,14 @@ int acousticGreens2D_computeRickerWavelet(const int npts,
                                           const double peakFreq,
                                           const bool lnorm,
                                           const bool lshift,
-                                          double *__restrict__ ricker)
+                                          double ricker[])
 {
     double *work = NULL;
     double area, pi2f2, pi2f2t2, t, t2, xmax;
     int i, ncopy, npts2;
     const double tol = 1.0 - 0.995; //1.e-2; //FLT_EPSILON*1000.0; //1.e-6;
     xmax = 0.0;
+    memset(ricker, 0, (size_t) npts*sizeof(double));
     pi2f2 = pow(M_PI*peakFreq, 2); 
     npts2 = npts/2;
     for (i=0; i<npts; i++)
@@ -141,6 +142,7 @@ int acousticGreens2D_computeRickerWavelet(const int npts,
     if (lshift)
     {
         work = ippsMalloc_64f(npts);
+        ippsZero_64f(work, npts);
         for (i=0; i<npts; i++)
         {
             if (fabs(ricker[i]) > tol*xmax)
@@ -196,10 +198,10 @@ int acousticGreens2D_computeGreensLineSource(
     const double Q,
     const int npts,
     const double dt,
-    const double *__restrict__ xs,
-    const double *__restrict__ xr,
-    const double *__restrict__ stf,
-    double *__restrict__ G)
+    const double xs[],
+    const double xr[],
+    const double stf[],
+    double G[])
 {
     double complex *Gw = NULL;
     double complex *stfF = NULL;
@@ -307,9 +309,9 @@ int acousticGreens2D_computeLineSourceFD(
     const double xs[3],
     const double xr[3],
     const int nomega,
-    const double *__restrict__ omega,
-    const double complex *__restrict__ stf,
-    double complex *__restrict__ G)
+    const double omega[],
+    const double complex stf[],
+    double complex G[])
 {
     double complex carg, coeff;
     double omegar, r, xscal;

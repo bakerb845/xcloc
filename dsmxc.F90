@@ -741,9 +741,9 @@ MODULE XCLOC_DSMXC
       INTEGER(C_INT), INTENT(OUT) :: ierr
       INTEGER i, igrd, igrd1, igrd2, indxXC, it1, it2, ixc, ixc1, ixc2, jgrd1, jgrd2, &
               kgrd1, kgrd2, lxc2, ngrdLoc
-      INTEGER(C_INT), CONTIGUOUS, POINTER :: tt1(:), tt2(:)
-      REAL(C_FLOAT), CONTIGUOUS, POINTER :: imagePtr32f(:)
-      REAL(C_FLOAT), CONTIGUOUS, POINTER :: xcPtr32f(:)
+      INTEGER, CONTIGUOUS, POINTER :: tt1(:), tt2(:)
+      REAL, CONTIGUOUS, POINTER :: imagePtr32f(:)
+      REAL, CONTIGUOUS, POINTER :: xcPtr32f(:)
       ! This would be problematic if all tables aren't set
       ierr = 0
       lhaveImage_ = .FALSE.
@@ -776,7 +776,7 @@ MODULE XCLOC_DSMXC
             ixc2 = (ixc - 1)*dataOffset_ + nptsInXCs_
             tt1 => ttimes_(jgrd1:jgrd2)
             tt2 => ttimes_(kgrd1:kgrd2)
-            xcPtr32f => xcs32f_(ixc1:ixc2)
+            xcPtr32f(1:nptsInXCs_) => xcs32f_(ixc1:ixc2)
             !$OMP SIMD ALIGNED(imagePtr32f, tt1, tt2: 64)
             DO i=1,ngrdLoc
                indxXC = lxc2 + tt1(i) - tt2(i)
@@ -788,6 +788,7 @@ MODULE XCLOC_DSMXC
          ENDDO
          NULLIFY(imagePtr32f)
       ENDDO
+      !$OMP ENDDO
       !$OMP END PARALLEL
       lhaveImage_ = .TRUE.
       RETURN

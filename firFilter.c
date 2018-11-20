@@ -240,6 +240,7 @@ int xcloc_firFilter_envelope32f(const int lds,
     ippsZero_32f(xmean,   filterLen);
     ippsZero_32f(yfiltIm, filterLen);
     // Loop on signals
+    #pragma omp for
     for (is=0; is<nsignals; is++)
     {
         // Demean the signal
