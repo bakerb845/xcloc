@@ -739,8 +739,8 @@ MODULE XCLOC_DSMXC
       SUBROUTINE xcloc_dsmxc_compute(ierr) &
       BIND(C, NAME='xcloc_dsmxc_compute')
       INTEGER(C_INT), INTENT(OUT) :: ierr
-      INTEGER i, igrd, igrd1, igrd2, indxXC, it1, it2, ixc, ixc1, ixc2, jgrd1, jgrd2, &
-              kgrd1, kgrd2, lxc2, ngrdLoc
+      INTEGER i, ic, igrd, igrd1, igrd2, indxXC, it1, it2, ixc, ixc1, ixc2, &
+              jgrd1, jgrd2, kgrd1, kgrd2, lxc2, nchunks, ngrdLoc
       INTEGER, CONTIGUOUS, POINTER :: tt1(:), tt2(:)
       REAL, CONTIGUOUS, POINTER :: imagePtr32f(:)
       REAL, CONTIGUOUS, POINTER :: xcPtr32f(:)
@@ -748,17 +748,27 @@ MODULE XCLOC_DSMXC
       ierr = 0
       lhaveImage_ = .FALSE.
       IF (.NOT.lhaveAllTables_) WRITE(OUTPUT_UNIT,905)
+      ! Compute the number of chunks and make sure I do all the grid oints
+      nchunks = INT(DBLE(ngrd_)/DBLE(blockSize_) + 1.d0)
+      IF (nchunks*blockSize_ < ngrd_) THEN
+         WRITE(ERROR_UNIT,900)
+         ierr = 1
+         RETURN
+      ENDIF
+  900 FORMAT('xcloc_dsmxc_compute: Internal error computing chunk size')
   905 FORMAT('xcloc_dsmxc_compute: Only a subset of tables were set')
       ! Compute
       !$OMP PARALLEL DEFAULT(NONE) &
-      !$OMP SHARED(blockSize_, dataOffset_, image32f_, ldg_, ngrd_) &
+      !$OMP SHARED(blockSize_, dataOffset_, image32f_, ldg_, nchunks, ngrd_) &
       !$OMP SHARED(nptsInXCs_, nxcPairs_, ttimes_, xcTablePairs_, xcs32f_) &
-      !$OMP PRIVATE(i, igrd, igrd1, ixc, ixc1, ixc2, igrd2, it1, it2, indxXC) &
+      !$OMP PRIVATE(i, ic, igrd, igrd1, ixc, ixc1, ixc2, igrd2, it1, it2, indxXC) &
       !$OMP PRIVATE(jgrd1, jgrd2, kgrd1, kgrd2, imagePtr32f, ngrdLoc)   &
       !$OMP PRIVATE(lxc2, tt1, tt2, xcPtr32f)
       lxc2 = nptsInXCs_/2
       !$OMP DO
-      DO igrd=1,ngrd_,blockSize_
+      DO ic=1,nchunks !igrd=1,ngrd_,blockSize_
+         igrd = (ic - 1)*blockSize_ + 1
+         IF (igrd > ngrd_) CYCLE 
          ngrdLoc = MIN(ngrd_ - igrd + 1, blockSize_)
          igrd1 = igrd
          igrd2 = igrd + ngrdLoc - 1
@@ -788,7 +798,7 @@ MODULE XCLOC_DSMXC
          ENDDO
          NULLIFY(imagePtr32f)
       ENDDO
-      !$OMP ENDDO
+      !$OMP ENDDO NOWAIT
       !$OMP END PARALLEL
       lhaveImage_ = .TRUE.
       RETURN

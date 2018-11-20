@@ -978,6 +978,7 @@ MODULE XCLOC_FDXC
                NULLIFY(xcPtr32c)
             ENDIF
          ENDDO ! Loop on number of cross-correlations
+         !$OMP END DO NOWAIT
          IF (ALLOCATED(mag32f)) DEALLOCATE(mag32f)
          !$OMP END PARALLEL
       ELSE
@@ -1020,6 +1021,7 @@ MODULE XCLOC_FDXC
                NULLIFY(xcPtr64z)
             ENDIF
          ENDDO ! Loop on number of cross-correlations
+         !$OMP END DO NOWAIT
          IF (ALLOCATED(mag64f)) DEALLOCATE(mag64f)
          !$OMP END PARALLEL
       ENDIF
