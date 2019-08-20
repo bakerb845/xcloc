@@ -7,7 +7,7 @@ jobs:
       #  auth:
       #     username: $DOCKER_USER
       #     password: $DOCKER_PASS
-      - image: bakerb845/ubuntu-xcloc
+      - image: bakerb845/ubuntu-rtseis
     steps:
       - checkout
       - run:
@@ -16,39 +16,42 @@ jobs:
       - run:
           name: Build the code
           command: |
-            export CC=gcc
-            export FC=gfortran
-            export MKL_LIB_ROOT=/opt/intel/mkl/lib/intel64
-            export IPP_LIB_ROOT=/opt/intel/ipp/lib/intel64
-            if [ -f Makefile ]; then
-               echo "Cleaning..."
-               make clean
+            export CC=gcc-7
+            export CXX=g++-7
+            export IPP_DIR=/opt/intel/ipp
+            export IPP_LIB_ROOT=${IPP_DIR}/lib/intel64
+            export MKL_DIR=/opt/intel/mkl
+            export MKL_LIB_ROOT=${MKL_DIR}/lib/intel64
+            export BUILD_DIR=build
+            if [ -d ${BUILD_DIR} ]; then
+               echo "Removing build directory" ${BUILD_DIR}
+               rm -rf ${BUILD_DIR}
             fi
-            if [ -f CMakeCache.txt ]; then
-               echo "Removing CMakeCache.txt"
-               rm CMakeCache.txt
-            fi
-            if [ -d CMakeFiles ]; then
-               echo "Removing CMakeFiles"
-               rm -rf CMakeFiles
-            fi
-            cmake \
-            -DCMAKE_INSTALL_PREFIX=/usr/local \
-            -DCMAKE_C_COMPILER=gcc \
-            -DCMAKE_Fortran_COMPILER=gfortran \
-            -DCMAKE_C_FLAGS="-g -O2 -Wall -std=c11" \
-            -DCMAKE_Fortran_FLAGS="-g -O2 -fbounds-check -Wall -m64" \
-            -DMKL_INCLUDE_DIR=/opt/intel/mkl/include \
-            -DMKL_LIBRARY="-Wl,--start-group ${MKL_LIB_ROOT}/libmkl_gf_lp64.a ${MKL_LIB_ROOT}/libmkl_sequential.a ${MKL_LIB_ROOT}/libmkl_core.a -Wl,--end-group" \
-            -DIPP_INCLUDE_DIR=/opt/intel/ipp/include \
-            -DIPP_LIBRARY="${IPP_LIB_ROOT}/libipps.so;${IPP_LIB_ROOT}/libippvm.so;${IPP_LIB_ROOT}/libippcore.so"
+            mkdir ${BUILD_DIR}
+            cd ${BUILD_DIR}
+            cmake .. \
+            -DCMAKE_C_COMPILER=gcc-7 \
+            -DCMAKE_CXX_COMPILER=g++-7 \
+            -DCMAKE_C_FLAGS="-Wall" \
+            -DCMAKE_CXX_FLAGS="-Wall" \
+            -DIPP_INCLUDE_DIR=${IPP_DIR}/include \
+            -DIPP_LIBRARY="${IPP_LIB_ROOT}/libipps.so;${IPP_LIB_ROOT}/libippvm.so;${IPP_LIB_ROOT}/libippcore.so" \
+            -DMKL_INCLUDE_DIR="${MKL_DIR}/include" \
+            -DMKL_LIBRARY="${MKL_LIB_ROOT}/libmkl_intel_lp64.so;${MKL_LIB_ROOT}/libmkl_sequential.so;${MKL_LIB_ROOT}/libmkl_core.so;${MKL_LIB_ROOT}/libmkl_avx2.so" \
+            -Dpybind11_INCLUDE_DIR="/usr/local/include/pybind11"
+            cd ..
       - run:
           name: Build
-          command: make
+          command: |
+            cd build
+            make
       - run:
-          name: Run cmake test
-          #command: make test
-          command: ctest --verbose
+          name: Test the code
+          command: |
+            cd build
+            ctest --verbose
       - run:
           name: Test intsall
-          command: make install
+          command: |
+            cd build
+            make install
