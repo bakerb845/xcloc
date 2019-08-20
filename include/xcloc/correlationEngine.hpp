@@ -28,6 +28,25 @@ public:
      * @throws std::invalid_argument if parameters is not valid.
      */
     explicit CorrelationEngine(const CorrelationEngineParameters &parameters);
+    /*!
+     * @brief Move constructor.
+     * @param[in,out] engine  The correlation engine from which to initialize
+     *                        this class.  On exit, engine's behavior is
+     *                        undefined.
+     */
+    CorrelationEngine(CorrelationEngine &&engine) noexcept;
+    /*! @} */
+
+    /*! @brief Operators
+     * @{
+     */
+    /*!
+     * @brief Move assignment operator.
+     * @param[in,out] engine  The correlation engine whose memory will be moved
+     *                        to this.  On exit, engine's behavior is undefined.
+     * @result The memory moved from engine to this.
+     */
+    CorrelationEngine& operator=(CorrelationEngine &&engine) noexcept;
     /*! @} */
 
     /*! @name Destructors
@@ -117,7 +136,7 @@ public:
      * @throws std::runtime_error if the correlograms are not yet computed.
      * @sa \haveCorrelograms(), \c getCorrelogramLength()
      */
-    void getCorrelogram(const int ixc, const int nwork, const T *xc[]);
+    void getCorrelogram(const int ixc, const int nwork, T *xc[]) const;
     /*!
      * @brief Get the waveform identifiers comprising the ixc'th correlation
      *        pair.

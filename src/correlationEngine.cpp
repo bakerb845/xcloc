@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <vector>
 #include <algorithm>
+#include <cfloat>
 #include <cassert>
 #include <iterator>
 #include <complex> // Put this before fftw
@@ -198,21 +199,32 @@ public:
     void clear() noexcept
     {
         mParms.clear();
+        mSignalMap.clear();
+        mCorrelationIndexPairs.clear();
         if (mHavePlan){fftw_destroy_plan(mForwardPlan);}
         if (mHavePlan){fftw_destroy_plan(mInversePlan);}
-        if (mWork){free(mWork);}
-        if (mInputData){fftw_free(mInputData);}
-        if (mCorrelogramSpectra){fftw_free(mCorrelogramSpectra);}
+        if (mInputData){MKL_free(mInputData);}
+        if (mWork){MKL_free(mWork);}   
+        if (mCorrelogramSpectra){MKL_free(mCorrelogramSpectra);}
         mInputSpectra = nullptr;
+        mCorrelogramSpectra = nullptr;
         mOutputCorrelograms = nullptr;
         mWork = nullptr;
-        mInputData = nullptr;
-        mCorrelogramSpectra = nullptr;
-        mSignalMap.clear();
+        mAccuracyMode = VML_HA;
+        mWorkSizeInBytes = 0;
+        mNumberOfSignals = 0;
+        mSamples = 0;
+        mPaddedInputLength = 0;
+        mNumberOfFrequencies = 0;
+        mNumberOfCorrelograms = 0;
+        mSamplesInCorrelogram = 0;
         mInputDataLeadingDimension = 0;
         mSpectraLeadingDimension = 0;
         mCorrelogramLeadingDimension = 0;
+        mUseFastSignalMap = false;
         mHavePlan = false;
+        mHaveCorrelograms = false;
+        mInitialized = false;
     }
     /// Initializes the class
     void initialize()
@@ -232,11 +244,13 @@ public:
         mSamples = mParms.getNumberOfSamples();
         mPaddedInputLength = mParms.getNumberOfPaddedSamples();
         mSamplesInCorrelogram = 2*mPaddedInputLength - 1;
-        mNumberOfFrequencies = mPaddedInputLength/2 + 1;
+        mNumberOfFrequencies = mSamplesInCorrelogram/2 + 1;
         mNumberOfCorrelograms = mParms.getNumberOfCorrelationPairs();
-        // Figure out the padding sizes
+        // Figure out the padding sizes.  Note, to perform the correlation we
+        // need the input signals evaluated at the transform frequencies of
+        // the correlograms.  Hence, the is significant padding.
         mInputDataLeadingDimension
-            = padLength(mPaddedInputLength, sizeof(double), 64);
+            = padLength(mSamplesInCorrelogram, sizeof(double), 64); //PaddedInputLength, sizeof(double), 64);
         mCorrelogramLeadingDimension
             = padLength(mSamplesInCorrelogram, sizeof(double), 64);
         mSpectraLeadingDimension
@@ -245,23 +259,25 @@ public:
         size_t nbytes = static_cast<size_t> (mInputDataLeadingDimension)
                        *static_cast<size_t> (mNumberOfSignals)
                        *sizeof(double);
-        mInputData = static_cast<double *> (fftw_malloc(nbytes));
-        std::memset(mInputData, 0, nbytes);
+        // Apple sits on 1 trillion in market capital but cant implement C11.
+/*
+#ifdef __APPLE__
+        void *mInputDataPtr = mInputData;
+        posix_memalign(&mInputDataPtr, 64, nbytes);
+#else
+        mInputData = aligned_alloc(64, nbytes);
+#endif
+*/
+        mInputData = static_cast<double *> (MKL_calloc(nbytes, 1, 64));
         // Allocate space for the workspace
         size_t work1 = static_cast<size_t> (mCorrelogramLeadingDimension)
                       *static_cast<size_t> (mNumberOfCorrelograms)
                       *sizeof(double);
         size_t work2 = static_cast<size_t> (mSpectraLeadingDimension)
                       *static_cast<size_t> (mNumberOfSignals)
-                      *2*sizeof(double);
+                      *sizeof(std::complex<double>);
         mWorkSizeInBytes = std::max(work1, work2);
-        /// Apple sits on 1 trillion in market capital but can't implement C11.
-#ifdef __APPLE__
-        posix_memalign(&mWork, 64, mWorkSizeInBytes);
-#else
-        mWork = aligned_alloc(64, mWorkSizeInBytes);
-#endif
-        std::memset(mWork, 0, mWorkSizeInBytes);
+        mWork = MKL_calloc(mWorkSizeInBytes, 1, 64);
         // Set input spectra and output correlograms to point at workspace
         mInputSpectra = reinterpret_cast<fftw_complex *> (mWork);
         mOutputCorrelograms = reinterpret_cast<double *> (mWork);
@@ -270,16 +286,18 @@ public:
                 *static_cast<size_t> (mSpectraLeadingDimension)
                 *sizeof(fftw_complex);
         mCorrelogramSpectra
-            = reinterpret_cast<fftw_complex *> (fftw_malloc(nbytes));
-        std::memset(mCorrelogramSpectra, 0, nbytes);
+            = reinterpret_cast<fftw_complex *> (MKL_calloc(nbytes, 1, 64));
         // Initialize the FFTw
         constexpr int rank = 1;
         constexpr int istride = 1;
         constexpr int ostride = 1;
         constexpr int inembed[1] = {0};
         constexpr int onembed[1] = {0};
+        // Forward transform input signals to correlogram frequencies
         int nf[1] = {mSamplesInCorrelogram};
+        // Inverse transform correlogram frequencies to full correlograms
         int ni[1] = {mSamplesInCorrelogram};
+        // Create the plans
         mForwardPlan = fftw_plan_many_dft_r2c(rank, nf, mNumberOfSignals,
                                               mInputData, inembed,
                                               istride, mInputDataLeadingDimension,
@@ -302,7 +320,8 @@ public:
         // First Fourier transform the input signals
         fftw_execute_dft_r2c(mForwardPlan, mInputData, mInputSpectra);
         // Set workspace
- 
+        auto nwork = std::max(mNumberOfFrequencies, mSamplesInCorrelogram);
+        auto work = static_cast<double *> (ippsMalloc_64f(nwork));
         // Now perform the correlation 
         for (int ixc=0; ixc<mNumberOfCorrelograms; ++ixc)
         {
@@ -313,17 +332,53 @@ public:
             auto j1 = ixc*mSpectraLeadingDimension;
             auto ft1 = reinterpret_cast<MKL_Complex16 *> (mInputSpectra[i1]);
             auto ft2 = reinterpret_cast<MKL_Complex16 *> (mInputSpectra[i2]);
-            auto xc
+            auto __attribute__((aligned(64))) xcPtr
                 = reinterpret_cast<MKL_Complex16 *> (mCorrelogramSpectra[j1]);
-            vmzMulByConj(mNumberOfFrequencies, ft1, ft2, xc, mAccuracyMode);
+            // Correlate ft1*conj(ft2)
+            vmzMulByConj(mNumberOfFrequencies, ft1, ft2, xcPtr, mAccuracyMode);
             // Do phase correlograms
             if (!mCrossCorrelate)
             {
+                // Compute absolute value and avoid division by zero
+                vmzAbs(mNumberOfFrequencies, xcPtr, work, mAccuracyMode);
+                // The numerator is close to zero so this will be 
+                // substantially less than 1.
+                constexpr double small = DBL_EPSILON*1.e2;
+                ippsThreshold_LT_64f_I(work, mNumberOfFrequencies, small);
+                // Now normalize
+                auto __attribute__((aligned(64))) xcPtr2
+                    = reinterpret_cast<std::complex<double> *> (xcPtr);
+                #pragma omp simd
+                for (int i=0; i<mNumberOfFrequencies; ++i)
+                {
+                    xcPtr2[i] = xcPtr2[i]/work[i];
+                }
             }
         }
-        // Finally inverse transform
+        // Inverse transform
         fftw_execute_dft_c2r(mInversePlan, mCorrelogramSpectra,
                              mOutputCorrelograms);
+        // Shuffle the correlograms to obtain causal and acausal part and 
+        // normalize
+        auto __attribute__((aligned(64))) xnorm
+             = static_cast<double> (mSamplesInCorrelogram);
+        int ncopy1 = mSamplesInCorrelogram/2;
+        int ncopy2 = mSamplesInCorrelogram - ncopy1;
+        for (int ixc=0; ixc<mNumberOfCorrelograms; ++ixc)
+        {
+            int j1 = ixc*mCorrelogramLeadingDimension;
+            // Copy and scale
+            auto __attribute__((aligned(64))) xcPtr = &mOutputCorrelograms[j1];
+            ippsDivC_64f(xcPtr, xnorm, work, mSamplesInCorrelogram);
+            // Shuffle
+            //ippsCopy_64f(work, &xcPtr[ncopy2], ncopy1);
+            //ippsCopy_64f(&work[ncopy1], xcPtr, ncopy2);
+            std::copy(work, work+ncopy2, &xcPtr[ncopy1]);
+            std::copy(&work[ncopy2], &work[ncopy2]+ncopy1, xcPtr);
+        }
+        // Release workspace
+        ippsFree(work);
+        mHaveCorrelograms = true;
     }
 //private:
     CorrelationEngineParameters mParms;
@@ -332,7 +387,7 @@ public:
     /// [mNumberOfSignals x mSpectraLeadingDimension].  Note, it shares the same
     /// space as mOutputCorrelgorams.
     fftw_complex *mInputSpectra = nullptr;
-    /// Holds the spectra of the correlograms.  This is a ro wmajor matrix
+    /// Holds the spectra of the correlograms.  This is a row major matrix
     /// whose dimensions are [mNumberOfCorrelograms x mSpectraLeadingDimension]
     fftw_complex *mCorrelogramSpectra = nullptr;
     /// A pointer to the output correlograms.  This is a row major matrix
@@ -397,15 +452,8 @@ template<>
 class CorrelationEngine<float>::CorrelationEngineImpl
 {
 public:
-    ~CorrelationEngineImpl()
-    {
-        clear();
-    }
-    void clear() noexcept
-    {
-        mParms.clear();
-    }
-    CorrelationEngineParameters mParms;
+
+//private:
 };
 
 //============================================================================//
@@ -434,26 +482,24 @@ CorrelationEngine<T>::CorrelationEngine(
 {
     *this = engine;
 }
+*/
 
+/// Move constructor
 template<class T>
 CorrelationEngine<T>::CorrelationEngine(CorrelationEngine &&engine) noexcept
 {
-   *this = std::move(engine);
+    *this = std::move(engine);
 }
-*/
-
-/*
 
 /// Operators
-template<class T>
-CorrelationEngine<T> CorrelationEngine::operator(CorrelationEngine &&engine) noexcept
+template<class T> CorrelationEngine<T>&
+CorrelationEngine<T>::operator=(CorrelationEngine &&engine) noexcept
 {
     if (&engine == this){return *this;}
     if (pImpl){pImpl.reset();}
     pImpl = std::move(engine.pImpl);
     return *this;
 }
-*/
 
 /// Destructor
 template<class T>
@@ -554,6 +600,61 @@ void CorrelationEngine<T>::computeCrossCorrelograms()
     constexpr bool mCrossCorrelate = true;
     if (!isInitialized()){throw std::runtime_error("Class not initialized\n");}
     pImpl->computeCorrelograms(mCrossCorrelate);
+}
+
+/// Compute phase correlograms
+template<class T>
+void CorrelationEngine<T>::computePhaseCorrelograms()
+{
+    constexpr bool mCrossCorrelate = false;
+    if (!isInitialized()){throw std::runtime_error("Class not initialized\n");}
+    pImpl->computeCorrelograms(mCrossCorrelate);
+}
+
+/// Get a correlogram
+template<class T>
+const T* CorrelationEngine<T>::getCorrelogramPointer(const int ixc) const
+{
+    auto nxc = getNumberOfCorrelograms(); // Throws on initialization
+    if (!haveCorrelograms())
+    {
+        throw std::runtime_error("Correlograms not yet computed\n");
+    }
+    // Check that ixc is in range
+    if (ixc < 0 || ixc >= nxc)
+    {
+        throw std::invalid_argument("ixc = " + std::to_string(ixc)
+                                  + " must be in range [0,"
+                                  + std::to_string(nxc-1) + "]\n");
+    }
+    int index = static_cast<size_t> (ixc)
+               *static_cast<size_t> (pImpl->mCorrelogramLeadingDimension);
+    const T *xcPtr = &pImpl->mOutputCorrelograms[index];
+    return xcPtr;
+}
+
+template<class T>
+void CorrelationEngine<T>::getCorrelogram(
+    const int ixc, const int nwork, T *xcIn[]) const
+{
+    // Get pointer to correlogram.  This throws an initialization error
+    // and checks if ixc is valid
+    auto xcPtr __attribute__((aligned(64))) = getCorrelogramPointer(ixc);
+    // Get the correlogram length and check nwork and xcIn
+    int lxc = getCorrelogramLength();
+    T *xc = *xcIn;
+    if (nwork < lxc || xc == nullptr)
+    {
+        if (nwork < lxc)
+        {
+            throw std::invalid_argument("nwork = " + std::to_string(nwork)
+                                      + " must be at least = " 
+                                      + std::to_string(lxc));
+        }
+        throw std::invalid_argument("xcIn is NULL\n"); 
+    }
+    // Finally perform the copy
+    std::copy(xcPtr, xcPtr+nwork, xc);    
 }
 
 /// Initialized?
