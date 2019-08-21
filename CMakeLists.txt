@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.2 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
 project(xcloc VERSION 2.0.0 LANGUAGES CXX)
 enable_testing()
 
@@ -73,7 +73,7 @@ set(LIBALL_PYTHON xcloc ${LIBALL} ${PYTHON_LIBRARIES})
 # cmake -DBUILD_SHARED_LIBS=YES /path/to/source
 set(BUILD_SHARED_LIBS YES)
 add_library(xcloc SHARED ${LIBSRC})
-target_link_libraries(xcloc PRIVATE ${MKL_LIBRARY} ${IPP_LIBRARY})
+target_link_libraries(xcloc PRIVATE ${LIBALL})
 
 ##########################################################################################
 #                                      Unit Tests                                        #
@@ -81,7 +81,7 @@ target_link_libraries(xcloc PRIVATE ${MKL_LIBRARY} ${IPP_LIBRARY})
 add_executable(testSerialLibrary
                testing/main.cpp
                testing/correlationEngine.cpp)
-target_link_libraries(testSerialLibrary PRIVATE xcloc ${GTEST_BOTH_LIBRARIES} ${IPP_LIBRARY})
+target_link_libraries(testSerialLibrary PRIVATE xcloc ${LIBALL} ${GTEST_BOTH_LIBRARIES})
 target_include_directories(testSerialLibrary PRIVATE ${GTEST_INCLUDE_DIRS})
 add_test(NAME testSerialLibrary
          COMMAND testSerialLibrary)
