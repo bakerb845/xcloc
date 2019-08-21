@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <vector>
 #include <algorithm>
+#include <cstring>
 #include <cfloat>
 #include <cassert>
 #include <iterator>
