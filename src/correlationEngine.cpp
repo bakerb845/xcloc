@@ -320,10 +320,13 @@ public:
     {
         // First Fourier transform the input signals
         fftw_execute_dft_r2c(mForwardPlan, mInputData, mInputSpectra);
+        #pragma omp parallel default(none)
+        {
         // Set workspace
-        auto nwork = std::max(mNumberOfFrequencies, mSamplesInCorrelogram);
-        auto work = static_cast<double *> (ippsMalloc_64f(nwork));
+        auto amplitudeSpectra
+             = static_cast<double *> (ippsMalloc_64f(mNumberOfFrequencies));
         // Now perform the correlation 
+        #pragma omp for
         for (int ixc=0; ixc<mNumberOfCorrelograms; ++ixc)
         {
             int signal1 = mCorrelationIndexPairs[ixc].first;
@@ -341,44 +344,53 @@ public:
             if (!mCrossCorrelate)
             {
                 // Compute absolute value and avoid division by zero
-                vmzAbs(mNumberOfFrequencies, xcPtr, work, mAccuracyMode);
+                vmzAbs(mNumberOfFrequencies, xcPtr, amplitudeSpectra,
+                       mAccuracyMode);
                 // The numerator is close to zero so this will be 
                 // substantially less than 1.
                 constexpr double small = DBL_EPSILON*1.e2;
-                ippsThreshold_LT_64f_I(work, mNumberOfFrequencies, small);
+                ippsThreshold_LT_64f_I(amplitudeSpectra, mNumberOfFrequencies,
+                                       small);
                 // Now normalize
                 auto __attribute__((aligned(64))) xcPtr2
                     = reinterpret_cast<std::complex<double> *> (xcPtr);
                 #pragma omp simd
                 for (int i=0; i<mNumberOfFrequencies; ++i)
                 {
-                    xcPtr2[i] = xcPtr2[i]/work[i];
+                    xcPtr2[i] = xcPtr2[i]/amplitudeSpectra[i];
                 }
             }
         }
+        ippsFree(amplitudeSpectra);
+        } // End parallel
         // Inverse transform
         fftw_execute_dft_c2r(mInversePlan, mCorrelogramSpectra,
                              mOutputCorrelograms);
+        #pragma omp parallel default(none)
+        {
+        auto xcTemp
+            = static_cast<double *> (ippsMalloc_64f(mSamplesInCorrelogram));
         // Shuffle the correlograms to obtain causal and acausal part and 
         // normalize
         auto __attribute__((aligned(64))) xnorm
              = static_cast<double> (mSamplesInCorrelogram);
         int ncopy1 = mSamplesInCorrelogram/2;
         int ncopy2 = mSamplesInCorrelogram - ncopy1;
+        #pragma omp for
         for (int ixc=0; ixc<mNumberOfCorrelograms; ++ixc)
         {
             int j1 = ixc*mCorrelogramLeadingDimension;
             // Copy and scale
             auto __attribute__((aligned(64))) xcPtr = &mOutputCorrelograms[j1];
-            ippsDivC_64f(xcPtr, xnorm, work, mSamplesInCorrelogram);
+            ippsDivC_64f(xcPtr, xnorm, xcTemp, mSamplesInCorrelogram);
             // Shuffle
-            //ippsCopy_64f(work, &xcPtr[ncopy2], ncopy1);
-            //ippsCopy_64f(&work[ncopy1], xcPtr, ncopy2);
-            std::copy(work, work+ncopy2, &xcPtr[ncopy1]);
-            std::copy(&work[ncopy2], &work[ncopy2]+ncopy1, xcPtr);
+            //ippsCopy_64f(xcTemp, &xcPtr[ncopy2], ncopy1);
+            //ippsCopy_64f(&xcTEmp[ncopy1], xcPtr, ncopy2);
+            std::copy(xcTemp, xcTemp+ncopy2, &xcPtr[ncopy1]);
+            std::copy(&xcTemp[ncopy2], &xcTemp[ncopy2]+ncopy1, xcPtr);
         }
-        // Release workspace
-        ippsFree(work);
+        ippsFree(xcTemp);
+        } // End parallel
         mHaveCorrelograms = true;
     }
 //private:
