@@ -87,6 +87,22 @@ add_test(NAME testSerialLibrary
          COMMAND testSerialLibrary)
 
 ##########################################################################################
+#                                       Installation                                     #
+##########################################################################################
+include(GNUInstallDirs)
+if (XCLOC_WRAP_PYTHON)
+   install(TARGETS xcloc pyxcloc
+           RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+           LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+           ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+else()
+   install(TARGETS xcloc
+           RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+           LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+           ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+endif()
+
+##########################################################################################
 #                                      CPACK Packaging                                   #
 ##########################################################################################
 set(CPACK_PACKAGE_NAME "Cross-correlation Location (xcloc)")
@@ -102,4 +118,5 @@ set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
 ##########################################################################################
 #                                  Configuration Details                                 #
 ##########################################################################################
+
 
