@@ -373,7 +373,7 @@ public:
         // Shuffle the correlograms to obtain causal and acausal part and 
         // normalize
         auto __attribute__((aligned(64))) xnorm
-             = static_cast<double> (mSamplesInCorrelogram);
+             = 1./static_cast<double> (mSamplesInCorrelogram);
         int ncopy1 = mSamplesInCorrelogram/2;
         int ncopy2 = mSamplesInCorrelogram - ncopy1;
         #pragma omp for
@@ -382,7 +382,7 @@ public:
             int j1 = ixc*mCorrelogramLeadingDimension;
             // Copy and scale
             auto __attribute__((aligned(64))) xcPtr = &mOutputCorrelograms[j1];
-            ippsDivC_64f(xcPtr, xnorm, xcTemp, mSamplesInCorrelogram);
+            ippsMulC_64f(xcPtr, xnorm, xcTemp, mSamplesInCorrelogram);
             // Shuffle
             //ippsCopy_64f(xcTemp, &xcPtr[ncopy2], ncopy1);
             //ippsCopy_64f(&xcTEmp[ncopy1], xcPtr, ncopy2);
