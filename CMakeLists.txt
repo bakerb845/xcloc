@@ -65,7 +65,8 @@ endif()
 #               ${CMAKE_SOURCE_DIR}/include/rtseis/config.h)
 set(LIBSRC 
     src/correlationEngine.cpp
-    src/correlationEngineParameters.cpp)
+    src/correlationEngineParameters.cpp
+    src/diffractionStackMigrationEngine.cpp)
 
 set(LIBALL ${MKL_LIBRARY} ${IPP_LIBRARY})
 set(LIBALL_PYTHON xcloc ${LIBALL} ${PYTHON_LIBRARIES})
