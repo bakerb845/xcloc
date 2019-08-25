@@ -31,8 +31,9 @@ if (XCLOC_WRAP_PYTHON)
    message(STATUS "PYTHON_INCLUDE_DIRS = ${PYTHON_INCLUDE_DIRS}")
    find_package(pybind11 REQUIRED)
 endif()
-
+set(FindIPP_DIR ${CMAKE_SOURCE_DIR}/CMakeModules)
 find_package(GTest REQUIRED)
+find_package(FindIPP REQUIRED)
 
 ##########################################################################################
 #                                       Include Directories                              #
@@ -60,6 +61,25 @@ endif()
 ##########################################################################################
 #                                      Define Library Dependencies                       #
 ##########################################################################################
+
+#if (NOT RTSEIS)
+#include(ExternalProject)
+#set(EXTERNAL_INSTALL_LOCATION ${CMAKE_BINARY_DIR}/external)
+#ExternalProject_Add(rtseis
+#                    GIT_REPOSITORY https://github.com/uofuseismo/rtseis
+#                    CMAKE_ARGS -DCMAKE_BUILD_TYPE=Release
+#                               -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+#                               -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}
+#                               -DCMAKE_INSTALL_PREFIX=${EXTERNAL_INSTALL_LOCATION}
+#                               -DIPP_INCLUDE_DIR=${IPP_INCLUDE_DIR}
+#                               -DIPP_CORE_LIBRARY=${IPP_CORE_LIBRARY}
+#                               -DIPP_VM_LIBRARY=${IPP_VM_LIBRARY}
+#                               -DIPP_IPPS_LIBRARY=${IPP_IPPS_LIBRARY}
+#                               -DMKL_INCLUDE_DIR=${MKL_INCLUDE_DIR}
+#                               -DMKL_LIBRARY=${MKL_LIBRARY}
+#                               -DGTEST_INCLUDE_DIRS=${GTEST_INCLUDE_DIRS}
+#                               -DGTEST_BOTH_LIBRARIES=${GTEST_BOTH_LIBRARIES}
+#                    )
 
 #configure_file(${CMAKE_SOURCE_DIR}/include/rtseis/config.h.in
 #               ${CMAKE_SOURCE_DIR}/include/rtseis/config.h)
