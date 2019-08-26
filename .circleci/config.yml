@@ -31,6 +31,7 @@ jobs:
             mkdir ${BUILD_DIR}
             cd ${BUILD_DIR}
             cmake .. \
+            -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_CXX_COMPILER=g++-7 \
             -DCMAKE_C_FLAGS="-Wall" \
             -DCMAKE_CXX_FLAGS="-Wall" \
