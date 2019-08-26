@@ -23,6 +23,7 @@ jobs:
             export MKL_DIR=/opt/intel/mkl
             export MKL_LIB_ROOT=${MKL_DIR}/lib/intel64
             export BUILD_DIR=build
+            export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${IPP_LIB_ROOT}
             if [ -d ${BUILD_DIR} ]; then
                echo "Removing build directory" ${BUILD_DIR}
                rm -rf ${BUILD_DIR}
