@@ -102,8 +102,10 @@ target_link_libraries(xcloc PRIVATE ${LIBALL})
 add_executable(testSerialLibrary
                testing/main.cpp
                testing/correlationEngine.cpp)
-target_link_libraries(testSerialLibrary PRIVATE xcloc ${LIBALL} ${GTEST_BOTH_LIBRARIES})
-target_include_directories(testSerialLibrary PRIVATE ${GTEST_INCLUDE_DIRS})
+target_link_libraries(testSerialLibrary
+                      PRIVATE xcloc ${MKL_LIBRARY} ${IPP_LIBRARY} ${GTEST_BOTH_LIBRARIES})
+target_include_directories(testSerialLibrary
+                           PRIVATE ${PRIVATE_INCLUDE_DEPENDS} ${GTEST_INCLUDE_DIRS})
 add_test(NAME testSerialLibrary
          COMMAND testSerialLibrary)
 
