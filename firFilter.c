@@ -68,7 +68,7 @@ int xcloc_firFilter_envelope64f(const int lds,
     winLen2 = winLen/2;
     // Begin the parallel computation 
     #pragma omp parallel default(none) \
-     shared(imCoeffs, x) \
+     shared(imCoeffs, lds, nImCoeffs, npts, nsignals, x) \
      firstprivate(winLen, winLen2)
     {
     int filterLen = npts + winLen2;
@@ -202,7 +202,7 @@ int xcloc_firFilter_envelope32f(const int lds,
     winLen2 = winLen/2 + 1; // Filter is symmetric so remove first half
     // Begin the parallel computation
     #pragma omp parallel default(none) \
-     shared(imCoeffs, nzImCoeffs, stderr, x) \
+     shared(imCoeffs, lds, npts, nnzImCoeffs, nzImCoeffs, nsignals, stderr, x) \
      firstprivate(winLen, winLen2) \
      reduction(max:ierr)
     {
@@ -217,7 +217,8 @@ int xcloc_firFilter_envelope32f(const int lds,
     status = ippsFIRSparseGetStateSize_32f(nnzImCoeffs, orderIm, &bSizeIm);
     if (status != ippStsNoErr)
     {   
-        fprintf(stderr, "%s: Error getting state size: %d\n", __func__, status);
+        fprintf(stderr, "%s: Error getting state size: %d\n",
+                "xcloc_firFilter_envelope32f",status);
         ierr = 1;
         goto ERROR;
     }
@@ -231,7 +232,7 @@ int xcloc_firFilter_envelope32f(const int lds,
     if (status != ippStsNoErr)
     {
         fprintf(stderr, "%s: Error initializing sparse filter: %d\n",
-                __func__, status);
+                "xcloc_firFilter_envelope32f", status);
         ierr = 1;
         goto ERROR;
     }
@@ -320,7 +321,7 @@ int xcloc_firFilter_rmsFilter64f(const int lds,
         return -1; 
     }
     #pragma omp parallel default(none) \
-     shared(pBufSize, pSpecSize, x, taps), \
+     shared(lds, npts, nsignals, pBufSize, pSpecSize, x, taps), \
      private(is) \
      firstprivate(filterLen, tapsLen, winLen2)
     {
@@ -412,7 +413,7 @@ int xcloc_firFilter_rmsFilter32f(const int lds,
         return -1; 
     }
     #pragma omp parallel default(none) \
-     shared(pBufSize, pSpecSize, x, taps), \
+     shared(lds, nsignals, npts, pBufSize, pSpecSize, x, taps), \
      private(is) \
      firstprivate(filterLen, tapsLen, winLen2)
     {

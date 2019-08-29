@@ -4,6 +4,7 @@
 #include <algorithm>
 #include "xcloc/diffractionStackMigrationEngine.hpp"
 #include "xcloc/correlationEngine.hpp"
+#include "xcloc/geometry/regularMesh.hpp"
 
 using namespace XCLoc;
 
@@ -11,12 +12,15 @@ template<class T>
 class DiffractionStackMigrationEngine<T>::DSMImpl
 {
 public:
+    std::vector<XCLoc::Geometry::IMesh<T>> mTravelTimeTables;
     /// Contains the correlograms
     std::shared_ptr<const CorrelationEngine<T>> mCorrelograms;
     /// Sampling period of seismograms
     double mSamplingPeriod = 1;
     /// Chunk size to emphasize locality in DSM for read/write operations
     int mChunkSize = 2048;
+    /// Flag indicating this is nodal-based imaging or cell-based imaging.
+    bool mNodalBasedImaging = true;
     /// Flag indicating that the correlograms are set
     bool mHaveCorrelationEngine = false;
 };
@@ -26,6 +30,8 @@ template<class T>
 DiffractionStackMigrationEngine<T>::DiffractionStackMigrationEngine() :
     pImpl(std::make_unique<DSMImpl> ())
 {
+XCLoc::Geometry::RegularMesh3D<T> mGrid;
+pImpl->mTravelTimeTables.push_back(mGrid);
 }
 
 /// Destructor
@@ -55,7 +61,13 @@ bool DiffractionStackMigrationEngine<T>::haveCorrelationEngine() const noexcept
 template<class T>
 void DiffractionStackMigrationEngine<T>::compute()
 {
-int nGridPoints = 0;
+    // Get the number of grid points
+    int nGridPoints = pImpl->mTravelTimeTables[0].getNumberOfGridPoints();
+    if (!pImpl->mNodalBasedImaging)
+    {
+        nGridPoints = pImpl->mTravelTimeTables[0].getNumberOfCells();
+    }
+    // Determine the correlogram length
     int nxc = pImpl->mCorrelograms.getNumberOfCorrelograms();
     int lxc2 = nxc/2;
     // Loop on chunks
@@ -81,8 +93,8 @@ int nGridPoints = 0;
             #pragma omp simd
             for (int i=0; i<nLocalGridPoints; ++i)
             {
-                 int correlogramIndex = lxc2 + tt1[i] - tt2[i];
-                 imagePtr[i] = imagePtr[i] + xc[correlogramIndex];
+                int correlogramIndex = lxc2 + tt1[i] - tt2[i];
+                imagePtr[i] = imagePtr[i] + xc[correlogramIndex];
             }
         } // Loop on correlograms
     } // Loop on chunks

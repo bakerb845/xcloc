@@ -86,7 +86,8 @@ endif()
 set(LIBSRC 
     src/correlationEngine.cpp
     src/correlationEngineParameters.cpp
-    src/diffractionStackMigrationEngine.cpp)
+    src/diffractionStackMigrationEngine.cpp
+    src/geometry/regularMesh.cpp)
 
 set(LIBALL ${MKL_LIBRARY} ${IPP_LIBRARY})
 set(LIBALL_PYTHON xcloc ${LIBALL} ${PYTHON_LIBRARIES})

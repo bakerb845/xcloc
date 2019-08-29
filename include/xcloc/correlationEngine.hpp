@@ -83,15 +83,15 @@ public:
      *         the waveform identifier does not exist.
      * @sa \c getInputSignalLength() \c isInitialized()
      */
-    void setInputSignal(const int waveid, const int nSamples, const double x[]);
+    void setInputSignal(int waveid, int nSamples, const double x[]);
     /*! @copydoc setInputSignal */
-    void setInputSignal(const int waveid, const int nSamples, const float x[]);
+    void setInputSignal(int waveid, int nSamples, const float x[]);
     /*!
      * @brief Sets all elements of the iw'th waveform to zero.  This is useful
      *        if the station is late or has a gap.
      * @param[in] waveid   Sets all elements of the waveid'th signal to zero.
      */
-    void zeroInputSignal(const int waveid); 
+    void zeroInputSignal(int waveid); 
     /*! @} */
 
     /*! @brief Compute
@@ -122,7 +122,7 @@ public:
      * @throws std::runtime_error if the correlograms are not yet computed. 
      * @sa \haveCorrelograms(), \c getCorrelogramLength()
      */
-    const T* getCorrelogramPointer(const int ixc) const;
+    const T* getCorrelogramPointer(int ixc) const;
     /*!
      * @brief Gets the ixc'th correlogram.
      * @param[in] ixc    The correlogram index.  This must be in the range of
@@ -136,7 +136,7 @@ public:
      * @throws std::runtime_error if the correlograms are not yet computed.
      * @sa \haveCorrelograms(), \c getCorrelogramLength()
      */
-    void getCorrelogram(const int ixc, const int nwork, T *xc[]) const;
+    void getCorrelogram(int ixc, int nwork, T *xc[]) const;
     /*!
      * @brief Get the waveform identifiers comprising the ixc'th correlation
      *        pair.
@@ -144,7 +144,7 @@ public:
      *                 [0, \c getNumberOfCorrelograms() - 1].
      * @throws std::runtime_error if the class is not initialized.
      */
-    std::pair<int,int> getCorrelationPair(const int ixc) const;
+    std::pair<int,int> getCorrelationPair(int ixc) const;
     /*! @} */
 
     /*! @name Properties
