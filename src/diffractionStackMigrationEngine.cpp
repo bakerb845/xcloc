@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <cmath>
 #include <algorithm>
+#include <vector>
 #include "xcloc/diffractionStackMigrationEngine.hpp"
 #include "xcloc/correlationEngine.hpp"
 #include "xcloc/geometry/regularMesh.hpp"
