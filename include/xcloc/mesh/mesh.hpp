@@ -1,7 +1,7 @@
-#ifndef XCLOC_GEOMETRY_MESH_HPP
-#define XCLOC_GEOMETRY_MESH_HPP
-#include "xcloc/geometry/enums.hpp"
-namespace XCLoc::Geometry
+#ifndef XCLOC_MESH_MESH_HPP
+#define XCLOC_MESH_MESH_HPP
+#include "xcloc/mesh/enums.hpp"
+namespace XCLoc::Mesh
 {
 /*!
  * @class IMesh "mesh.hpp" "xcloc/geometry/mesh.hpp"
@@ -46,7 +46,7 @@ public:
      * @brief Gets the mesh type.
      * @result The mesh type.
      */
-    virtual XCLoc::Geometry::MeshType getMeshType() const = 0;
+    virtual XCLoc::Mesh::MeshType getMeshType() const = 0;
 };
 }
 #endif

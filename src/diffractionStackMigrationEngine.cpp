@@ -5,7 +5,7 @@
 #include <vector>
 #include "xcloc/diffractionStackMigrationEngine.hpp"
 #include "xcloc/correlationEngine.hpp"
-#include "xcloc/geometry/regularMesh.hpp"
+#include "xcloc/mesh/regularMesh3D.hpp"
 
 using namespace XCLoc;
 
@@ -13,7 +13,7 @@ template<class T>
 class DiffractionStackMigrationEngine<T>::DSMImpl
 {
 public:
-    std::vector<XCLoc::Geometry::IMesh<T>> mTravelTimeTables;
+    std::vector<XCLoc::Mesh::IMesh<T>> mTravelTimeTables;
     /// Contains the correlograms
     std::shared_ptr<const CorrelationEngine<T>> mCorrelograms;
     /// Sampling period of seismograms
@@ -31,7 +31,7 @@ template<class T>
 DiffractionStackMigrationEngine<T>::DiffractionStackMigrationEngine() :
     pImpl(std::make_unique<DSMImpl> ())
 {
-XCLoc::Geometry::RegularMesh3D<T> mGrid;
+XCLoc::Mesh::RegularMesh3D<T> mGrid;
 pImpl->mTravelTimeTables.push_back(mGrid);
 }
 

@@ -1,20 +1,20 @@
-#ifndef XCLOC_GEOMETRY_REGULARMESH3D_HPP
-#define XCLOC_GEOMETRY_REGULARMESH3D_HPP
+#ifndef XCLOC_MESH_REGULARMESH3D_HPP
+#define XCLOC_MESH_REGULARMESH3D_HPP
 #include <memory>
-#include "xcloc/geometry/mesh.hpp"
-namespace XCLoc::Geometry
+#include "xcloc/mesh/mesh.hpp"
+namespace XCLoc::Mesh
 {
 /*!
  * @brief Defines a structured grid.
  */
-template<class T>
+template<class T = double>
 class RegularMesh3D : public IMesh<T>
 {
 public:
     /*!
      * @brief Defines the storage ordering of the field in the regular mesh.
      */
-    enum class FieldOrdering
+    enum FieldOrdering
     {
         NX_NY_NZ, /*!< The field is packed in row major order [nx, ny, nz]
                        where nz changes most rapidly and nx changes slowest. */
@@ -171,6 +171,41 @@ public:
     bool haveGridDimensions() const noexcept;
     /*! @} */
 
+    /*! @name Origin
+     * @{
+     */
+    /*!
+     * @brief Sets the x origin.
+     * @param[in] x0  The x origin in meters.
+     */
+    void setOriginInX(double x0) noexcept;
+    /*!
+     * @brief Gets the x origin.
+     * @result The x origin in meters.
+     */
+    double getOriginInX() const noexcept;
+    /*!
+     * @brief Sets the y origin.
+     * @param[in] y0  The y origin in meters.
+     */
+    void setOriginInY(double y0) noexcept;
+    /*!
+     * @brief Gets the y origin.
+     * @result The y origin in meters.
+     */
+    double getOriginInY() const noexcept;
+    /*!
+     * @brief Sets the z origin.
+     * @param[in] z0  The z origin in meters.
+     */
+    void setOriginInZ(double z0) noexcept;
+    /*!
+     * @brief Gets the z origin.
+     * @result The z origin in meters.
+     */
+    double getOriginInZ() const noexcept;
+    /*!@ } */
+
     /*! @name Cell-based Scalar Field
      * @{
      */
@@ -192,7 +227,7 @@ public:
     void setCellularScalarField(const std::string &fieldName,
                                 int ncell,
                                 const T field[],
-                                const FieldOrdering order);
+                                const RegularMesh3DOrderingType order);
     /*!
      * @brief Gets a pointer to the cell-based scalar field data.
      * @param[in] fieldName  The name of the scalar field.
@@ -232,7 +267,7 @@ public:
     void setNodalScalarField(const std::string &fieldName,
                              int ngrd,
                              const T field[],
-                             const FieldOrdering order);
+                             const RegularMesh3DOrderingType order);
     /*!
      * @brief Gets a pointer to the node-based scalar field data.
      * @param[in] fieldName  The name of the scalar field.
@@ -255,7 +290,7 @@ public:
      * @brief Gets the mesh type.
      * @result The mesh type.
      */
-    XCLoc::Geometry::MeshType getMeshType() const noexcept override;
+    XCLoc::Mesh::MeshType getMeshType() const noexcept override;
 private:
     class RegularMeshImpl;
     std::unique_ptr<RegularMeshImpl> pImpl;

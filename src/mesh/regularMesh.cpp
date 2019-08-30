@@ -4,10 +4,11 @@
 #include <vector>
 #include <string>
 #include <boost/align/aligned_allocator.hpp>
-#include "xcloc/geometry/regularMesh.hpp"
+#include "xcloc/mesh/regularMesh3D.hpp"
+#include "xcloc/mesh/enums.hpp"
 #include "xcloc/enums.hpp"
 
-using namespace XCLoc::Geometry;
+using namespace XCLoc::Mesh;
 
 template<class T>
 class RegularMesh3D<T>::RegularMeshImpl
@@ -66,8 +67,7 @@ public:
     GeometryOrientationType mGeometryOrientation
         = GeometryOrientationType::EAST_NORTH_DOWN;
     /// Indicates the type of mesh that this is.
-    const XCLoc::Geometry::MeshType mMeshType
-         = XCLoc::Geometry::MeshType::REGULAR_MESH;
+    const XCLoc::Mesh::MeshType mMeshType = XCLoc::Mesh::MeshType::REGULAR_MESH;
 };
 
 /// Constructor
@@ -103,17 +103,6 @@ RegularMesh3D<T>& RegularMesh3D<T>::operator=(const RegularMesh3D &mesh)
     pImpl = std::make_unique<RegularMeshImpl> (*mesh.pImpl);
     return *this;
 }
-
-/*
-template<class T>
-int RegularMesh3D<T>::getNumberOfImagePoints() const
-{
-    int nGrid = getNumberOfGridPointsInX()
-               *getNumberOfGridPointsInY()
-               *getNumberOfGridPointsInZ();
-    return pImpl->mNumberOfImagePoints;
-}
-*/
 
 /// Number of grid points in x
 template<class T>
@@ -249,7 +238,7 @@ double RegularMesh3D<T>::getGridSpacingInX() const
 template<class T>
 void RegularMesh3D<T>::setGridSpacingInY(const double dy)
 {
-    pImpl->mDeltaX = 0;
+    pImpl->mDeltaY = 0;
     if (dy == 0)
     {
         throw std::invalid_argument("dy cannot be 0\n");
@@ -290,6 +279,41 @@ double RegularMesh3D<T>::getGridSpacingInZ() const
 }
 
 /// Grid origin 
+template<class T>
+double RegularMesh3D<T>::getOriginInX() const noexcept
+{
+    return pImpl->mOriginX;
+}
+
+template<class T>
+void RegularMesh3D<T>::setOriginInX(const double x0) noexcept
+{
+    pImpl->mOriginX = x0;
+}
+
+template<class T>
+double RegularMesh3D<T>::getOriginInY() const noexcept
+{
+    return pImpl->mOriginY;
+}
+
+template<class T>
+void RegularMesh3D<T>::setOriginInY(const double y0) noexcept
+{
+    pImpl->mOriginY = y0;
+}
+
+template<class T>
+double RegularMesh3D<T>::getOriginInZ() const noexcept
+{
+    return pImpl->mOriginZ;
+}
+
+template<class T>
+void RegularMesh3D<T>::setOriginInZ(const double z0) noexcept
+{
+    pImpl->mOriginZ = z0;
+}
 
 /// Cell-based scalar field
 template<class T>
@@ -297,7 +321,7 @@ void RegularMesh3D<T>::setCellularScalarField(
     const std::string &fieldName,
     const int ncell,
     const T field[],
-    const RegularMesh3D::FieldOrdering order)
+    const RegularMesh3DOrderingType order)
 {
     int ncellRef = getNumberOfCells(); // Throws
     if (ncell != ncellRef)
@@ -309,7 +333,7 @@ void RegularMesh3D<T>::setCellularScalarField(
     if (field == nullptr){throw std::invalid_argument("field is NULL\n");}
     std::vector<T, boost::alignment::aligned_allocator<T, 64>> fvec(ncell);
     // Need to permute to row major (nz, ny, nx)
-    if (order == RegularMesh3D::FieldOrdering::NZ_NY_NX)
+    if (order == RegularMesh3DOrderingType::NZ_NY_NX)
     {
         auto ncellx = getNumberOfGridPointsInX() - 1;
         auto ncelly = getNumberOfGridPointsInY() - 1;
@@ -364,7 +388,7 @@ void RegularMesh3D<T>::setNodalScalarField(
     const std::string &fieldName,
     const int ngrd,
     const T field[],
-    const RegularMesh3D::FieldOrdering order)
+    const RegularMesh3DOrderingType order)
 {
     int ngrdRef = getNumberOfGridPoints(); // Throws
     if (ngrd != ngrdRef)
@@ -376,7 +400,7 @@ void RegularMesh3D<T>::setNodalScalarField(
     if (field == nullptr){throw std::invalid_argument("field is NULL\n");}
     std::vector<T, boost::alignment::aligned_allocator<T, 64>> fvec(ngrd);
     // Need to permute to row major (nz, ny, nx)
-    if (order == RegularMesh3D::FieldOrdering::NZ_NY_NX)
+    if (order == RegularMesh3DOrderingType::NZ_NY_NX)
     {
         auto ngrdx = getNumberOfGridPointsInX();
         auto ngrdy = getNumberOfGridPointsInY();
@@ -427,12 +451,12 @@ bool RegularMesh3D<T>::haveNodalScalarField(
 
 /// Gets the geometry type
 template<class T>
-XCLoc::Geometry::MeshType RegularMesh3D<T>::getMeshType() const noexcept
+XCLoc::Mesh::MeshType RegularMesh3D<T>::getMeshType() const noexcept
 {
     return pImpl->mMeshType;
 }
 
 /// Class instantiation
-template class XCLoc::Geometry::RegularMesh3D<double>;
-template class XCLoc::Geometry::RegularMesh3D<float>;
-template class XCLoc::Geometry::RegularMesh3D<int>;
+template class XCLoc::Mesh::RegularMesh3D<double>;
+template class XCLoc::Mesh::RegularMesh3D<float>;
+template class XCLoc::Mesh::RegularMesh3D<int>;

@@ -1,6 +1,6 @@
-#ifndef XCLOC_GEOMETRY_ENUMS_HPP
-#define XCLOC_GEOMETRY_ENUMS_HPP
-namespace XCLoc::Geometry
+#ifndef XCLOC_MESH_ENUMS_HPP
+#define XCLOC_MESH_ENUMS_HPP
+namespace XCLoc::Mesh
 {
 /*!
  * @brief Defines the mesh type.
@@ -26,5 +26,17 @@ enum class GeometryOrientationType
                             This is a right handed coordinate system which
                             is useful for plotting software. */
 };
+
+/*!
+ * @brief Defines the storage ordering of the field in the regular 3D mesh.
+ */
+enum class RegularMesh3DOrderingType
+{
+    NX_NY_NZ, /*!< The field is packed in row major order [nx, ny, nz]
+                   where nz changes most rapidly and nx changes slowest. */
+    NZ_NY_NX  /*!< The field is packed in row major order [nz, ny, nx]
+                   where nx changes most rapidly and nz changes slowest. */
+};
+
 }
 #endif

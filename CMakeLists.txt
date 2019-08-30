@@ -87,7 +87,7 @@ set(LIBSRC
     src/correlationEngine.cpp
     src/correlationEngineParameters.cpp
     src/diffractionStackMigrationEngine.cpp
-    src/geometry/regularMesh.cpp)
+    src/mesh/regularMesh.cpp)
 
 set(LIBALL ${MKL_LIBRARY} ${IPP_LIBRARY})
 set(LIBALL_PYTHON xcloc ${LIBALL} ${PYTHON_LIBRARIES})
@@ -102,7 +102,8 @@ target_link_libraries(xcloc PRIVATE ${LIBALL})
 ##########################################################################################
 add_executable(testSerialLibrary
                testing/main.cpp
-               testing/correlationEngine.cpp)
+               testing/correlationEngine.cpp
+               testing/mesh.cpp)
 target_link_libraries(testSerialLibrary
                       PRIVATE xcloc ${LIBALL} ${GTEST_BOTH_LIBRARIES})
 target_include_directories(testSerialLibrary
