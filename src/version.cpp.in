@@ -1,0 +1,43 @@
+#include <cstdio>
+#include <cstdlib>
+#include <string>
+#include "xcloc/version.hpp"
+
+#define MAJOR @xcloc_VERSION_MAJOR@
+#define MINOR @xcloc_VERSION_MINOR@
+#define PATCH @xcloc_VERSION_PATCH@
+#define VERSION "@PROJECT_VERSION@"
+
+using namespace XCLoc;
+
+int Version::getMajor() noexcept
+{
+    return MAJOR;
+}
+
+int Version::getMinor() noexcept
+{
+    return MINOR;
+}
+
+int Version::getPatch() noexcept
+{
+    return PATCH;
+}
+
+bool Version::isAtLeast(const int major, const int minor,
+                        const int patch) noexcept
+{
+    if (MAJOR < major){return false;}
+    if (MAJOR > major){return true;}
+    if (MINOR < minor){return false;}
+    if (MINOR > minor){return true;}
+    if (PATCH < patch){return false;}
+    return true;
+}
+
+std::string Version::getVersion() noexcept
+{
+    std::string version(VERSION);
+    return version;
+}

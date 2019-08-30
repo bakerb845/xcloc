@@ -38,6 +38,8 @@ find_package(FindIPP REQUIRED)
 ##########################################################################################
 #                                       Include Directories                              #
 ##########################################################################################
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/version.cpp.in
+               ${CMAKE_CURRENT_SOURCE_DIR}/src/version.cpp)
 
 include_directories(
    ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -87,7 +89,8 @@ set(LIBSRC
     src/correlationEngine.cpp
     src/correlationEngineParameters.cpp
     src/diffractionStackMigrationEngine.cpp
-    src/mesh/regularMesh.cpp)
+    src/mesh/regularMesh.cpp
+    src/version.cpp)
 
 set(LIBALL ${MKL_LIBRARY} ${IPP_LIBRARY})
 set(LIBALL_PYTHON xcloc ${LIBALL} ${PYTHON_LIBRARIES})
