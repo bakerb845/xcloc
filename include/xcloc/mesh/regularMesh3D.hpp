@@ -232,9 +232,11 @@ public:
      * @brief Gets a pointer to the cell-based scalar field data.
      * @param[in] fieldName  The name of the scalar field.
      * @result A pointer to the cell-based scalar field.  This is an array whose
-     *         dimensions is [getNumberOfCells()].
+     *         dimensions is [getNumberOfCells()].  Its ordering is defined
+     *         by \c getCellularScalarFieldOrdering().
      * @throws std::invalid_argument if fieldName's data has not been set.
-     * @sa \c haveCellularScalarField(), \c getNumberOfCells()
+     * @sa \c haveCellularScalarField(), \c getNumberOfCells(),
+     *     \c getCellularScalarFieldOrdering()
      */
     const T *getCellularScalarFieldPointer(
         const std::string &fieldName) const override;
@@ -244,6 +246,50 @@ public:
      * @result True indicates that the cell-based field exists.
      */
     bool haveCellularScalarField(const std::string &fieldName) const noexcept;
+    /*!
+     * @brief Gets the ordering of the cell-based scalar field.
+     * @param[in] fieldName  The name of the scalar field.
+     * @throws std::invalid_argument if the scalar field does not exist.
+     * @note This may not match your input format.
+     * @sa \c haveCellularScalarField()
+     */
+    RegularMesh3DOrderingType getCellularScalarFieldOrdering(
+        const std::string &fieldName) const;
+    /*!
+     * @brief Gets the max index and value of a cell-based scalar field.
+     * @param[in] fieldName  The name of the scalar field.
+     * @result The maximum value (result.first) and the cell index
+     *         (result.second) in the field at which the max was found.
+     * @throws std::invalid_argument if the scalar field does not exist.
+     * @sa \c haveCellularScalarField().
+     */
+    std::pair<T, int> getCellularScalarFieldMaxValueAndIndex(
+        const std::string &fieldName) const override;
+    /*!
+     * @brief Gets the min index and value of a cell-based scalar field.
+     * @param[in] fieldName  The name of the scalar field.
+     * @result The minimum value (result.first) and the cell index
+     *         (result.second) in the field at which the min was found.
+     * @throws std::invalid_argument if the scalar field does not exist.
+     * @sa \c haveCellularScalarField().
+     */
+    std::pair<T, int> getCellularScalarFieldMinValueAndIndex(
+        const std::string &fieldName) const override;
+    /*!
+     * @brief Converts a cell index to the cell-based triplet 
+     *        (icellx, icelly, icellz).
+     * @param[in] index    The cell index.  This must be in the range
+     *                     [0, \c getNumberOfCells() - 1].
+     * @param[out] icellx  The cell index in x.
+     * @param[out] icelly  The cell index in y.
+     * @param[out] icellz  The cell index in z.
+     * @throws std::invalid_argument if the index is out of range. 
+     * @throws std::runtime_error if the number of grid points in x,
+     *         y, or z was not set.
+     * @sa \c getNumberOfCells()
+     */
+    void convertCellIndexToGrid(int index,
+                                int *icellx, int *icelly, int *icellz) const;
     /*! @} */
 
     /*! @name Nodal-based Scalar Field
@@ -272,9 +318,11 @@ public:
      * @brief Gets a pointer to the node-based scalar field data.
      * @param[in] fieldName  The name of the scalar field.
      * @result A pointer to the node-based scalar field.  This is an array whose
-     *         dimensions is [getNumberOfGridPoints()].
+     *         dimensions is [getNumberOfGridPoints()].  Its ordering is 
+     *         defined by \c getNodalScalarFieldOrdering().
      * @throws std::invalid_argument if fieldName's data has not been set.
-     * @sa \c haveNodalScalarField(), \c getNumberOfGridPoints()
+     * @sa \c haveNodalScalarField(), \c getNumberOfGridPoints(),
+     *     \c getNodalScalarFieldOrdering()
      */
     const T *getNodalScalarFieldPointer(
         const std::string &fieldName) const override;
@@ -284,6 +332,49 @@ public:
      * @result True indicates that the nodal-based field exists.
      */
     bool haveNodalScalarField(const std::string &fieldName) const noexcept;
+    /*!
+     * @brief Gets the ordering of the node-based scalar field.
+     * @param[in] fieldName  The name of the scalar field.
+     * @throws std::invalid_argument if the scalar field does not exist.
+     * @note This may not match your input format.
+     * @sa \c haveNodalScalarField() 
+     */
+    RegularMesh3DOrderingType getNodalScalarFieldOrdering(
+        const std::string &fieldName) const;
+    /*!
+     * @brief Gets the min index and value of a node-based scalar field.
+     * @param[in] fieldName  The name of the scalar field.
+     * @result The minimum value (result.first) and node index (result.second)
+     *         in the field at which the min was found.
+     * @throws std::invalid_argument if the scalar field does not exist.
+     * @sa \c haveCellularScalarField().
+     */
+    std::pair<T, int> getNodalScalarFieldMinValueAndIndex(
+        const std::string &fieldName) const override;
+    /*!
+     * @brief Gets the max index and value of a node-based scalar field.
+     * @param[in] fieldName  The name of the scalar field.
+     * @result The maximum value (result.first) and node index (result.second)
+     *         in the field at which the max was found.
+     * @throws std::invalid_argument if the scalar field does not exist.
+     * @sa \c haveCellularScalarField().
+     */
+    std::pair<T, int> getNodalScalarFieldMaxValueAndIndex(
+        const std::string &fieldName) const override;
+    /*!
+     * @brief Converts a grid index to the grid-based triplet (ix,iy,iz).
+     * @param[in] index  The grid index.  This must be in the range
+     *                   [0, \c getNumberOfGridPoints() - 1].
+     * @param[out] ix    The grid index in x.
+     * @param[out] iy    The grid index in y.
+     * @param[out] iz    The grid index in z.
+     * @throws std::invalid_argument if the index is out of range.
+     * @throws std::runtime_error if the number of grid points in x,
+     *         y, or z was not set.
+     * @sa \c getNumberOfGridPoints()
+     */
+    void convertNodeIndexToGrid(int index,
+                                int *ix, int *iy, int *iz) const;
     /*! @} */
     
     /*!

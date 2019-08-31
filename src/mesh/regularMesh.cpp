@@ -3,6 +3,7 @@
 #include <map>
 #include <vector>
 #include <string>
+#include <algorithm>
 #include <boost/align/aligned_allocator.hpp>
 #include "xcloc/mesh/regularMesh3D.hpp"
 #include "xcloc/mesh/enums.hpp"
@@ -68,6 +69,8 @@ public:
         = GeometryOrientationType::EAST_NORTH_DOWN;
     /// Indicates the type of mesh that this is.
     const XCLoc::Mesh::MeshType mMeshType = XCLoc::Mesh::MeshType::REGULAR_MESH;
+    /// Defines the mesh ordering
+    const RegularMesh3DOrderingType mOrder = RegularMesh3DOrderingType::NX_NY_NZ;
 };
 
 /// Constructor
@@ -382,6 +385,43 @@ bool RegularMesh3D<T>::haveCellularScalarField(
     return false;
 }
 
+/// Get the cellular ordering in the scalar field
+template<class T> XCLoc::Mesh::RegularMesh3DOrderingType
+RegularMesh3D<T>::getCellularScalarFieldOrdering(
+    const std::string &fieldName) const
+{
+    if (!haveCellularScalarField(fieldName))
+    {
+        throw std::invalid_argument("field " + fieldName
+                                  + " does not exist\n");
+    }
+    return RegularMesh3DOrderingType::NX_NY_NZ;
+}
+
+template<class T>
+std::pair<T, int> RegularMesh3D<T>::getCellularScalarFieldMinValueAndIndex(
+    const std::string &fieldName) const
+{
+    auto field = getCellularScalarFieldPointer(fieldName); // This throws
+    int ncell = getNumberOfCells(); // This throws
+    auto element = std::min_element(field, field+ncell);
+    int index = std::distance(field, element);
+    std::pair<T, int> result(*element, index);
+    return result;
+}
+
+template<class T>
+std::pair<T, int> RegularMesh3D<T>::getCellularScalarFieldMaxValueAndIndex(
+    const std::string &fieldName) const
+{
+    auto field = getCellularScalarFieldPointer(fieldName); // This throws
+    int ncell = getNumberOfCells(); // This throws
+    auto element = std::max_element(field, field+ncell);
+    int index = std::distance(field, element);
+    std::pair<T, int> result(*element, index);
+    return result;
+}
+
 /// Nodal-based scalar field
 template<class T>
 void RegularMesh3D<T>::setNodalScalarField(
@@ -447,6 +487,42 @@ bool RegularMesh3D<T>::haveNodalScalarField(
     auto result = pImpl->mNodalScalarFields.find(fieldName);
     if (result != pImpl->mNodalScalarFields.end()){return true;}
     return false;
+}
+
+template<class T>
+std::pair<T, int> RegularMesh3D<T>::getNodalScalarFieldMinValueAndIndex(
+    const std::string &fieldName) const
+{
+    auto field = getNodalScalarFieldPointer(fieldName); // This throws
+    int ngrd = getNumberOfGridPoints(); // This throws
+    auto element = std::min_element(field, field+ngrd);
+    int index = std::distance(field, element);
+    std::pair<T, int> result(*element, index);
+    return result;
+}
+
+template<class T>
+std::pair<T, int> RegularMesh3D<T>::getNodalScalarFieldMaxValueAndIndex(
+    const std::string &fieldName) const
+{
+    auto field = getNodalScalarFieldPointer(fieldName); // This throws
+    int ngrd = getNumberOfGridPoints(); // This throws
+    auto element = std::max_element(field, field+ngrd);
+    int index = std::distance(field, element);    
+    std::pair<T, int> result(*element, index);
+    return result;
+}
+
+/// Get the node ordering in the scalar field
+template<class T> XCLoc::Mesh::RegularMesh3DOrderingType
+RegularMesh3D<T>::getNodalScalarFieldOrdering(
+    const std::string &fieldName) const
+{
+    if (!haveNodalScalarField(fieldName))
+    {
+        throw std::invalid_argument("field " + fieldName + " does not exist\n");
+    }
+    return RegularMesh3DOrderingType::NX_NY_NZ;
 }
 
 /// Gets the geometry type

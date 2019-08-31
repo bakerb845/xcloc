@@ -43,7 +43,7 @@ DiffractionStackMigrationEngine<T>::~DiffractionStackMigrationEngine()
 /// Sets the correlation engine
 template<class T>
 void DiffractionStackMigrationEngine<T>::setCorrelationEngine(
-    std::shared_ptr<const CorrelationEngine<T>> &correlograms)
+    std::shared_ptr<const CorrelationEngine<T>> correlograms)
 {
     if (pImpl->mCorrelograms){pImpl->mCorrelograms.release();}
     pImpl->mCorrelograms

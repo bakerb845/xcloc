@@ -43,6 +43,46 @@ public:
      */
     virtual int getNumberOfGridPoints() const = 0;
     /*!
+     * @brief Gets the max index and value of a cell-based scalar field.
+     * @param[in] fieldName  The name of the scalar field.
+     * @result The maximum value (result.first) and the cell index
+     *         (result.second) in the field at which the max was found.
+     * @throws std::invalid_argument if the scalar field does not exist.
+     * @sa \c haveCellularScalarField().
+     */
+    virtual std::pair<T, int> getCellularScalarFieldMaxValueAndIndex(
+        const std::string &fieldName) const = 0;
+    /*!
+     * @brief Gets the min index and value of a cell-based scalar field.
+     * @param[in] fieldName  The name of the scalar field.
+     * @result The minimum value (result.first) and the cell index
+     *         (result.second) in the field at which the max was found.
+     * @throws std::invalid_argument if the scalar field does not exist.
+     * @sa \c haveCellularScalarField().
+     */
+    virtual std::pair<T, int> getCellularScalarFieldMinValueAndIndex(
+        const std::string &fieldName) const = 0;
+    /*!
+     * @brief Gets the min index and value of a nodal-based scalar field.
+     * @param[in] fieldName  The name of the scalar field.
+     * @result The minimum value (result.first) and the nodal index
+     *         (result.second) in the field at which the min was found.
+     * @throws std::invalid_argument if the scalar field does not exist.
+     * @sa \c haveCellularScalarField().
+     */
+    virtual std::pair<T, int> getNodalScalarFieldMinValueAndIndex(
+        const std::string &fieldName) const = 0;
+    /*!
+     * @brief Gets the max index and value of a nodal-based scalar field.
+     * @param[in] fieldName  The name of the scalar field.
+     * @result The maximum value (result.first) and the nodal index
+     *         (result.second) in the field at which the max was found.
+     * @throws std::invalid_argument if the scalar field does not exist.
+     * @sa \c haveCellularScalarField().
+     */
+    virtual std::pair<T, int> getNodalScalarFieldMaxValueAndIndex(
+        const std::string &fieldName) const = 0;
+    /*!
      * @brief Gets the mesh type.
      * @result The mesh type.
      */

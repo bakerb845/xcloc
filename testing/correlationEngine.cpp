@@ -5,6 +5,8 @@
 #include <ipps.h>
 #include "xcloc/correlationEngineParameters.hpp"
 #include "xcloc/correlationEngine.hpp"
+#include "xcloc/correlogramPostProcessorParameters.hpp"
+#include "xcloc/correlogramPostProcessor.hpp"
 #include <gtest/gtest.h>
 
 namespace
@@ -142,5 +144,43 @@ TEST(testCorrelationEngine, correlograms)
         EXPECT_LE(error, 1.e-12);
     }
 }
+
+TEST(testCorrelogramPostProcessor, parameters)
+{
+    CorrelogramPostProcessorParameters parameters;
+    EXPECT_FALSE(parameters.isValid());
+    
+    parameters.setNoFiltering();
+    EXPECT_TRUE(parameters.isValid());
+    EXPECT_EQ(parameters.getFilteringType(),
+              CorrelogramFilteringType::NO_FILTERING);
+    parameters.clear();
+
+    // fir envelope
+    EXPECT_FALSE(parameters.isValid());
+    EXPECT_NO_THROW(parameters.setFIREnvelopeFiltering(199));
+    EXPECT_EQ(parameters.getFilteringType(),
+              CorrelogramFilteringType::FIR_ENVELOPE_FILTERING);
+    EXPECT_EQ(parameters.getFIREnvelopeFilterLength(), 199);
+    // deal with odd number
+    EXPECT_NO_THROW(parameters.setFIREnvelopeFiltering(200));
+    EXPECT_EQ(parameters.getFIREnvelopeFilterLength(), 201);
+    EXPECT_TRUE(parameters.isValid());
+
+    // Test copy constructor
+    CorrelogramPostProcessorParameters copyParms(parameters);
+    EXPECT_EQ(copyParms.getFilteringType(),
+              CorrelogramFilteringType::FIR_ENVELOPE_FILTERING);
+    EXPECT_EQ(copyParms.getFIREnvelopeFilterLength(), 201);
+}
+
+TEST(testCorrelogramPostProcessor, processor)
+{
+    CorrelogramPostProcessorParameters parameters;
+    parameters.setFIREnvelopeFiltering(301);
+
+    CorrelogramPostProcessor<double> dproc;
+
+} 
 
 }

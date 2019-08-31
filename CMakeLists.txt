@@ -38,13 +38,14 @@ find_package(FindIPP REQUIRED)
 ##########################################################################################
 #                                       Include Directories                              #
 ##########################################################################################
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/version.cpp.in
-               ${CMAKE_CURRENT_SOURCE_DIR}/src/version.cpp)
+configure_file(${CMAKE_SOURCE_DIR}/src/version.cpp.in
+               ${CMAKE_SOURCE_DIR}/src/version.cpp)
 
 include_directories(
-   ${CMAKE_CURRENT_SOURCE_DIR}/include
+   ${CMAKE_SOURCE_DIR}/include
    ${IPP_INCLUDE_DIR}
    ${MKL_INCLUDE_DIR}
+   ${RTSEIS_INCLUDE_DIR}
 )
 set(PRIVATE_INCLUDE_DEPENDS ${IPP_INCLUDE_DIR} ${MKL_INCLUDE_DIR})
 message("Include directories:" ${PRIVATE_INCLUDE_DEPENDS})
@@ -57,7 +58,7 @@ if (RTSEIS_WRAP_PYTHON)
    add_library(pyxcloc MODULE
                python/pyxcloc.cpp
                )
-   target_link_libraries(pyrtseis PRIVATE pybind11::module rtseis)
+   target_link_libraries(pyxcloc PRIVATE pybind11::module xcloc)
 endif()
 
 ##########################################################################################
@@ -83,16 +84,16 @@ endif()
 #                               -DGTEST_BOTH_LIBRARIES=${GTEST_BOTH_LIBRARIES}
 #                    )
 
-#configure_file(${CMAKE_SOURCE_DIR}/include/rtseis/config.h.in
-#               ${CMAKE_SOURCE_DIR}/include/rtseis/config.h)
-set(LIBSRC 
+set(LIBSRC
     src/correlationEngine.cpp
     src/correlationEngineParameters.cpp
+    src/correlogramPostProcessor.cpp
+    src/correlogramPostProcessorParameters.cpp
     src/diffractionStackMigrationEngine.cpp
     src/mesh/regularMesh.cpp
     src/version.cpp)
 
-set(LIBALL ${MKL_LIBRARY} ${IPP_LIBRARY})
+set(LIBALL ${RTSEIS_LIBRARY} ${MKL_LIBRARY} ${IPP_LIBRARY})
 set(LIBALL_PYTHON xcloc ${LIBALL} ${PYTHON_LIBRARIES})
 
 # cmake -DBUILD_SHARED_LIBS=YES /path/to/source

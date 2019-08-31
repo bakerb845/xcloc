@@ -2,7 +2,6 @@
 #define XCLOC_ENUMS_HPP
 namespace XCLoc
 {
-
 /*!
  * @brief Defines the floating point precision.
  */
@@ -27,5 +26,18 @@ enum class MKLFloatingPointAccuracy
                         and for float precision this may have less than four
                         digits of accuracy.  This mode is not recommended. */
 };
+/*!
+ * @brief Defines the correlogram post-processing strategy.
+ */
+enum class CorrelogramFilteringType
+{
+    NO_FILTERING,           /*!< Do not modify raw correlograms. */
+    FIR_ENVELOPE_FILTERING, /*!< Compute FIR-based envelope of correlograms.
+                                 This helps to reduce side-lobe artifacts
+                                 in the migration caused by imperfect
+                                 velocity models. */
+   UNKNOWN                 /*!< Unkonwn filtering option. */
+};
+
 }
 #endif
