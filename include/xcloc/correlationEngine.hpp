@@ -114,7 +114,7 @@ public:
      * @{
      */
     /*!
-     * @brief Gets a pointer to ixc'th correlogram.
+     * @brief Gets a pointer to ixc'th unprocessed correlogram.
      * @param[in] ixc   The correlogram index.  This must be in the range of
      *                  [0, \c getNumberOfCorrelograms() - 1].
      * @result A pointer to the ixc'th correlogram.  This is an array whose
@@ -122,9 +122,9 @@ public:
      * @throws std::runtime_error if the correlograms are not yet computed. 
      * @sa \haveCorrelograms(), \c getCorrelogramLength()
      */
-    const T* getCorrelogramPointer(int ixc) const;
+    const T* getRawCorrelogramPointer(int ixc) const;
     /*!
-     * @brief Gets the ixc'th correlogram.
+     * @brief Gets the unprocessed ixc'th correlogram.
      * @param[in] ixc    The correlogram index.  This must be in the range of
      *                   [0, \c getNumberOfCorrelograms() - 1].
      * @param[in] nwork  The length of xc.  This must be at least
@@ -136,7 +136,7 @@ public:
      * @throws std::runtime_error if the correlograms are not yet computed.
      * @sa \haveCorrelograms(), \c getCorrelogramLength()
      */
-    void getCorrelogram(int ixc, int nwork, T *xc[]) const;
+    void getRawCorrelogram(int ixc, int nwork, T *xc[]) const;
     /*!
      * @brief Get the waveform identifiers comprising the ixc'th correlation
      *        pair.

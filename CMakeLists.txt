@@ -87,8 +87,6 @@ endif()
 set(LIBSRC
     src/correlationEngine.cpp
     src/correlationEngineParameters.cpp
-    src/correlogramPostProcessor.cpp
-    src/correlogramPostProcessorParameters.cpp
     src/diffractionStackMigrationEngine.cpp
     src/mesh/regularMesh.cpp
     src/version.cpp)

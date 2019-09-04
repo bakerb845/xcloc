@@ -17,8 +17,14 @@ public:
     int mSamples = 0;
     /// The number of samples to which to pad
     int mPadSamples = 0;
+    /// FIR filter length for envelope
+    int mEnvelopeLength = 0;
+    /// Filtering post-processing strategy
+    CorrelogramFilteringType mFilterType
+         = CorrelogramFilteringType::NO_FILTERING;
     /// MKL accuracy
-    MKLFloatingPointAccuracy mMKLAccuracy = MKLFloatingPointAccuracy::HIGH_ACCURACY;
+    MKLFloatingPointAccuracy mMKLAccuracy
+         = MKLFloatingPointAccuracy::HIGH_ACCURACY;
 };
 
 /// Constructors
@@ -66,6 +72,8 @@ void CorrelationEngineParameters::clear() noexcept
     pImpl->mXCPairs.clear();
     pImpl->mSamples = 0;
     pImpl->mPadSamples = 0;
+    pImpl->mEnvelopeLength = 0;
+    pImpl->mFilterType = CorrelogramFilteringType::NO_FILTERING;
     pImpl->mMKLAccuracy = MKLFloatingPointAccuracy::HIGH_ACCURACY;
 }
 
@@ -210,6 +218,12 @@ int CorrelationEngineParameters::getNumberOfPaddedSamples() const
     return pImpl->mPadSamples;
 }
 
+int CorrelationEngineParameters::getCorrelogramLength() const
+{
+    int lenxc = 2*getNumberOfPaddedSamples() - 1; // throws
+    return lenxc;
+}
+
 /// MKL accuracy
 void CorrelationEngineParameters::setMKLFloatingPointAccuracy(
     const MKLFloatingPointAccuracy accuracy) noexcept
@@ -223,10 +237,73 @@ CorrelationEngineParameters::getMKLFloatingPointAccuracy() const noexcept
     return pImpl->mMKLAccuracy;
 }
 
+/// No filtering - compute raw correlograms
+void CorrelationEngineParameters::setNoFiltering() noexcept
+{
+    pImpl->mFilterType = CorrelogramFilteringType::NO_FILTERING;
+}
+
+/// FIR envelope
+void CorrelationEngineParameters::setFIREnvelopeFiltering(
+    const int envelopeLength)
+{
+    pImpl->mFilterType = CorrelogramFilteringType::NO_FILTERING;
+    if (envelopeLength < 1)
+    {
+        throw std::invalid_argument("Envelope length = "
+                                  + std::to_string(envelopeLength)
+                                  + " must be positive\n");
+    }
+    int lenxc = getCorrelogramLength(); // Throws
+    if (envelopeLength%2 == 1)
+    {
+        if (envelopeLength > lenxc)
+        {
+            throw std::invalid_argument("Envelope length = "
+                                      + std::to_string(envelopeLength)
+                                      + " cannot exceed "
+                                      + std::to_string(lenxc) + "\n");
+        }
+        pImpl->mEnvelopeLength = envelopeLength;
+    }
+    else
+    {
+        if (envelopeLength + 1 > lenxc)
+        {
+            throw std::invalid_argument("Envelope length = "
+                                      + std::to_string(envelopeLength + 1)
+                                      + " cannot exceed "
+                                      + std::to_string(lenxc) + "\n");
+        }
+        pImpl->mEnvelopeLength = envelopeLength + 1;
+    }
+    pImpl->mFilterType = CorrelogramFilteringType::FIR_ENVELOPE_FILTERING;
+}
+
+int CorrelationEngineParameters::getFIREnvelopeFilterLength() const
+{
+    if (getFilteringType() != CorrelogramFilteringType::FIR_ENVELOPE_FILTERING)
+    {
+        throw std::runtime_error("Must set an FIR envelope filter\n");
+    }
+    return pImpl->mEnvelopeLength;
+}
+
+/// Filtering strategy 
+CorrelogramFilteringType
+CorrelationEngineParameters::getFilteringType() const noexcept
+{
+    return pImpl->mFilterType;
+}
+
 // Valid?
 bool CorrelationEngineParameters::isValid() const noexcept
 {
     if (pImpl->mSamples < 1){return false;}
     if (pImpl->mXCPairs.empty()){return false;}
+    if (pImpl->mFilterType == CorrelogramFilteringType::FIR_ENVELOPE_FILTERING)
+    {
+        if (pImpl->mEnvelopeLength%2 != 1){return false;}
+    }
     return true;
 }

@@ -5,7 +5,6 @@
 #include <ipps.h>
 #include "xcloc/correlationEngineParameters.hpp"
 #include "xcloc/correlationEngine.hpp"
-#include "xcloc/correlogramPostProcessorParameters.hpp"
 #include "xcloc/correlogramPostProcessor.hpp"
 #include <gtest/gtest.h>
 
@@ -24,11 +23,25 @@ TEST(testCorrelationEngine, parameters)
 
     EXPECT_NO_THROW(parameters.setNumberOfPaddedSamples(120));
     EXPECT_EQ(parameters.getNumberOfPaddedSamples(), 120);
+    EXPECT_EQ(parameters.getCorrelogramLength(), 2*120 - 1);
 
     parameters.setMKLFloatingPointAccuracy(MKLFloatingPointAccuracy::LOW_ACCURACY);
     EXPECT_EQ(parameters.getMKLFloatingPointAccuracy(),
               MKLFloatingPointAccuracy::LOW_ACCURACY);
 
+    // Check default is set
+    EXPECT_EQ(parameters.getFilteringType(),
+              CorrelogramFilteringType::NO_FILTERING);
+    // fir envelope
+    EXPECT_NO_THROW(parameters.setFIREnvelopeFiltering(199));
+    EXPECT_EQ(parameters.getFilteringType(),
+              CorrelogramFilteringType::FIR_ENVELOPE_FILTERING);
+    EXPECT_EQ(parameters.getFIREnvelopeFilterLength(), 199);
+    // deal with odd number
+    EXPECT_NO_THROW(parameters.setFIREnvelopeFiltering(200));
+    EXPECT_EQ(parameters.getFIREnvelopeFilterLength(), 201);
+
+    // still not initialized yet
     EXPECT_FALSE(parameters.isValid());
 
     std::vector<std::pair<int, int>> xcPairs;
@@ -70,6 +83,9 @@ TEST(testCorrelationEngine, parameters)
     EXPECT_EQ(copyParms.getNumberOfPaddedSamples(), 120);
     EXPECT_EQ(copyParms.getMKLFloatingPointAccuracy(),
               MKLFloatingPointAccuracy::LOW_ACCURACY);
+    EXPECT_EQ(copyParms.getFilteringType(),
+              CorrelogramFilteringType::FIR_ENVELOPE_FILTERING);
+    EXPECT_EQ(copyParms.getFIREnvelopeFilterLength(), 201);
     EXPECT_TRUE(copyParms.isValid());
     EXPECT_NO_THROW(xcPairs = parameters.getCorrelationPairs()); 
     EXPECT_EQ(static_cast<int> (xcPairs.size()),
@@ -138,49 +154,14 @@ TEST(testCorrelationEngine, correlograms)
     // Get the correlogram
     for (int ixc=0; ixc<dcorr.getNumberOfCorrelograms(); ++ixc)
     {
-        auto xcPtr = dcorr.getCorrelogramPointer(ixc);
+        auto xcPtr = dcorr.getRawCorrelogramPointer(ixc);
         double error; 
         ippsNormDiff_Inf_64f(xcPtr, xcsRef.data()+ixc*19, 19, &error);
         EXPECT_LE(error, 1.e-12);
     }
+
+    // Compute phase correlograms
 }
 
-TEST(testCorrelogramPostProcessor, parameters)
-{
-    CorrelogramPostProcessorParameters parameters;
-    EXPECT_FALSE(parameters.isValid());
-    
-    parameters.setNoFiltering();
-    EXPECT_TRUE(parameters.isValid());
-    EXPECT_EQ(parameters.getFilteringType(),
-              CorrelogramFilteringType::NO_FILTERING);
-    parameters.clear();
-
-    // fir envelope
-    EXPECT_FALSE(parameters.isValid());
-    EXPECT_NO_THROW(parameters.setFIREnvelopeFiltering(199));
-    EXPECT_EQ(parameters.getFilteringType(),
-              CorrelogramFilteringType::FIR_ENVELOPE_FILTERING);
-    EXPECT_EQ(parameters.getFIREnvelopeFilterLength(), 199);
-    // deal with odd number
-    EXPECT_NO_THROW(parameters.setFIREnvelopeFiltering(200));
-    EXPECT_EQ(parameters.getFIREnvelopeFilterLength(), 201);
-    EXPECT_TRUE(parameters.isValid());
-
-    // Test copy constructor
-    CorrelogramPostProcessorParameters copyParms(parameters);
-    EXPECT_EQ(copyParms.getFilteringType(),
-              CorrelogramFilteringType::FIR_ENVELOPE_FILTERING);
-    EXPECT_EQ(copyParms.getFIREnvelopeFilterLength(), 201);
-}
-
-TEST(testCorrelogramPostProcessor, processor)
-{
-    CorrelogramPostProcessorParameters parameters;
-    parameters.setFIREnvelopeFiltering(301);
-
-    CorrelogramPostProcessor<double> dproc;
-
-} 
 
 }

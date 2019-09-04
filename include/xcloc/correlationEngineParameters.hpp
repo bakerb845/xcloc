@@ -163,6 +163,19 @@ public:
     int getNumberOfPaddedSamples() const;
     /*! @} */
 
+    /*! @name Correlogram Length
+     * @{
+     */
+    /*!
+     * @brief Gets the correlogram length.
+     * @result The length of the correlograms which is 
+     *         2*getNumberOfPaddedSamples() - 1.
+     * @throws std::runtime_error if \c setNumberOfSamples() was not set.
+     * @sa \c getNumberOfPaddedSamples().
+     */
+    int getCorrelogramLength() const;
+    /*! @} */
+
     /*! @name MKL Accuracy
      * @{
      */
@@ -176,6 +189,42 @@ public:
      * @result The accuracy of some MKL floating point computations.
      */
     MKLFloatingPointAccuracy getMKLFloatingPointAccuracy() const noexcept; 
+    /*! @} */
+
+    /*! @name Post-Processing Filters
+     * @{
+     */
+    /*!
+     * @brief Disables filtering.  This should only be when travel times are
+     *        computed in very accurate velocity models.  Otherwise,
+     *        destructive interference can severely degrade the imaging.
+     */
+    void setNoFiltering() noexcept;
+    /*!
+     * @brief The correlogram post-processor will compute the
+     * @param[in] envelopeLength  The FIR envelope length.  Since the FIR
+     *                            delay is removed analytically the length
+     *                            must be an odd number.  If envelopeLength
+     *                            is even then envelopeLength will internally
+     *                            be set to envelopeLength + 1.
+     * @throws std::invalid_argument if the envelope length is not positive or
+     *         the filter length exceeds \c getCorrelogramLength().
+     */
+    void setFIREnvelopeFiltering(int envelopeLength);
+    /*!
+     * @brief Gets the FIR-based envelope filter length.
+     * @result The FIR filter length.
+     * @throws std::runtime_error if the filtering strategy is no
+     *         CorrelogramFilteringType::FIR_ENVELOPE_FILTERING.
+     * @sa \c getFilteringType().
+     */
+    int getFIREnvelopeFilterLength() const;
+    /*!
+     * @brief Gets the correlogram filtering strategy.
+     * @result The filtering strategy.
+     * @sa \c isValid()
+     */
+    CorrelogramFilteringType getFilteringType() const noexcept;
     /*! @} */
 
     /*!

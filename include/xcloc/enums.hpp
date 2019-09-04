@@ -32,11 +32,10 @@ enum class MKLFloatingPointAccuracy
 enum class CorrelogramFilteringType
 {
     NO_FILTERING,           /*!< Do not modify raw correlograms. */
-    FIR_ENVELOPE_FILTERING, /*!< Compute FIR-based envelope of correlograms.
+    FIR_ENVELOPE_FILTERING  /*!< Compute FIR-based envelope of correlograms.
                                  This helps to reduce side-lobe artifacts
                                  in the migration caused by imperfect
                                  velocity models. */
-   UNKNOWN                 /*!< Unkonwn filtering option. */
 };
 
 }

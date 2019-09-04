@@ -1,5 +1,8 @@
 #include <cstdio>
 #include <cstdlib>
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 #include <vector>
 #include <algorithm>
 #include <cstring>
@@ -12,6 +15,7 @@
 #include <ipps.h>
 #include "xcloc/correlationEngine.hpp"
 #include "xcloc/correlationEngineParameters.hpp"
+#include "rtseis/utilities/transforms/firEnvelope.hpp"
 
 using namespace XCLoc;
 
@@ -199,17 +203,23 @@ public:
     /// Releases memory
     void clear() noexcept
     {
+        mEnvelopes.clear();
         mParms.clear();
         mSignalMap.clear();
         mCorrelationIndexPairs.clear();
         if (mHavePlan){fftw_destroy_plan(mForwardPlan);}
         if (mHavePlan){fftw_destroy_plan(mInversePlan);}
         if (mInputData){MKL_free(mInputData);}
-        if (mWork){MKL_free(mWork);}   
+        if (mWork){MKL_free(mWork);}
+        if (mProcessedCorrelograms && mFilterCorrelograms)
+        {
+            MKL_free(mProcessedCorrelograms);
+        }
         if (mCorrelogramSpectra){MKL_free(mCorrelogramSpectra);}
         mInputSpectra = nullptr;
         mCorrelogramSpectra = nullptr;
-        mOutputCorrelograms = nullptr;
+        mProcessedCorrelograms = nullptr;
+        mRawOutputCorrelograms = nullptr;
         mWork = nullptr;
         mAccuracyMode = VML_HA;
         mWorkSizeInBytes = 0;
@@ -225,6 +235,7 @@ public:
         mUseFastSignalMap = false;
         mHavePlan = false;
         mHaveCorrelograms = false;
+        mFilterCorrelograms = false;
         mInitialized = false;
     }
     /// Initializes the class
@@ -244,9 +255,15 @@ public:
         // Get the number of samples and compute the correlogram length
         mSamples = mParms.getNumberOfSamples();
         mPaddedInputLength = mParms.getNumberOfPaddedSamples();
-        mSamplesInCorrelogram = 2*mPaddedInputLength - 1;
+        mSamplesInCorrelogram = mParms.getCorrelogramLength(); //2*mPaddedInputLength - 1;
         mNumberOfFrequencies = mSamplesInCorrelogram/2 + 1;
         mNumberOfCorrelograms = mParms.getNumberOfCorrelationPairs();
+        // Filter correlograms?
+        mFilterCorrelograms = false;
+        if (mParms.getFilteringType() != CorrelogramFilteringType::NO_FILTERING)
+        {
+            mFilterCorrelograms = true;
+        } 
         // Figure out the padding sizes.  Note, to perform the correlation we
         // need the input signals evaluated at the transform frequencies of
         // the correlograms.  Hence, the is significant padding.
@@ -281,7 +298,18 @@ public:
         mWork = MKL_calloc(mWorkSizeInBytes, 1, 64);
         // Set input spectra and output correlograms to point at workspace
         mInputSpectra = reinterpret_cast<fftw_complex *> (mWork);
-        mOutputCorrelograms = reinterpret_cast<double *> (mWork);
+        mRawOutputCorrelograms = reinterpret_cast<double *> (mWork);
+        // Set the processed output correlograms
+        if (mFilterCorrelograms)
+        {
+            size_t nbytes = work1;
+            mProcessedCorrelograms
+               = static_cast<double *> (MKL_calloc(nbytes, 1, 64)); 
+        }
+        else
+        {
+            mProcessedCorrelograms = mRawOutputCorrelograms;
+        }
         // Allocate space for frequency domain correlograms
         nbytes = static_cast<size_t> (mNumberOfCorrelograms)
                 *static_cast<size_t> (mSpectraLeadingDimension)
@@ -308,7 +336,7 @@ public:
         mInversePlan = fftw_plan_many_dft_c2r(rank, ni, mNumberOfCorrelograms,
                                               mCorrelogramSpectra, inembed,
                                               istride, mSpectraLeadingDimension,
-                                              mOutputCorrelograms, onembed,
+                                              mRawOutputCorrelograms, onembed,
                                               ostride, mCorrelogramLeadingDimension,
                                               FFTW_PATIENT);
         mHavePlan = true;
@@ -365,7 +393,7 @@ public:
         } // End parallel
         // Inverse transform
         fftw_execute_dft_c2r(mInversePlan, mCorrelogramSpectra,
-                             mOutputCorrelograms);
+                             mRawOutputCorrelograms);
         #pragma omp parallel default(none)
         {
         auto xcTemp
@@ -381,7 +409,8 @@ public:
         {
             int j1 = ixc*mCorrelogramLeadingDimension;
             // Copy and scale
-            auto __attribute__((aligned(64))) xcPtr = &mOutputCorrelograms[j1];
+            auto __attribute__((aligned(64)))
+                xcPtr = &mRawOutputCorrelograms[j1];
             ippsMulC_64f(xcPtr, xnorm, xcTemp, mSamplesInCorrelogram);
             // Shuffle
             //ippsCopy_64f(xcTemp, &xcPtr[ncopy2], ncopy1);
@@ -394,11 +423,14 @@ public:
         mHaveCorrelograms = true;
     }
 //private:
+    /// FIR envelope filter
+    std::vector<RTSeis::Utilities::Transforms::FIREnvelope<double>> mEnvelopes;
+    /// Correlogram parameters
     CorrelationEngineParameters mParms;
     /// A pointer to the input data that was transformed to the frequency 
     /// domain This is a row major matrix whose dimensions are
     /// [mNumberOfSignals x mSpectraLeadingDimension].  Note, it shares the same
-    /// space as mOutputCorrelgorams.
+    /// space as mRawOutputCorrelgorams.
     fftw_complex *mInputSpectra = nullptr;
     /// Holds the spectra of the correlograms.  This is a row major matrix
     /// whose dimensions are [mNumberOfCorrelograms x mSpectraLeadingDimension]
@@ -406,8 +438,13 @@ public:
     /// A pointer to the output correlograms.  This is a row major matrix
     /// whose dimensions are
     /// [mNumberOfCorrelograms x mCorrelogramLeadingDimension].
-    //// Note, it shares the same space as mInputSpectra.
-    double *mOutputCorrelograms = nullptr;    
+    /// Note, it shares the same space as mInputSpectra.
+    double *mRawOutputCorrelograms = nullptr;    
+    /// Holds the processed correlograms.  If no processing is required then
+    /// this points back to the raw correlograms otherwise it is alllocated.
+    /// Regardless, it has dimension 
+    /// [mNumberOfCorrelograms x mCorrelogramLeadingDimension]. 
+    double *mProcessedCorrelograms = nullptr;
     /// Holds the correlograms in the in the frequency domain.  These will
     /// be transformed back to the time domain.
     /// This performs double duty and is a chunk of memory that holds the
@@ -457,6 +494,8 @@ public:
     bool mHavePlan = false;
     /// Flag indicating that the correlograms have been computed
     bool mHaveCorrelograms = false;
+    /// Flag indicating that we are to filter the correlograms
+    bool mFilterCorrelograms = false;
     /// Flag indicating that the class is initialized
     bool mInitialized = false;
 };
@@ -626,7 +665,7 @@ void CorrelationEngine<T>::computePhaseCorrelograms()
 
 /// Get a correlogram
 template<class T>
-const T* CorrelationEngine<T>::getCorrelogramPointer(const int ixc) const
+const T* CorrelationEngine<T>::getRawCorrelogramPointer(const int ixc) const
 {
     auto nxc = getNumberOfCorrelograms(); // Throws on initialization
     if (!haveCorrelograms())
@@ -642,17 +681,17 @@ const T* CorrelationEngine<T>::getCorrelogramPointer(const int ixc) const
     }
     int index = static_cast<size_t> (ixc)
                *static_cast<size_t> (pImpl->mCorrelogramLeadingDimension);
-    const T *xcPtr = &pImpl->mOutputCorrelograms[index];
+    const T *xcPtr = &pImpl->mRawOutputCorrelograms[index];
     return xcPtr;
 }
 
 template<class T>
-void CorrelationEngine<T>::getCorrelogram(
+void CorrelationEngine<T>::getRawCorrelogram(
     const int ixc, const int nwork, T *xcIn[]) const
 {
     // Get pointer to correlogram.  This throws an initialization error
     // and checks if ixc is valid
-    auto xcPtr __attribute__((aligned(64))) = getCorrelogramPointer(ixc);
+    auto xcPtr __attribute__((aligned(64))) = getRawCorrelogramPointer(ixc);
     // Get the correlogram length and check nwork and xcIn
     int lxc = getCorrelogramLength();
     T *xc = *xcIn;
