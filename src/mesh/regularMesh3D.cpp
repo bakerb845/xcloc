@@ -508,7 +508,7 @@ std::pair<T, int> RegularMesh3D<T>::getNodalScalarFieldMaxValueAndIndex(
     auto field = getNodalScalarFieldPointer(fieldName); // This throws
     int ngrd = getNumberOfGridPoints(); // This throws
     auto element = std::max_element(field, field+ngrd);
-    int index = std::distance(field, element);    
+    int index = std::distance(field, element);
     std::pair<T, int> result(*element, index);
     return result;
 }

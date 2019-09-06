@@ -4,7 +4,7 @@
 #include <algorithm>
 #include <vector>
 #include "xcloc/diffractionStackMigrationEngine.hpp"
-#include "xcloc/correlationEngine.hpp"
+#include "xcloc/correlograms.hpp"
 #include "xcloc/mesh/regularMesh3D.hpp"
 
 using namespace XCLoc;
@@ -15,7 +15,7 @@ class DiffractionStackMigrationEngine<T>::DSMImpl
 public:
     std::vector<XCLoc::Mesh::IMesh<T>> mTravelTimeTables;
     /// Contains the correlograms
-    std::shared_ptr<const CorrelationEngine<T>> mCorrelograms;
+    std::shared_ptr<const Correlograms<T>> mCorrelograms;
     /// Sampling period of seismograms
     double mSamplingPeriod = 1;
     /// Chunk size to emphasize locality in DSM for read/write operations
@@ -23,7 +23,7 @@ public:
     /// Flag indicating this is nodal-based imaging or cell-based imaging.
     bool mNodalBasedImaging = true;
     /// Flag indicating that the correlograms are set
-    bool mHaveCorrelationEngine = false;
+    bool mHaveCorrelograms = false;
 };
 
 /// Constructor
@@ -41,21 +41,23 @@ DiffractionStackMigrationEngine<T>::~DiffractionStackMigrationEngine()
     = default;
 
 /// Sets the correlation engine
+/*
 template<class T>
-void DiffractionStackMigrationEngine<T>::setCorrelationEngine(
-    std::shared_ptr<const CorrelationEngine<T>> correlograms)
+void DiffractionStackMigrationEngine<T>::setCorrelograms(
+    std::shared_ptr<const Correlograms<T>> correlograms)
 {
     if (pImpl->mCorrelograms){pImpl->mCorrelograms.release();}
     pImpl->mCorrelograms
-        = std::make_shared<const CorrelationEngine<T>> (correlograms);
-    pImpl->mHaveCorrelogramEngine = true;
+        = std::make_shared<const Correlograms<T>> (correlograms);
+    pImpl->mHaveCorrelograms = true;
 }
+*/
 
 /// Determines if the correlation engine was set
 template<class T>
-bool DiffractionStackMigrationEngine<T>::haveCorrelationEngine() const noexcept
+bool DiffractionStackMigrationEngine<T>::haveCorrelograms() const noexcept
 {
-    return pImpl->mHaveCorrelationEngine;
+    return pImpl->mHaveCorrelograms;
 }
 
 /// Computes the diffraction stack migration
@@ -83,7 +85,7 @@ void DiffractionStackMigrationEngine<T>::compute()
         {
             // Get the ixc'th correlogram
             auto __attribute((aligned(64)))
-                xc = pImpl->mCorrelograms.getCorrelogram(ixc);
+                xc = pImpl->mCorrelograms.getProcessedCorrelogram(ixc);
             auto xcPair = pImpl->mCorrelograms.getCorreloationPair(ixc);
             // Extract the appropriate travel time tables
             int it1 = xcPair.first;

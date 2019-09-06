@@ -2,8 +2,15 @@
 #define XCLOC_CORRELOGRAMS_HPP 1
 #include <memory>
 #include "xcloc/enums.hpp"
+
 namespace XCLoc
 {
+class CorrelogramParameters;
+/*!
+ * @class Correlograms "correlationEngine.hpp" "xcloc/correlationEngine.hpp"
+ * @brief This computes the correlograms.
+ * @copyright Ben Baker (University of Utah) distributed under the MIT license.
+ */
 template<class T=double>
 class Correlograms
 {
@@ -16,10 +23,16 @@ public:
      */
     Correlograms();
     /*!
+     * @brief Constructs the correlation engine from the parameters.
+     * @param[in] parameters  The correlation engine parameters.
+     * @throws std::invalid_argument if parameters is not valid.
+     */
+    explicit Correlograms(const CorrelogramParameters &parameters);
+    /*!
      * @brief Move constructor.
-     * @param[in,out] correlograms  The correlograms class from which to
-     *                              initialize this class.  On exit, 
-     *                              correlograms's behavior is undefined. 
+     * @param[in,out] engine  The correlation engine from which to initialize
+     *                        this class.  On exit, engine's behavior is
+     *                        undefined.
      */
     Correlograms(Correlograms &&engine) noexcept;
     /*! @} */
@@ -28,12 +41,25 @@ public:
      * @{
      */
     /*!
-     * @param[in,out] correlograms  The correlograms class from which to
-     *                              initialize this class.  On exit,
-     *                              correlograms's behavior is undefined.
-     * @result The memory moved from correlograms to this.
+     * @brief Move assignment operator.
+     * @param[in,out] engine  The correlation engine whose memory will be moved
+     *                        to this.  On exit, engine's behavior is undefined.
+     * @result The memory moved from engine to this.
      */
-    Correlograms& operator=(Correlograms &&correlograms) noexcept;
+    Correlograms& operator=(Correlograms &&engine) noexcept;
+    /*! @} */
+
+    /*! @name Destructors
+     * @{
+     */
+    /*!
+     * @brief Destructor 
+     */
+    ~Correlograms();
+    /*!
+     * @brief Clears the memory and resets the module.
+     */
+    void clear() noexcept;
     /*! @} */
 
     /*! @name Initialization
@@ -43,8 +69,7 @@ public:
      * @brief Initializes the cross-correlation engine.
      * @throws std::invalid_argument if parameters are not valid.
      */
-    void initialize(const CorrelationEngineParameters &correlationParameters,
-                    const CorrelationPostProcessorParameters &processingParameters);
+    void initialize(const CorrelogramParameters &parameters);
     /*!
      * @brief Sets the iw'th waveform.
      * @param[in] waveid    The waveform identifier.  This refers to the signal
@@ -54,7 +79,7 @@ public:
      * @param[in] x         The signal to set.  This is an array of dimension
      *                      [nSamples].
      * @throws std::runtime_error if the class is not intialized.
-     * @throws std::invalid_argument if nSamples is incorrect, x is NULL, or
+     * @throws std::invalid_argument if nSamples is incorrect, x is NULL, or 
      *         the waveform identifier does not exist.
      * @sa \c getInputSignalLength() \c isInitialized()
      */
@@ -66,19 +91,19 @@ public:
      *        if the station is late or has a gap.
      * @param[in] waveid   Sets all elements of the waveid'th signal to zero.
      */
-    void zeroInputSignal(int waveid);
+    void zeroInputSignal(int waveid); 
     /*! @} */
 
     /*! @brief Compute
      * @{
      */
     /*!
-     * @brief Computes the cross-correlograms and applies the post-processing.
-     * @throws std::runtime_error
+     * @brief Computes the cross-correlograms.
+     * @throws std::runtime_error 
      */
     void computeCrossCorrelograms();
     /*!
-     * @brief Computes the phase-correlograms and applies the post-processing.
+     * @brief Computes the phase-correlograms.
      * @throws std::runtime_error if the class is not initialized and all the
      *         signals are not set.
      */
@@ -89,7 +114,17 @@ public:
      * @{
      */
     /*!
-     * @brief Gets a pointer to ixc'th raw correlogram.
+     * @brief Gets a pointer to ixc'th unprocessed correlogram.
+     * @param[in] ixc   The correlogram index.  This must be in the range of
+     *                  [0, \c getNumberOfCorrelograms() - 1].
+     * @result A pointer to the ixc'th correlogram.  This is an array whose
+     *         length is [\c getCorrelogramLength()].
+     * @throws std::runtime_error if the correlograms are not yet computed. 
+     * @sa \haveCorrelograms(), \c getCorrelogramLength()
+     */
+    const T* getRawCorrelogramPointer(int ixc) const;
+    /*!
+     * @brief Gets a pointer to ixc'th processed correlogram.
      * @param[in] ixc   The correlogram index.  This must be in the range of
      *                  [0, \c getNumberOfCorrelograms() - 1].
      * @result A pointer to the ixc'th correlogram.  This is an array whose
@@ -97,9 +132,9 @@ public:
      * @throws std::runtime_error if the correlograms are not yet computed.
      * @sa \haveCorrelograms(), \c getCorrelogramLength()
      */
-    const T* getRawCorrelogramPointer(int ixc) const;
+    const T* getProcessedCorrelogramPointer(int ixc) const;
     /*!
-     * @brief Gets the ixc'th raw correlogram.
+     * @brief Gets the ixc'th unprocessed correlogram.
      * @param[in] ixc    The correlogram index.  This must be in the range of
      *                   [0, \c getNumberOfCorrelograms() - 1].
      * @param[in] nwork  The length of xc.  This must be at least
@@ -112,16 +147,6 @@ public:
      * @sa \haveCorrelograms(), \c getCorrelogramLength()
      */
     void getRawCorrelogram(int ixc, int nwork, T *xc[]) const;
-    /*!
-     * @brief Gets a pointer to ixc'th processed correlogram.
-     * @param[in] ixc   The correlogram index.  This must be in the range of
-     *                  [0, \c getNumberOfCorrelograms() - 1].
-     * @result A pointer to the ixc'th correlogram.  This is an array whose
-     *         length is [\c getCorrelogramLength()].
-     * @throws std::runtime_error if the correlograms are not yet computed.
-     * @sa \haveCorrelograms(), \c getCorrelogramLength()
-     */
-    const T* getProcessedCorrelogramPointer(int ixc) const;
     /*!
      * @brief Gets the ixc'th processed correlogram.
      * @param[in] ixc    The correlogram index.  This must be in the range of
@@ -187,8 +212,8 @@ public:
     bool haveCorrelograms() const noexcept;
     /*! @} */
 private:
-    class CorrelgoramsImpl;
-    std::unique_ptr<CorrelgramsImpl> pImpl;
+    class CorrelogramsImpl;
+    std::unique_ptr<CorrelogramsImpl> pImpl;   
 };
 }
 #endif

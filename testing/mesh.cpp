@@ -61,7 +61,7 @@ TEST(testMesh, regularMesh3D)
     std::vector<double> cellScalar2(mesh.getNumberOfCells());
     std::vector<double> nodeScalar1(mesh.getNumberOfGridPoints());
     std::vector<double> nodeScalar2(mesh.getNumberOfGridPoints());
-    int iter = 0;
+    int iter = 1;
     for (int k=0; k<nz-1; ++k)
     {
         for (int j=0; j<ny-1; ++j)
@@ -76,9 +76,10 @@ TEST(testMesh, regularMesh3D)
     }
     for (int i=0; i<mesh.getNumberOfGridPoints(); ++i)
     {
-        nodeScalar1[i] =-i;
-        nodeScalar2[i] = i;
+        nodeScalar1[i] =-(i + 1);
+        nodeScalar2[i] = (i + 1);
     }
+    // Set cell data
     EXPECT_FALSE(mesh.haveCellularScalarField("cellTest1"));
     EXPECT_FALSE(mesh.haveCellularScalarField("cellTest2"));
     mesh.setCellularScalarField("cellTest1",
@@ -91,7 +92,56 @@ TEST(testMesh, regularMesh3D)
                                 RegularMesh3DOrderingType::NZ_NY_NX);
     EXPECT_TRUE(mesh.haveCellularScalarField("cellTest1"));
     EXPECT_TRUE(mesh.haveCellularScalarField("cellTest2"));
+    // Set nodal data
+    EXPECT_FALSE(mesh.haveNodalScalarField("nodalTest1"));
+    EXPECT_FALSE(mesh.haveNodalScalarField("nodalTest2"));
+    mesh.setNodalScalarField("nodalTest1",
+                             nodeScalar1.size(),
+                             nodeScalar1.data(),
+                             RegularMesh3DOrderingType::NX_NY_NZ);
+    mesh.setNodalScalarField("nodalTest2",
+                             nodeScalar2.size(),
+                             nodeScalar2.data(),
+                             RegularMesh3DOrderingType::NZ_NY_NX);
+    EXPECT_TRUE(mesh.haveNodalScalarField("nodalTest1"));
+    EXPECT_TRUE(mesh.haveNodalScalarField("nodalTest2"));
+
+    // Verify mins/maxes are right
+    auto cellMin1 = mesh.getCellularScalarFieldMinValueAndIndex("cellTest1");
+    auto cellMax1 = mesh.getCellularScalarFieldMaxValueAndIndex("cellTest1");
+    auto nodeMin1 = mesh.getNodalScalarFieldMinValueAndIndex("nodalTest1");
+    auto nodeMax1 = mesh.getNodalScalarFieldMaxValueAndIndex("nodalTest1");
+    EXPECT_EQ(static_cast<int> (nodeMin1.first),  -mesh.getNumberOfGridPoints());
+    EXPECT_EQ(static_cast<int> (nodeMax1.first),  -1);
+    EXPECT_EQ(static_cast<int> (cellMin1.first),  -mesh.getNumberOfCells());
+    EXPECT_EQ(static_cast<int> (cellMax1.first),  -1);
+    auto cellMin2 = mesh.getCellularScalarFieldMinValueAndIndex("cellTest2");
+    auto cellMax2 = mesh.getCellularScalarFieldMaxValueAndIndex("cellTest2");
+    auto nodeMin2 = mesh.getNodalScalarFieldMinValueAndIndex("nodalTest2");
+    auto nodeMax2 = mesh.getNodalScalarFieldMaxValueAndIndex("nodalTest2");
+    EXPECT_EQ(static_cast<int> (nodeMin2.first),  1);
+    EXPECT_EQ(static_cast<int> (nodeMax2.first),  mesh.getNumberOfGridPoints());
+    EXPECT_EQ(static_cast<int> (cellMin2.first),  1);
+    EXPECT_EQ(static_cast<int> (cellMax2.first),  mesh.getNumberOfCells());
+
+printf("%f %d\n", cellMax1.first, cellMax1.second);
+printf("%f %d\n", cellMin1.first, cellMin1.second);
+printf("%f %d\n", nodeMax1.first, nodeMax1.second);
+printf("%f %d\n", nodeMin1.first, nodeMin1.second);
+
     // Test copy
+    RegularMesh3D meshCopy(mesh);
+    EXPECT_TRUE(mesh.haveGridDimensions());
+    EXPECT_EQ(meshCopy.getNumberOfGridPointsInX(), nx);
+    EXPECT_EQ(meshCopy.getNumberOfGridPointsInY(), ny);
+    EXPECT_EQ(meshCopy.getNumberOfGridPointsInZ(), nz);
+    EXPECT_EQ(meshCopy.getNumberOfCells(), (nx-1)*(ny-1)*(nz-1));
+    EXPECT_EQ(meshCopy.getNumberOfGridPoints(), nx*ny*nz);
+    EXPECT_EQ(meshCopy.getOriginInX(), x0);
+    EXPECT_EQ(meshCopy.getOriginInY(), y0);
+    EXPECT_EQ(meshCopy.getOriginInZ(), z0);
+
+
 }
 
 }

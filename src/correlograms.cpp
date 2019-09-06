@@ -2,6 +2,12 @@
 #include <cstdlib>
 #ifdef _OPENMP
 #include <omp.h>
+#else
+namespace
+{
+int omp_get_thread_num(){return 0;}
+int omp_get_num_threads(){return 1;}
+}
 #endif
 #include <vector>
 #include <algorithm>
@@ -13,8 +19,8 @@
 #include <mkl.h>
 #include <fftw/fftw3.h>
 #include <ipps.h>
-#include "xcloc/correlationEngine.hpp"
-#include "xcloc/correlationEngineParameters.hpp"
+#include "xcloc/correlograms.hpp"
+#include "xcloc/correlogramParameters.hpp"
 #include "rtseis/utilities/transforms/firEnvelope.hpp"
 
 using namespace XCLoc;
@@ -192,11 +198,11 @@ inline void checkInputSignalAndLength(const int nSamples,
 //============================================================================//
 
 template<>
-class CorrelationEngine<double>::CorrelationEngineImpl
+class Correlograms<double>::CorrelogramsImpl
 {
 public:
     /// Destructor
-    ~CorrelationEngineImpl()
+    ~CorrelogramsImpl()
     {
         clear();
     }
@@ -263,7 +269,17 @@ public:
         if (mParms.getFilteringType() != CorrelogramFilteringType::NO_FILTERING)
         {
             mFilterCorrelograms = true;
-        } 
+        }
+        if (mParms.getFilteringType() ==
+           CorrelogramFilteringType::FIR_ENVELOPE_FILTERING)
+        {
+            mEnvelopes.resize(omp_get_num_threads());
+            for (int i=0; i<static_cast<int> (mEnvelopes.size()); ++i)
+            {
+                mEnvelopes[i].initialize(mParms.getFIREnvelopeFilterLength(),
+                                         RTSeis::POST_PROCESSING);
+            }
+        }
         // Figure out the padding sizes.  Note, to perform the correlation we
         // need the input signals evaluated at the transform frequencies of
         // the correlograms.  Hence, the is significant padding.
@@ -420,13 +436,28 @@ public:
         }
         ippsFree(xcTemp);
         } // End parallel
+        // Compute envelopes?
+        if (mParms.getFilteringType() ==
+            CorrelogramFilteringType::FIR_ENVELOPE_FILTERING)
+        {
+            #pragma omp parallel for
+            for (int ixc=0; ixc<mNumberOfCorrelograms; ++ixc)
+            {
+                int threadID = omp_get_thread_num();
+                int j1 = ixc*mCorrelogramLeadingDimension;
+                auto xcPtr = &mRawOutputCorrelograms[j1];
+                auto ycPtr = &mProcessedCorrelograms[j1];
+                mEnvelopes[threadID].transform(mSamplesInCorrelogram,
+                                               xcPtr, &ycPtr);
+            }
+        }
         mHaveCorrelograms = true;
     }
 //private:
     /// FIR envelope filter
     std::vector<RTSeis::Utilities::Transforms::FIREnvelope<double>> mEnvelopes;
     /// Correlogram parameters
-    CorrelationEngineParameters mParms;
+    CorrelogramParameters mParms;
     /// A pointer to the input data that was transformed to the frequency 
     /// domain This is a row major matrix whose dimensions are
     /// [mNumberOfSignals x mSpectraLeadingDimension].  Note, it shares the same
@@ -501,7 +532,7 @@ public:
 };
 
 template<>
-class CorrelationEngine<float>::CorrelationEngineImpl
+class Correlograms<float>::CorrelogramsImpl
 {
 public:
 
@@ -514,23 +545,23 @@ public:
 
 /// Constructors
 template<class T>
-CorrelationEngine<T>::CorrelationEngine() :
-    pImpl(std::make_unique<CorrelationEngineImpl> ()) 
+Correlograms<T>::Correlograms() :
+    pImpl(std::make_unique<CorrelogramsImpl> ()) 
 {
 }
 
 template<class T>
-CorrelationEngine<T>::CorrelationEngine(
-    const CorrelationEngineParameters &parameters) :
-    pImpl(std::make_unique<CorrelationEngineImpl> ())
+Correlograms<T>::Correlograms(
+    const CorrelogramParameters &parameters) :
+    pImpl(std::make_unique<CorrelogramsImpl> ())
 {
     initialize(parameters);
 }
 
 /*
 template<class T>
-CorrelationEngine<T>::CorrelationEngine(
-    const CorrelationEngine &engine)
+Correlograms<T>::Correlograms(
+    const Correlograms &engine)
 {
     *this = engine;
 }
@@ -538,14 +569,14 @@ CorrelationEngine<T>::CorrelationEngine(
 
 /// Move constructor
 template<class T>
-CorrelationEngine<T>::CorrelationEngine(CorrelationEngine &&engine) noexcept
+Correlograms<T>::Correlograms(Correlograms &&engine) noexcept
 {
     *this = std::move(engine);
 }
 
 /// Operators
-template<class T> CorrelationEngine<T>&
-CorrelationEngine<T>::operator=(CorrelationEngine &&engine) noexcept
+template<class T> Correlograms<T>&
+Correlograms<T>::operator=(Correlograms &&engine) noexcept
 {
     if (&engine == this){return *this;}
     if (pImpl){pImpl.reset();}
@@ -555,18 +586,17 @@ CorrelationEngine<T>::operator=(CorrelationEngine &&engine) noexcept
 
 /// Destructor
 template<class T>
-CorrelationEngine<T>::~CorrelationEngine() = default;
+Correlograms<T>::~Correlograms() = default;
 
 template<class T>
-void CorrelationEngine<T>::clear() noexcept
+void Correlograms<T>::clear() noexcept
 {
     pImpl->clear();
 }
 
 /// Initializer
 template<class T>
-void CorrelationEngine<T>::initialize(
-    const CorrelationEngineParameters &parameters)
+void Correlograms<T>::initialize(const CorrelogramParameters &parameters)
 {
     if (!parameters.isValid())
     {
@@ -580,7 +610,7 @@ void CorrelationEngine<T>::initialize(
 
 /// Set the input signal - double to double
 template<>
-void CorrelationEngine<double>::setInputSignal(
+void Correlograms<double>::setInputSignal(
     const int waveID, const int nSamples, const double *__restrict__ x)
 {
     pImpl->mHaveCorrelograms = false;
@@ -603,7 +633,7 @@ void CorrelationEngine<double>::setInputSignal(
 
 /// Set the input signal - float to double
 template<>
-void CorrelationEngine<double>::setInputSignal(
+void Correlograms<double>::setInputSignal(
     const int waveID, const int nSamples, const float x[])
 {
     pImpl->mHaveCorrelograms = false;
@@ -626,7 +656,7 @@ void CorrelationEngine<double>::setInputSignal(
 
 /// Set an input signal to zero
 template<class T>
-void CorrelationEngine<T>::zeroInputSignal(const int waveID)
+void Correlograms<T>::zeroInputSignal(const int waveID)
 {
     pImpl->mHaveCorrelograms = false;
     // Verify class is initialized
@@ -647,7 +677,7 @@ void CorrelationEngine<T>::zeroInputSignal(const int waveID)
 
 /// Compute cross correlograms
 template<class T>
-void CorrelationEngine<T>::computeCrossCorrelograms()
+void Correlograms<T>::computeCrossCorrelograms()
 {
     constexpr bool mCrossCorrelate = true;
     if (!isInitialized()){throw std::runtime_error("Class not initialized\n");}
@@ -656,7 +686,7 @@ void CorrelationEngine<T>::computeCrossCorrelograms()
 
 /// Compute phase correlograms
 template<class T>
-void CorrelationEngine<T>::computePhaseCorrelograms()
+void Correlograms<T>::computePhaseCorrelograms()
 {
     constexpr bool mCrossCorrelate = false;
     if (!isInitialized()){throw std::runtime_error("Class not initialized\n");}
@@ -665,7 +695,7 @@ void CorrelationEngine<T>::computePhaseCorrelograms()
 
 /// Get a correlogram
 template<class T>
-const T* CorrelationEngine<T>::getRawCorrelogramPointer(const int ixc) const
+const T* Correlograms<T>::getRawCorrelogramPointer(const int ixc) const
 {
     auto nxc = getNumberOfCorrelograms(); // Throws on initialization
     if (!haveCorrelograms())
@@ -686,7 +716,29 @@ const T* CorrelationEngine<T>::getRawCorrelogramPointer(const int ixc) const
 }
 
 template<class T>
-void CorrelationEngine<T>::getRawCorrelogram(
+const T* Correlograms<T>::getProcessedCorrelogramPointer(
+    const int ixc) const
+{
+    auto nxc = getNumberOfCorrelograms(); // Throws on initialization
+    if (!haveCorrelograms())
+    {
+        throw std::runtime_error("Correlograms not yet computed\n");
+    }
+    // Check that ixc is in range
+    if (ixc < 0 || ixc >= nxc)
+    {
+        throw std::invalid_argument("ixc = " + std::to_string(ixc)
+                                  + " must be in range [0,"
+                                  + std::to_string(nxc-1) + "]\n");
+    }
+    int index = static_cast<size_t> (ixc)
+               *static_cast<size_t> (pImpl->mCorrelogramLeadingDimension);
+    const T *xcPtr = &pImpl->mProcessedCorrelograms[index];
+    return xcPtr;
+}
+
+template<class T>
+void Correlograms<T>::getRawCorrelogram(
     const int ixc, const int nwork, T *xcIn[]) const
 {
     // Get pointer to correlogram.  This throws an initialization error
@@ -709,23 +761,48 @@ void CorrelationEngine<T>::getRawCorrelogram(
     std::copy(xcPtr, xcPtr+nwork, xc);    
 }
 
+template<class T>
+void Correlograms<T>::getProcessedCorrelogram(
+    const int ixc, const int nwork, T *xcIn[]) const
+{
+    // Get pointer to correlogram.  This throws an initialization error
+    // and checks if ixc is valid
+    auto xcPtr __attribute__((aligned(64)))
+        = getProcessedCorrelogramPointer(ixc);
+    // Get the correlogram length and check nwork and xcIn
+    int lxc = getCorrelogramLength();
+    T *xc = *xcIn;
+    if (nwork < lxc || xc == nullptr)
+    {
+        if (nwork < lxc)
+        {
+            throw std::invalid_argument("nwork = " + std::to_string(nwork)
+                                      + " must be at least = "
+                                      + std::to_string(lxc));
+        }
+        throw std::invalid_argument("xcIn is NULL\n");
+    }
+    // Finally perform the copy
+    std::copy(xcPtr, xcPtr+nwork, xc);
+}
+
 /// Initialized?
 template<class T>
-bool CorrelationEngine<T>::isInitialized() const noexcept
+bool Correlograms<T>::isInitialized() const noexcept
 {
     return pImpl->mInitialized;
 }
 
 /// Checks if the correlograms have been computed 
 template<class T>
-bool CorrelationEngine<T>::haveCorrelograms() const noexcept
+bool Correlograms<T>::haveCorrelograms() const noexcept
 {
     return pImpl->mHaveCorrelograms;
 }
 
 /// Number of samples in input signals
 template<class T>
-int CorrelationEngine<T>::getInputSignalLength() const
+int Correlograms<T>::getInputSignalLength() const
 {
     if (!isInitialized()){throw std::runtime_error("Class not initialized\n");}
     return pImpl->mSamples;
@@ -733,7 +810,7 @@ int CorrelationEngine<T>::getInputSignalLength() const
 
 /// Number of correlograms
 template<class T>
-int CorrelationEngine<T>::getNumberOfCorrelograms() const
+int Correlograms<T>::getNumberOfCorrelograms() const
 {
     if (!isInitialized()){throw std::runtime_error("Class not initialized\n");}
     return pImpl->mNumberOfCorrelograms;
@@ -741,13 +818,13 @@ int CorrelationEngine<T>::getNumberOfCorrelograms() const
 
 /// Number of samples in correlogram
 template<class T>
-int CorrelationEngine<T>::getCorrelogramLength() const
+int Correlograms<T>::getCorrelogramLength() const
 {
     if (!isInitialized()){throw std::runtime_error("Class not initialized\n");}
     return pImpl->mSamplesInCorrelogram;
 }
 
 /// Template instantiation
-template class XCLoc::CorrelationEngine<double>;
-//template class XCLoc::CorrelationEngine<float>;
+template class XCLoc::Correlograms<double>;
+//template class XCLoc::Correlograms<float>;
 

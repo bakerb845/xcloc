@@ -3,12 +3,12 @@
 #include <string>
 #include <vector>
 #include <cassert>
-#include "xcloc/correlationEngineParameters.hpp"
+#include "xcloc/correlogramParameters.hpp"
 #include "xcloc/enums.hpp"
 
 using namespace XCLoc;
 
-class CorrelationEngineParameters::CorrelationEngineParametersImpl
+class CorrelogramParameters::CorrelogramParametersImpl
 {
 public:
     /// Cross-correlation pairs
@@ -28,36 +28,36 @@ public:
 };
 
 /// Constructors
-CorrelationEngineParameters::CorrelationEngineParameters() :
-    pImpl(std::make_unique<CorrelationEngineParametersImpl> ())
+CorrelogramParameters::CorrelogramParameters() :
+    pImpl(std::make_unique<CorrelogramParametersImpl> ())
 {
 }
 
-CorrelationEngineParameters::CorrelationEngineParameters(
-    const CorrelationEngineParameters &parameters)
+CorrelogramParameters::CorrelogramParameters(
+    const CorrelogramParameters &parameters)
 {
     *this = parameters;
 }
 
-CorrelationEngineParameters::CorrelationEngineParameters(
-    CorrelationEngineParameters &&parameters) noexcept
+CorrelogramParameters::CorrelogramParameters(
+    CorrelogramParameters &&parameters) noexcept
 {
     *this = std::move(parameters);
 }
 
 /// Operators
-CorrelationEngineParameters&
-CorrelationEngineParameters::operator=(
-    const CorrelationEngineParameters &parms)
+CorrelogramParameters&
+CorrelogramParameters::operator=(
+    const CorrelogramParameters &parms)
 {
     if (&parms == this){return *this;}
-    pImpl = std::make_unique<CorrelationEngineParametersImpl> (*parms.pImpl);
+    pImpl = std::make_unique<CorrelogramParametersImpl> (*parms.pImpl);
     return *this; 
 }
 
-CorrelationEngineParameters&
-CorrelationEngineParameters::operator=(
-   CorrelationEngineParameters &&parms) noexcept
+CorrelogramParameters&
+CorrelogramParameters::operator=(
+   CorrelogramParameters &&parms) noexcept
 {
     if (&parms == this){return *this;}
     pImpl = std::move(parms.pImpl);
@@ -65,9 +65,9 @@ CorrelationEngineParameters::operator=(
 }
 
 /// Destructors
-CorrelationEngineParameters::~CorrelationEngineParameters() = default;
+CorrelogramParameters::~CorrelogramParameters() = default;
 
-void CorrelationEngineParameters::clear() noexcept
+void CorrelogramParameters::clear() noexcept
 {
     pImpl->mXCPairs.clear();
     pImpl->mSamples = 0;
@@ -78,7 +78,7 @@ void CorrelationEngineParameters::clear() noexcept
 }
 
 /// Number of samples
-void CorrelationEngineParameters::setNumberOfSamples(const int nSamples)
+void CorrelogramParameters::setNumberOfSamples(const int nSamples)
 {
     pImpl->mSamples = 0;
     pImpl->mPadSamples = 0;
@@ -92,7 +92,7 @@ void CorrelationEngineParameters::setNumberOfSamples(const int nSamples)
     pImpl->mPadSamples = nSamples;
 }
 
-int CorrelationEngineParameters::getNumberOfSamples() const
+int CorrelogramParameters::getNumberOfSamples() const
 {
     if (pImpl->mSamples < 1)
     {
@@ -102,7 +102,7 @@ int CorrelationEngineParameters::getNumberOfSamples() const
 }
 
 /// Creat a default correlation pairs table
-void CorrelationEngineParameters::setCorrelationPairs(
+void CorrelogramParameters::setCorrelationPairs(
     const int nSignals, const bool ldoAutoCorrelations)
 {
     pImpl->mXCPairs.clear();
@@ -147,7 +147,7 @@ void CorrelationEngineParameters::setCorrelationPairs(
     setCorrelationPairs(xcPairs);
 }
 
-void CorrelationEngineParameters::setCorrelationPairs(
+void CorrelogramParameters::setCorrelationPairs(
     const std::vector<std::pair<int, int>> &xcPairs)
 {
     pImpl->mXCPairs.clear();
@@ -159,7 +159,7 @@ void CorrelationEngineParameters::setCorrelationPairs(
 }
 
 std::vector<std::pair<int, int>>
-CorrelationEngineParameters::getCorrelationPairs() const
+CorrelogramParameters::getCorrelationPairs() const
 {
     if (pImpl->mXCPairs.empty())
     {
@@ -169,7 +169,7 @@ CorrelationEngineParameters::getCorrelationPairs() const
 }
 
 std::pair<int, int>
-CorrelationEngineParameters::getCorrelationPair(const int ixc) const
+CorrelogramParameters::getCorrelationPair(const int ixc) const
 {
     auto nXCPairs = getNumberOfCorrelationPairs(); // throws
     if (ixc < 0 || ixc >= nXCPairs)
@@ -183,7 +183,7 @@ CorrelationEngineParameters::getCorrelationPair(const int ixc) const
 }
 
 /// Number of correlation pairs
-int CorrelationEngineParameters::getNumberOfCorrelationPairs() const
+int CorrelogramParameters::getNumberOfCorrelationPairs() const
 {
     if (pImpl->mXCPairs.empty())
     {
@@ -194,7 +194,7 @@ int CorrelationEngineParameters::getNumberOfCorrelationPairs() const
 
 
 /// Number of padded samples
-void CorrelationEngineParameters::setNumberOfPaddedSamples(
+void CorrelogramParameters::setNumberOfPaddedSamples(
     const int nPadSamples)
 {
     pImpl->mPadSamples = pImpl->mSamples;
@@ -209,7 +209,7 @@ void CorrelationEngineParameters::setNumberOfPaddedSamples(
     pImpl->mPadSamples = nPadSamples; 
 }
 
-int CorrelationEngineParameters::getNumberOfPaddedSamples() const
+int CorrelogramParameters::getNumberOfPaddedSamples() const
 {
     if (pImpl->mPadSamples < 1)
     {
@@ -218,33 +218,33 @@ int CorrelationEngineParameters::getNumberOfPaddedSamples() const
     return pImpl->mPadSamples;
 }
 
-int CorrelationEngineParameters::getCorrelogramLength() const
+int CorrelogramParameters::getCorrelogramLength() const
 {
     int lenxc = 2*getNumberOfPaddedSamples() - 1; // throws
     return lenxc;
 }
 
 /// MKL accuracy
-void CorrelationEngineParameters::setMKLFloatingPointAccuracy(
+void CorrelogramParameters::setMKLFloatingPointAccuracy(
     const MKLFloatingPointAccuracy accuracy) noexcept
 {
     pImpl->mMKLAccuracy = accuracy;
 }
 
 MKLFloatingPointAccuracy 
-CorrelationEngineParameters::getMKLFloatingPointAccuracy() const noexcept
+CorrelogramParameters::getMKLFloatingPointAccuracy() const noexcept
 {
     return pImpl->mMKLAccuracy;
 }
 
 /// No filtering - compute raw correlograms
-void CorrelationEngineParameters::setNoFiltering() noexcept
+void CorrelogramParameters::setNoFiltering() noexcept
 {
     pImpl->mFilterType = CorrelogramFilteringType::NO_FILTERING;
 }
 
 /// FIR envelope
-void CorrelationEngineParameters::setFIREnvelopeFiltering(
+void CorrelogramParameters::setFIREnvelopeFiltering(
     const int envelopeLength)
 {
     pImpl->mFilterType = CorrelogramFilteringType::NO_FILTERING;
@@ -280,7 +280,7 @@ void CorrelationEngineParameters::setFIREnvelopeFiltering(
     pImpl->mFilterType = CorrelogramFilteringType::FIR_ENVELOPE_FILTERING;
 }
 
-int CorrelationEngineParameters::getFIREnvelopeFilterLength() const
+int CorrelogramParameters::getFIREnvelopeFilterLength() const
 {
     if (getFilteringType() != CorrelogramFilteringType::FIR_ENVELOPE_FILTERING)
     {
@@ -291,13 +291,13 @@ int CorrelationEngineParameters::getFIREnvelopeFilterLength() const
 
 /// Filtering strategy 
 CorrelogramFilteringType
-CorrelationEngineParameters::getFilteringType() const noexcept
+CorrelogramParameters::getFilteringType() const noexcept
 {
     return pImpl->mFilterType;
 }
 
 // Valid?
-bool CorrelationEngineParameters::isValid() const noexcept
+bool CorrelogramParameters::isValid() const noexcept
 {
     if (pImpl->mSamples < 1){return false;}
     if (pImpl->mXCPairs.empty()){return false;}

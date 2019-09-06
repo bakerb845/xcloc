@@ -85,10 +85,10 @@ endif()
 #                    )
 
 set(LIBSRC
-    src/correlationEngine.cpp
-    src/correlationEngineParameters.cpp
+    src/correlograms.cpp
+    src/correlogramParameters.cpp
     src/diffractionStackMigrationEngine.cpp
-    src/mesh/regularMesh.cpp
+    src/mesh/regularMesh3D.cpp
     src/version.cpp)
 
 set(LIBALL ${RTSEIS_LIBRARY} ${MKL_LIBRARY} ${IPP_LIBRARY})
@@ -105,7 +105,8 @@ target_link_libraries(xcloc PRIVATE ${LIBALL})
 add_executable(testSerialLibrary
                testing/main.cpp
                testing/correlationEngine.cpp
-               testing/mesh.cpp)
+               testing/mesh.cpp
+               testing/gaussianWavelet.cpp)
 target_link_libraries(testSerialLibrary
                       PRIVATE xcloc ${LIBALL} ${GTEST_BOTH_LIBRARIES})
 target_include_directories(testSerialLibrary

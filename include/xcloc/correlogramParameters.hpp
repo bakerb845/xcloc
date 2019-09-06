@@ -1,17 +1,17 @@
-#ifndef XCLOC_CORRELATIONENGINEPARAMETERS_HPP
-#define XCLOC_CORRELATIONENGINEPARAMETERS_HPP 1
+#ifndef XCLOC_CORRELOGRAMPARAMETERS_HPP
+#define XCLOC_CORRELOGRAMPARAMETERS_HPP 1
 #include <vector>
 #include <memory>
 #include "xcloc/enums.hpp"
 
 namespace XCLoc
 {
-class CorrelationEngineParameters;
+class CorrelogramParameters;
 /*!
- * @class CorrelationEngineParameters "correlationEngineParameters.hpp" "xcloc/correlationEngineParameters.hpp"
+ * @class CorrelogramParameters "correlationEngineParameters.hpp" "xcloc/correlationEngineParameters.hpp"
  * @brief This defines the parameters for the cross-correlation engine.
  */
-class CorrelationEngineParameters
+class CorrelogramParameters
 {
 public:
     /*! @name Constructors
@@ -20,20 +20,20 @@ public:
     /*!
      * @brief Default constructor.
      */
-    CorrelationEngineParameters();
+    CorrelogramParameters();
     /*!
      * @brief Copy constructor.
      * @param[in] parameters  The parameters from which to initialize 
      *                        this class.
      */
-    CorrelationEngineParameters(const CorrelationEngineParameters &parameters);
+    CorrelogramParameters(const CorrelogramParameters &parameters);
     /*!
      * @brief Move constructor.
      * @param[in,out] parameters  The parameters class from which to initialize
      *                            this class.  On exit, parameters' behavior is
      *                            undefined.
      */
-    CorrelationEngineParameters(CorrelationEngineParameters &&parameters) noexcept;
+    CorrelogramParameters(CorrelogramParameters &&parameters) noexcept;
     /*! @} */
 
     /*! @name Operators
@@ -44,14 +44,14 @@ public:
      * @param[in,out] parameters  The parameters to copy.
      * @result A deep copy of the parameters.
      */
-    CorrelationEngineParameters& operator=(const CorrelationEngineParameters &parameters); 
+    CorrelogramParameters& operator=(const CorrelogramParameters &parameters); 
     /*!
      * @brief Move assignment operator.
      * @param[in,out] parameters  The parameters memory to be moved to this.
      *                            On exit, parameters' behavior is undefined.
      * @result The moved memory from parameters.
      */
-    CorrelationEngineParameters& operator=(CorrelationEngineParameters &&parameters) noexcept;
+    CorrelogramParameters& operator=(CorrelogramParameters &&parameters) noexcept;
     /*! @} */
 
     /*! @name Destructors
@@ -60,7 +60,7 @@ public:
     /*!
      * @brief Destructor
      */
-    ~CorrelationEngineParameters();
+    ~CorrelogramParameters();
     /*!
      * @brief Resets the class.
      */
@@ -233,8 +233,8 @@ public:
      */
     bool isValid() const noexcept;
 private:
-    class CorrelationEngineParametersImpl;
-    std::unique_ptr<CorrelationEngineParametersImpl> pImpl;
+    class CorrelogramParametersImpl;
+    std::unique_ptr<CorrelogramParametersImpl> pImpl;
 };
 }
 #endif
