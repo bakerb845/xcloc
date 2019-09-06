@@ -11,17 +11,6 @@ template<class T = double>
 class RegularMesh3D : public IMesh<T>
 {
 public:
-    /*!
-     * @brief Defines the storage ordering of the field in the regular mesh.
-     */
-    enum FieldOrdering
-    {
-        NX_NY_NZ, /*!< The field is packed in row major order [nx, ny, nz]
-                       where nz changes most rapidly and nx changes slowest. */
-        NZ_NY_NX  /*!< The field is packed in row major order [nz, ny, nx]
-                       where nx changes most rapidly and nz changes slowest. */
-    };
-public:
     /*! @name Constructors
      * @{
      */

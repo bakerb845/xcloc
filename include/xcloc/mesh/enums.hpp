@@ -38,5 +38,16 @@ enum class RegularMesh3DOrderingType
                    where nx changes most rapidly and nz changes slowest. */
 };
 
+/*!
+ * @brief Defines the storage ordering of the field in the regular 3D mesh.
+ */
+enum class RegularMesh2DOrderingType
+{
+    NX_NZ, /*!< The field is packed in row major order [nx, nz]
+                where nz changes most rapidly and nx changes slowest. */
+    NZ_NX  /*!< The field is packed in row major order [nz, nx]
+                where nx changes most rapidly and nz changes slowest. */
+};
+
 }
 #endif
