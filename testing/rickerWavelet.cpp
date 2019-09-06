@@ -5,7 +5,7 @@
 #include <cmath>
 #include <cstring>
 #include <ipps.h>
-#include "gaussianWavelet.hpp"
+#include "rickerWavelet.hpp"
 #include "rtseis/utilities/transforms/dftRealToComplex.hpp"
 
 class RickerWavelet::RickerWaveletImpl
@@ -286,3 +286,12 @@ RickerWavelet::getWaveletFourierTransform() const
     }
     return pImpl->mRickerDFT; 
 } 
+
+/// Valid?
+bool RickerWavelet::isValid() const noexcept
+{
+    if (!haveSamplingRate()){return false;}
+    if (!haveCenterFrequency()){return false;}
+    if (!haveNumberOfSamples()){return false;}
+    return true;
+}

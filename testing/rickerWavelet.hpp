@@ -101,6 +101,12 @@ public:
     bool haveNumberOfSamples() const noexcept;
     /*! @} */
 
+    /*!
+     * @brief Checks if this is usable source time function class.
+     * @result True indicates that this is a usable source time function.
+     */
+    bool isValid() const noexcept;
+
     /*! @name Center Frequency
      * @{
      */

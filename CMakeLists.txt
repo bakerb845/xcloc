@@ -36,8 +36,10 @@ if (XCLOC_WRAP_PYTHON)
 endif()
 set(FindIPP_DIR ${CMAKE_SOURCE_DIR}/CMakeModules)
 set(FindRTSeis_DIR ${CMAKE_SOURCE_DIR}/CMakeModules)
+#set(FindHDF5_DIR ${FindHDF5_DIR})
 find_package(GTest REQUIRED)
 find_package(FindIPP REQUIRED)
+#find_package(FindHDF5)
 find_package(FindRTSeis)
 if (${RTSEIS_FOUND})
    message("RTSeis found")
@@ -54,6 +56,7 @@ include_directories(
    ${IPP_INCLUDE_DIR}
    ${MKL_INCLUDE_DIR}
    ${RTSEIS_INCLUDE_DIR}
+   ${HDF5_INCLUDE_DIR}
 )
 set(PRIVATE_INCLUDE_DEPENDS ${IPP_INCLUDE_DIR} ${MKL_INCLUDE_DIR})
 message("Include directories:" ${PRIVATE_INCLUDE_DEPENDS})
@@ -100,9 +103,10 @@ set(LIBSRC
     src/diffractionStackMigrationEngine.cpp
     src/mesh/regularMesh2D.cpp
     src/mesh/regularMesh3D.cpp
+    src/mesh/h5io.cpp
     src/version.cpp)
 
-set(LIBALL ${RTSEIS_LIBRARY} ${MKL_LIBRARY} ${IPP_LIBRARY})
+set(LIBALL ${RTSEIS_LIBRARY} ${MKL_LIBRARY} ${IPP_LIBRARY} ${HDF5_CXX_LIBRARIES} ${HDF5_LIBRARIES})
 set(LIBALL_PYTHON xcloc ${LIBALL} ${PYTHON_LIBRARIES})
 
 add_library(xcloc SHARED ${LIBSRC})
@@ -115,7 +119,8 @@ add_executable(testSerialLibrary
                testing/main.cpp
                testing/correlationEngine.cpp
                testing/mesh.cpp
-               testing/gaussianWavelet.cpp)
+               testing/acousticGreens2D.cpp
+               testing/rickerWavelet.cpp)
 target_link_libraries(testSerialLibrary
                       PRIVATE xcloc ${LIBALL} ${GTEST_BOTH_LIBRARIES})
 target_include_directories(testSerialLibrary
