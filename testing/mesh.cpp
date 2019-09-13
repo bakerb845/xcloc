@@ -68,16 +68,54 @@ TEST(testMesh, regularMesh3D)
         {
             for (int i=0; i<nx-1; ++i)
             {
-                cellScalar1[i*(nz-1)*(ny-1) + j*(nz-1) + k] = -iter;
-                cellScalar2[k*(nx-1)*(ny-1) + j*(nx-1) + i] = +iter;
+                int icell = i*(nz-1)*(ny-1) + j*(nz-1) + k;
+                int jcell = k*(nx-1)*(ny-1) + j*(nx-1) + i;
+                cellScalar1[icell] = -iter;
+                cellScalar2[jcell] = +iter;
+                int icellx, icelly, icellz;
+                mesh.convertCellIndexToGrid(jcell, &icellx, &icelly, &icellz);
+                EXPECT_EQ(icellx, i);
+                EXPECT_EQ(icelly, j);
+                EXPECT_EQ(icellz, k);
+                double x, y, z;
+                double xref = x0 + i*dx + dx/2;
+                double yref = y0 + j*dy + dy/2;
+                double zref = z0 + k*dz + dz/2;
+                mesh.convertCellIndexToPosition(jcell, &x, &y, &z);
+                EXPECT_NEAR(x, xref, 1.e-14);
+                EXPECT_NEAR(y, yref, 1.e-14);
+                EXPECT_NEAR(z, zref, 1.e-14);
                 iter = iter + 1;
             }
         }
     }
-    for (int i=0; i<mesh.getNumberOfGridPoints(); ++i)
+    iter = 1;
+    for (int k=0; k<nz; ++k)
     {
-        nodeScalar1[i] =-(i + 1);
-        nodeScalar2[i] = (i + 1);
+        for (int j=0; j<ny; ++j)
+        {
+            for (int i=0; i<nx; ++i)
+            {
+                int igrd = i*nz*ny + j*nz + k;
+                int jgrd = k*nx*ny + j*nx + i;
+                int ix, iy, iz;
+                mesh.convertNodeIndexToGrid(jgrd, &ix, &iy, &iz);
+                EXPECT_EQ(i, ix);
+                EXPECT_EQ(j, iy);
+                EXPECT_EQ(k, iz);
+                double x, y, z;
+                double xref = x0 + i*dx;
+                double yref = y0 + j*dy;
+                double zref = z0 + k*dz;
+                mesh.convertGridIndexToPosition(jgrd, &x, &y, &z);
+                EXPECT_NEAR(x, xref, 1.e-14);
+                EXPECT_NEAR(y, yref, 1.e-14);
+                EXPECT_NEAR(z, zref, 1.e-14);
+                nodeScalar1[igrd] =-iter; //(igrd + 1);
+                nodeScalar2[jgrd] = iter; //(igrd + 1);
+                iter = iter + 1;
+            }
+        }
     }
     // Set cell data
     EXPECT_FALSE(mesh.haveCellularScalarField("cellTest1"));

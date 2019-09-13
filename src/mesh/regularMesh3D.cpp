@@ -3,6 +3,7 @@
 #include <map>
 #include <vector>
 #include <string>
+#include <cassert>
 #include <algorithm>
 #include <boost/align/aligned_allocator.hpp>
 #include "xcloc/mesh/regularMesh3D.hpp"
@@ -105,6 +106,14 @@ RegularMesh3D<T>& RegularMesh3D<T>::operator=(const RegularMesh3D &mesh)
     if (pImpl){clear();}
     pImpl = std::make_unique<RegularMeshImpl> (*mesh.pImpl);
     return *this;
+}
+
+/// Deep copy
+template<class T>
+std::unique_ptr<IMesh<T>> RegularMesh3D<T>::clone() const
+{
+    auto res = std::make_unique<RegularMesh3D> (*this);
+    return res;
 }
 
 /// Number of grid points in x
@@ -422,6 +431,45 @@ std::pair<T, int> RegularMesh3D<T>::getCellularScalarFieldMaxValueAndIndex(
     return result;
 }
 
+/// Grid conversions
+template<class T>
+void RegularMesh3D<T>::convertCellIndexToGrid(
+    const int index,
+    int *icellx, int *icelly, int *icellz) const
+{
+    int ncell = getNumberOfCells(); // Throws
+    if (index < 0 || index >= ncell)
+    {
+        throw std::invalid_argument("index = " + std::to_string(index)
+                                  + " must be in range [0,"
+                                  + std::to_string(ncell-1) + "]\n");
+    }
+    auto nxny = (pImpl->mGridPointsInX - 1)*(pImpl->mGridPointsInY - 1);
+    auto nx = pImpl->mGridPointsInX - 1;
+    // Solve for slowest changing index (z), intermediate (y), then fastest (x)
+    *icellz = index/nxny;
+    *icelly = (index - *icellz*nxny)/nx;
+    *icellx = index - *icelly*nx - *icellz*nxny;
+}
+
+template<class T>
+void RegularMesh3D<T>::convertCellIndexToPosition(
+    const int index, double *x, double *y, double *z) const
+{
+    int ix, iy, iz;
+    convertCellIndexToGrid(index, &ix, &iy, &iz); // Throws
+    auto dx = getGridSpacingInX(); // Throws
+    auto dy = getGridSpacingInY(); // Throws
+    auto dz = getGridSpacingInZ(); // Throws
+    // Shift origins so that we finish half way between grid points
+    auto x0 = getOriginInX() + dx/2;
+    auto y0 = getOriginInY() + dy/2;
+    auto z0 = getOriginInZ() + dz/2;
+    *x = x0 + static_cast<double> (ix)*dx;
+    *y = y0 + static_cast<double> (iy)*dy;
+    *z = z0 + static_cast<double> (iz)*dz;
+}
+
 /// Nodal-based scalar field
 template<class T>
 void RegularMesh3D<T>::setNodalScalarField(
@@ -531,6 +579,44 @@ XCLoc::Mesh::MeshType RegularMesh3D<T>::getMeshType() const noexcept
 {
     return pImpl->mMeshType;
 }
+
+/// Grid conversions
+template<class T>
+void RegularMesh3D<T>::convertNodeIndexToGrid(const int index,
+                                              int *ix, int *iy, int *iz) const
+{
+    int ngrd = getNumberOfGridPoints(); // Throws
+    if (index < 0 || index >= ngrd)
+    {
+        throw std::invalid_argument("index = " + std::to_string(index)
+                                  + " must be in range [0,"
+                                  + std::to_string(ngrd-1) + "]\n");
+    }
+    auto nxny = pImpl->mGridPointsInX*pImpl->mGridPointsInY;
+    auto nx = pImpl->mGridPointsInX;
+    // Solve for slowest changing index (z), intermediate (y), then fastest (x)
+    *iz = index/nxny;
+    *iy = (index - *iz*nxny)/nx;
+    *ix = index - *iy*nx - *iz*nxny;
+}
+
+template<class T>
+void RegularMesh3D<T>::convertGridIndexToPosition(
+    const int index, double *x, double *y, double *z) const
+{
+    int ix, iy, iz;
+    convertNodeIndexToGrid(index, &ix, &iy, &iz); // Throws
+    auto dx = getGridSpacingInX(); // Throws
+    auto dy = getGridSpacingInY(); // Throws
+    auto dz = getGridSpacingInZ(); // Throws
+    auto x0 = getOriginInX();
+    auto y0 = getOriginInY();
+    auto z0 = getOriginInZ();
+    *x = x0 + static_cast<double> (ix)*dx;
+    *y = y0 + static_cast<double> (iy)*dy;
+    *z = z0 + static_cast<double> (iz)*dz;
+}
+
 
 /// Class instantiation
 template class XCLoc::Mesh::RegularMesh3D<double>;

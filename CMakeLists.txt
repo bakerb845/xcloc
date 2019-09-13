@@ -100,7 +100,9 @@ endif()
 set(LIBSRC
     src/correlograms.cpp
     src/correlogramParameters.cpp
-    src/diffractionStackMigrationEngine.cpp
+    src/correlogramDSM.cpp
+    src/correlogramDSMParameters.cpp
+    src/travelTimeTable.cpp
     src/mesh/regularMesh2D.cpp
     src/mesh/regularMesh3D.cpp
     src/mesh/h5io.cpp
@@ -119,6 +121,7 @@ add_executable(testSerialLibrary
                testing/main.cpp
                testing/correlationEngine.cpp
                testing/mesh.cpp
+               testing/dsm.cpp
                testing/acousticGreens2D.cpp
                testing/rickerWavelet.cpp)
 target_link_libraries(testSerialLibrary

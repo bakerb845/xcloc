@@ -99,6 +99,14 @@ RegularMesh2D<T>& RegularMesh2D<T>::operator=(const RegularMesh2D &mesh)
     return *this;
 }
 
+/// Deep copy
+template<class T>
+std::unique_ptr<IMesh<T>> RegularMesh2D<T>::clone() const
+{
+    auto res = std::make_unique<RegularMesh2D> (*this);
+    return res;
+}
+
 /// Number of grid points in x
 template<class T>
 void RegularMesh2D<T>::setNumberOfGridPointsInX(const int nx)
@@ -349,6 +357,39 @@ std::pair<T, int> RegularMesh2D<T>::getCellularScalarFieldMaxValueAndIndex(
     return result;
 }
 
+/// Grid conversions
+template<class T>
+void RegularMesh2D<T>::convertCellIndexToGrid(
+    const int index, int *icellx, int *icellz) const
+{
+    int ncell = getNumberOfCells(); // Throws
+    if (index < 0 || index >= ncell)
+    {
+        throw std::invalid_argument("index = " + std::to_string(index)
+                                  + " must be in range [0,"
+                                  + std::to_string(ncell-1) + "]\n");
+    }
+    auto nx = pImpl->mGridPointsInX - 1;
+    // Solve for slowest changing index (z) then fastest changing index (x)
+    *icellz = index/nx;
+    *icellx = index - *icellz*nx;
+}
+
+template<class T>
+void RegularMesh2D<T>::convertCellIndexToPosition(
+    const int index, double *x, double *z) const
+{
+    int ix, iz;
+    convertCellIndexToGrid(index, &ix, &iz); // Throws
+    auto dx = getGridSpacingInX(); // Throws
+    auto dz = getGridSpacingInZ(); // Throws
+    // Shift origins so that we finish half way between grid points
+    auto x0 = getOriginInX() + dx/2;
+    auto z0 = getOriginInZ() + dz/2;
+    *x = x0 + static_cast<double> (ix)*dx;
+    *z = z0 + static_cast<double> (iz)*dz;
+}
+
 /// Nodal-based scalar field
 template<class T>
 void RegularMesh2D<T>::setNodalScalarField(
@@ -446,6 +487,38 @@ RegularMesh2D<T>::getNodalScalarFieldOrdering(
         throw std::invalid_argument("field " + fieldName + " does not exist\n");
     }
     return RegularMesh2DOrderingType::NX_NZ;
+}
+
+/// Grid conversions
+template<class T>
+void RegularMesh2D<T>::convertNodeIndexToGrid(const int index,
+                                              int *ix, int *iz) const
+{
+    int ngrd = getNumberOfGridPoints(); // Throws
+    if (index < 0 || index >= ngrd)
+    {
+        throw std::invalid_argument("index = " + std::to_string(index)
+                                  + " must be in range [0,"
+                                  + std::to_string(ngrd-1) + "]\n");
+    }
+    auto nx = pImpl->mGridPointsInX;
+    // Solve for slowest changing index (z) then fastest changing index (x)
+    *iz = index/nx;
+    *ix = index - *iz*nx;
+}
+
+template<class T>
+void RegularMesh2D<T>::convertGridIndexToPosition(
+    const int index, double *x, double *z) const
+{
+    int ix, iz;
+    convertNodeIndexToGrid(index, &ix, &iz); // Throws
+    auto dx = getGridSpacingInX(); // Throws
+    auto dz = getGridSpacingInZ(); // Throws
+    auto x0 = getOriginInX();
+    auto z0 = getOriginInZ();
+    *x = x0 + static_cast<double> (ix)*dx;
+    *z = z0 + static_cast<double> (iz)*dz;
 }
 
 /// Gets the geometry type

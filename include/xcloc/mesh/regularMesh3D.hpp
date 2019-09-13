@@ -34,6 +34,7 @@ public:
      * @result A deep copy of the mesh.
      */
     RegularMesh3D& operator=(const RegularMesh3D &mesh);
+    std::unique_ptr<IMesh<T>> clone() const override;
     /*! @} */
     /*! @name Destructors 
      * @{
@@ -234,7 +235,7 @@ public:
      * @param[in] fieldName  The name of the cell-based scalar field.
      * @result True indicates that the cell-based field exists.
      */
-    bool haveCellularScalarField(const std::string &fieldName) const noexcept;
+    bool haveCellularScalarField(const std::string &fieldName) const noexcept override;
     /*!
      * @brief Gets the ordering of the cell-based scalar field.
      * @param[in] fieldName  The name of the scalar field.
@@ -279,6 +280,20 @@ public:
      */
     void convertCellIndexToGrid(int index,
                                 int *icellx, int *icelly, int *icellz) const;
+    /*!
+     * @brief Converts a cell index to position triplet (x,y,z)
+     * @param[in] index    The cell index.  This must be in the range
+     *                     [0, \c getNumberOfCells() - 1].
+     * @param[out] x       The cell's position in x (meters).
+     * @param[out] y       The cell's position in y (meters).
+     * @param[out] z       The cell'z position in z (meters).
+     * @throws std::invalid_argument if the index is out of range.
+     * @throws std::runtime_error if the number of grid points in x,
+     *         y, or z was not set or the grid spacing in x, y, or z
+     *         was not set.
+     */
+    void convertCellIndexToPosition(int index,
+                                    double *x, double *y, double *z) const;
     /*! @} */
 
     /*! @name Nodal-based Scalar Field
@@ -320,7 +335,7 @@ public:
      * @param[in] fieldName  The name of the nodal-based scalar field.
      * @result True indicates that the nodal-based field exists.
      */
-    bool haveNodalScalarField(const std::string &fieldName) const noexcept;
+    bool haveNodalScalarField(const std::string &fieldName) const noexcept override;
     /*!
      * @brief Gets the ordering of the node-based scalar field.
      * @param[in] fieldName  The name of the scalar field.
@@ -364,6 +379,20 @@ public:
      */
     void convertNodeIndexToGrid(int index,
                                 int *ix, int *iy, int *iz) const;
+    /*!
+     * @brief Converts a grid index to position triplet (x,y,z)
+     * @param[in] index    The cell index.  This must be in the range
+     *                     [0, \c getNumberOfGridPoints() - 1].
+     * @param[out] x       The grid index's position in x (meters).
+     * @param[out] y       The grid index's position in y (meters).
+     * @param[out] z       The grid index's position in z (meters).
+     * @throws std::invalid_argument if the index is out of range.
+     * @throws std::runtime_error if the number of grid points in x,
+     *         y, or z was not set or the grid spacing in x, y, or z
+     *         was not set.
+     */
+    void convertGridIndexToPosition(int index,
+                                    double *x, double *y, double *z) const;
     /*! @} */
     
     /*!

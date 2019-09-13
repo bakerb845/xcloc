@@ -7,6 +7,7 @@
 #include <ipps.h>
 #include "rickerWavelet.hpp"
 #include "rtseis/utilities/transforms/dftRealToComplex.hpp"
+#include "rtseis/utilities/transforms/utilities.hpp"
 
 class RickerWavelet::RickerWaveletImpl
 {
@@ -17,7 +18,7 @@ public:
     double mCenterFrequency = 0;
     double mTol = 0.005;
     int mSamples = 0;
-    bool mShift = true; 
+    bool mShift = false;
     bool mNormalize = true;
     bool mHaveWavelet = false;
     bool mHaveDFT = false;
@@ -46,6 +47,13 @@ RickerWavelet& RickerWavelet::operator=(const RickerWavelet &wavelet)
     return *this;
 }
 
+/// Deep copy
+std::unique_ptr<ISourceTimeFunction> RickerWavelet::clone() const
+{
+    auto res = std::make_unique<RickerWavelet> (*this);
+    return res;
+}
+
 /// Move assignment
 RickerWavelet& RickerWavelet::operator=(RickerWavelet &&wavelet) noexcept
 {
@@ -64,8 +72,9 @@ void RickerWavelet::clear() noexcept
     pImpl->mRickerDFT.clear();
     pImpl->mSamplingRate = 0;
     pImpl->mCenterFrequency = 0;
+    pImpl->mTol = 0.005;
     pImpl->mSamples = 0;
-    pImpl->mShift = true;
+    pImpl->mShift = false;
     pImpl->mNormalize = true;
     pImpl->mHaveWavelet = false;
     pImpl->mHaveDFT = false;
@@ -185,7 +194,7 @@ bool RickerWavelet::getNormalizeByEnergy() const noexcept
 
 /// Shift?
 void RickerWavelet::setShiftWaveletToTraceStart(const bool lshift,
-                                                  const double tol) noexcept
+                                                const double tol) noexcept
 {
     pImpl->mHaveWavelet = false;
     pImpl->mHaveDFT = false;
@@ -209,52 +218,53 @@ bool RickerWavelet::getShiftWaveletToTraceStart() const noexcept
 /// Compute the ricker wavelet
 std::vector<double> RickerWavelet::getWavelet() const
 {
-    pImpl->mHaveWavelet = false;
-    pImpl->mHaveDFT = false;
-    // Compute a Ricker wavelet whose peak is at the middle of the time series
-    const double peakFreq = pImpl->mCenterFrequency; 
-    const double pi2f2 = std::pow(M_PI*peakFreq, 2);
-    const double dt = 1./getSamplingRate();
-    int npts = getNumberOfSamples()/2;
-    int npts2 = npts/2;
-    double xmax = 0;
-    for (int i=0; i<npts; ++i)
+    if (!pImpl->mHaveWavelet)
     {
-        double t = static_cast<double> (-npts2 + i)*dt;
-        double t2 = t*t;
-        double pi2f2t2 = pi2f2*t2;
-        pImpl->mRicker[i] = (1.0 - 2.0*pi2f2t2)*std::exp(-pi2f2t2);
-        xmax = std::max(std::abs(pImpl->mRicker[i]), xmax);
-    }
-    // Shift the wavelet to the start of the trace - easier to work in
-    // pct of 1 b/c the wavelet has max value of 1
-    double *ricker = pImpl->mRicker.data();
-    if (pImpl->mShift)
-    {
-        double tolXmax = pImpl->mTol*xmax;
-        auto work = ippsMalloc_64f(npts);
-        ippsZero_64f(work, npts);
+        pImpl->mHaveDFT = false;
+        // Compute a Ricker wavelet whose peak is at the middle of the time series
+        const double peakFreq = pImpl->mCenterFrequency; 
+        const double pi2f2 = std::pow(M_PI*peakFreq, 2);
+        const double dt = 1./getSamplingRate();
+        int npts = getNumberOfSamples();
+        int npts2 = npts/2;
+        double xmax = 0;
+        pImpl->mRicker.resize(npts);
         for (int i=0; i<npts; ++i)
         {
-            if (std::abs(ricker[i]) > tolXmax)
-            {
-                int ncopy = npts - i;
-                ippsCopy_64f(&ricker[i], work, ncopy);
-                break;
-            }
+            double t = static_cast<double> (-npts2 + i)*dt;
+            double t2 = t*t;
+            double pi2f2t2 = pi2f2*t2;
+            pImpl->mRicker[i] = (1.0 - 2.0*pi2f2t2)*std::exp(-pi2f2t2);
+            xmax = std::max(std::abs(pImpl->mRicker[i]), xmax);
         }
-        std::memset(ricker, 0, static_cast<size_t> (npts)*sizeof(double));
-        ippsCopy_64f(work, ricker, npts);
-        ippsFree(work);
+        // Shift the wavelet to the start of the trace - easier to work in
+        // pct of 1 b/c the wavelet has max value of 1
+        double *ricker = pImpl->mRicker.data();
+        if (pImpl->mShift)
+        {
+            double tolXmax = pImpl->mTol*xmax;
+            std::vector<double> work(npts, 0); // Initialize to zeros
+            for (int i=0; i<npts; ++i)
+            {
+                if (std::abs(ricker[i]) > tolXmax)
+                {
+                    int ncopy = npts - i;
+                    std::copy(ricker+i, ricker+i+ncopy, work.begin());
+                    break;
+                }
+            }
+            std::fill(ricker, ricker+static_cast<size_t> (npts), 0);
+            std::copy(work.begin(), work.end(), ricker);
+        }
+        // Normalize the area energy in the signal
+        if (pImpl->mNormalize)
+        {
+            double area;
+            ippsNorm_L2_64f(ricker, npts, &area);
+            ippsDivC_64f_I(area, ricker, npts);
+        }
+        pImpl->mHaveWavelet = true;
     }
-    // Normalize the area energy in the signal
-    if (pImpl->mNormalize)
-    {
-        double area;
-        ippsNorm_L2_64f(ricker, npts, &area);
-        ippsDivC_64f_I(area, ricker, npts);
-    }
-    pImpl->mHaveWavelet = true;
     return pImpl->mRicker; 
 }
 
@@ -278,6 +288,7 @@ RickerWavelet::getWaveletFourierTransform() const
         if (!pImpl->mHaveDFT)
         {
             pImpl->mRickerDFT.resize(npts/2+1);
+            dft.initialize(npts);
             std::complex<double> *ptr = pImpl->mRickerDFT.data();
             dft.forwardTransform(npts, pImpl->mRicker.data(),
                                  npts/2+1, &ptr);

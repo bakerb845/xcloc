@@ -1,5 +1,6 @@
 #ifndef XCLOC_MESH_MESH_HPP
 #define XCLOC_MESH_MESH_HPP
+#include <memory>
 #include "xcloc/mesh/enums.hpp"
 namespace XCLoc::Mesh
 {
@@ -13,9 +14,25 @@ class IMesh
 {
 public:
     /*!
+     * @brief Ensures abstract base class can copy itself.
+     */
+    virtual std::unique_ptr<IMesh<T>> clone() const = 0;
+    /*!
      * @brief Default destructor.
      */
     virtual ~IMesh() = default;
+    /*!
+     * @brief Determines if the nodal scalar field is set.
+     * @param[in] fieldName  The name of the scalar field.
+     * @result True indicates that the field exists.
+     */
+    virtual bool haveNodalScalarField(const std::string &fieldName) const noexcept = 0;
+    /*!
+     * @brief Determines if the cell-based scalar field is set.
+     * @param[in] fieldName  The name of the scalar field.
+     * @result True indicates that the field exists.
+     */
+    virtual bool haveCellularScalarField(const std::string &fieldName) const noexcept = 0;
     /*!
      * @brief Gets a pointer to a nodal scalar field.
      * @param[in] fieldName  The name of the scalar field.
