@@ -234,7 +234,8 @@ std::vector<double> RickerWavelet::getWavelet() const
             double t = static_cast<double> (-npts2 + i)*dt;
             double t2 = t*t;
             double pi2f2t2 = pi2f2*t2;
-            pImpl->mRicker[i] = (1.0 - 2.0*pi2f2t2)*std::exp(-pi2f2t2);
+            // Make this negative so first motion is up
+            pImpl->mRicker[i] =-(1.0 - 2.0*pi2f2t2)*std::exp(-pi2f2t2);
             xmax = std::max(std::abs(pImpl->mRicker[i]), xmax);
         }
         // Shift the wavelet to the start of the trace - easier to work in

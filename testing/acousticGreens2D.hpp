@@ -73,23 +73,46 @@ public:
      * @param[in] vel   The seismic velocity in m/s.
      * @throws std::invalid_argument if vel is not positive.
      */ 
-    void setVelocity(const double vel);
+    void setVelocity(double vel);
     /*!
      * @brief Sets the whose spaces' density.
      * @param[in] density  The density in kg/m**3
      * @throws std::invalid_argument if density is not positive.
      */
-    void setDensity(const double density);
+    void setDensity(double density);
     /*!
      * @brief Sets the quality factor.
      * @param[in] q   The quality factor.
      * @throws std::invalid_argument if q is not positive.
      */
-    void setQualityFactor(const double q);
+    void setQualityFactor(double q);
+
+    /*!
+     * @brief Sets the receiver positions.
+     * @param[in] positions  The (x,y) positions (meters) of the receivers.
+     * @throws std::invalid_argument if positions.size() is 0.
+     */
+    void setReceiverPositions(const std::vector<std::pair<double, double>> &positions);
+    /*!
+     * @brief Sets the source position.
+     * @param[in] position  The (x,y) position (meters) of the source.
+     */
+    void setSourcePosition(const std::pair<double, double> &position) noexcept;
+                
     /*!
      * @brief Computes the Greens functions.
+     * @throws std::runtime_error if the velocicity, density, source time 
+     *         function, receiver positions, or source locations were not set.
      */
     void compute();
+    /*!
+     * @brief Gets the Green's function for the irec'th receiver.
+     * @param[in] irec
+     * @throws std::invalid_argument if irec is less than 0 or greater than or
+     *         equal to the number of receivers.
+     * @throws std::runtime_error if the Greens functions were not computed.
+     */
+    std::vector<double> getGreensFunction(int irec) const;
 private:
     class AcousticGreens2DImpl;
     std::unique_ptr<AcousticGreens2DImpl> pImpl;
