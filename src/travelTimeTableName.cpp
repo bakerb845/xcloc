@@ -66,6 +66,20 @@ TravelTimeTableName::operator=(TravelTimeTableName &tableName) noexcept
     return *this;
 }
 
+/// Destructor
+TravelTimeTableName::~TravelTimeTableName() = default;
+
+/// Resets the class
+void TravelTimeTableName::clear() noexcept
+{
+    pImpl->mNetwork.clear();
+    pImpl->mStation.clear();
+    pImpl->mPhase.clear();
+    pImpl->mHaveNetwork = false;
+    pImpl->mHaveStation = false;
+    pImpl->mHavePhase = false;
+}
+
 /// Network
 void TravelTimeTableName::setNetwork(const std::string &network) noexcept
 {
