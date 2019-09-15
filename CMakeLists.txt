@@ -103,6 +103,8 @@ set(LIBSRC
     src/correlogramDSM.cpp
     src/correlogramDSMParameters.cpp
     src/travelTimeTable.cpp
+    src/travelTimeTables.cpp
+    src/travelTimeTableName.cpp
     src/mesh/regularMesh2D.cpp
     src/mesh/regularMesh3D.cpp
     src/mesh/h5io.cpp

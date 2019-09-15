@@ -24,6 +24,9 @@ public:
     /*! @name Constructors
      * @{
      */
+    /*!
+     * @brief Constructor
+     */
     TravelTimeTable();
     /*!
      * @brief Copy constructor.
@@ -80,12 +83,6 @@ public:
      * @throws std::invalid_argument if the travel time field cannot be
      *         found or has no points.
      */
-/*
-    void setTravelTimeTable(const std::string &fieldName,
-                            const Mesh::RegularMesh3D<T> &mesh);
-    void setTravelTimeTable(const std::string &fieldName,
-                            const Mesh::RegularMesh2D<T> &mesh);
-*/
     void setTravelTimeTable(const std::string &fieldName,
                             const Mesh::IMesh<T> &mesh);
     /*!
