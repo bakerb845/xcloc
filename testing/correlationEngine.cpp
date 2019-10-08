@@ -8,6 +8,7 @@
 #include <ipps.h>
 #include <rtseis/utilities/transforms/dftRealToComplex.hpp>
 #include <rtseis/utilities/transforms/utilities.hpp>
+#include <rtseis/utilities/transforms/firEnvelope.hpp>
 #include "xcloc/correlograms.hpp"
 #include "xcloc/correlogramParameters.hpp"
 #include <gtest/gtest.h>
@@ -211,8 +212,13 @@ TEST(testCorrelograms, generalTest)
     parameters.setNumberOfSamples(nSamples);
     parameters.setNumberOfPaddedSamples(nPaddedSamples);
     parameters.setCorrelationPairs(nSignals, ldoAutoCorrelograms);
+    parameters.setFIREnvelopeFiltering(199); 
     EXPECT_TRUE(parameters.isValid());
     Correlograms<double> dcorr(parameters);
+    // Create a class to compute envelopes
+    RTSeis::Utilities::Transforms::FIREnvelope<double> envelope;
+    envelope.initialize(199,
+                        RTSeis::ProcessingMode::POST_PROCESSING);
     // Create an RNG
     std::random_device rndDevice;
     std::mt19937 mersenneEngine {rndDevice()};  // Generates random numbers 
@@ -232,6 +238,7 @@ TEST(testCorrelograms, generalTest)
     dcorr.computeCrossCorrelograms();
     // Compare
     int lenxc = dcorr.getCorrelogramLength();
+    std::vector<double> xcRefEnv(lenxc);
     int ixc = 0; 
     for (int i=0; i<nSignals; ++i)
     {
@@ -240,6 +247,7 @@ TEST(testCorrelograms, generalTest)
             auto xcPair = parameters.getCorrelationPair(ixc);
             auto xc1 = signals[xcPair.first];
             auto xc2 = signals[xcPair.second];
+            // Compute reference then compare raw correlogram
             auto xcRef = computeReferenceCorrelogram(nPaddedSamples,
                                                      xc1.data(), xc2.data(),
                                                      false);
@@ -247,6 +255,12 @@ TEST(testCorrelograms, generalTest)
             auto xcPtr = dcorr.getRawCorrelogramPointer(ixc);
             double error;
             ippsNormDiff_Inf_64f(xcPtr, xcRef.data(), lenxc, &error); 
+            EXPECT_LE(error, 1.e-10);
+            // Repeat for envelope
+            auto xcRefEnvPtr = xcRefEnv.data();
+            envelope.transform(lenxc, xcRef.data(), &xcRefEnvPtr); 
+            xcPtr = dcorr.getProcessedCorrelogramPointer(ixc);
+            ippsNormDiff_Inf_64f(xcPtr, xcRefEnvPtr, lenxc, &error);
             EXPECT_LE(error, 1.e-10);
             ixc = ixc + 1;
         }
@@ -270,6 +284,12 @@ TEST(testCorrelograms, generalTest)
             auto xcPtr = dcorr.getRawCorrelogramPointer(ixc);
             double error;
             ippsNormDiff_Inf_64f(xcPtr, xcRef.data(), lenxc, &error);
+            EXPECT_LE(error, 1.e-10);
+            // Repeat for envelope
+            auto xcRefEnvPtr = xcRefEnv.data();
+            envelope.transform(lenxc, xcRef.data(), &xcRefEnvPtr);
+            xcPtr = dcorr.getProcessedCorrelogramPointer(ixc);
+            ippsNormDiff_Inf_64f(xcPtr, xcRefEnvPtr, lenxc, &error);
             EXPECT_LE(error, 1.e-10);
             ixc = ixc + 1;
         }
