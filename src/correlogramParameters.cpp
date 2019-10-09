@@ -4,6 +4,7 @@
 #include <vector>
 #include <cassert>
 #include "xcloc/correlogramParameters.hpp"
+#include "xcloc/waveformIdentifier.hpp"
 #include "xcloc/enums.hpp"
 
 using namespace XCLoc;
@@ -12,7 +13,7 @@ class CorrelogramParameters::CorrelogramParametersImpl
 {
 public:
     /// Cross-correlation pairs
-    std::vector<std::pair<int,int>> mXCPairs;
+    std::vector<std::pair<WaveformIdentifier,WaveformIdentifier>> mXCPairs;
     /// Number of samples in each input signal
     int mSamples = 0;
     /// The number of samples to which to pad
@@ -102,6 +103,7 @@ int CorrelogramParameters::getNumberOfSamples() const
 }
 
 /// Creat a default correlation pairs table
+/*
 void CorrelogramParameters::setCorrelationPairs(
     const int nSignals, const bool ldoAutoCorrelations)
 {
@@ -146,9 +148,11 @@ void CorrelogramParameters::setCorrelationPairs(
     }
     setCorrelationPairs(xcPairs);
 }
+*/
 
 void CorrelogramParameters::setCorrelationPairs(
-    const std::vector<std::pair<int, int>> &xcPairs)
+    const std::vector<std::pair<WaveformIdentifier,
+                                WaveformIdentifier>> &xcPairs)
 {
     pImpl->mXCPairs.clear();
     if (xcPairs.size() < 1)
@@ -158,7 +162,7 @@ void CorrelogramParameters::setCorrelationPairs(
     pImpl->mXCPairs = xcPairs; 
 }
 
-std::vector<std::pair<int, int>>
+std::vector<std::pair<WaveformIdentifier, WaveformIdentifier>>
 CorrelogramParameters::getCorrelationPairs() const
 {
     if (pImpl->mXCPairs.empty())
@@ -168,7 +172,7 @@ CorrelogramParameters::getCorrelationPairs() const
     return pImpl->mXCPairs;
 }
 
-std::pair<int, int>
+std::pair<WaveformIdentifier, WaveformIdentifier>
 CorrelogramParameters::getCorrelationPair(const int ixc) const
 {
     auto nXCPairs = getNumberOfCorrelationPairs(); // throws
@@ -178,8 +182,7 @@ CorrelogramParameters::getCorrelationPair(const int ixc) const
                                   + " must be in range [0,"
                                   + std::to_string(nXCPairs-1) + "]\n");
     }
-    std::pair<int, int> result = pImpl->mXCPairs[ixc];
-    return result;
+    return pImpl->mXCPairs[ixc];
 }
 
 /// Number of correlation pairs

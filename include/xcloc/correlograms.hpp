@@ -5,6 +5,7 @@
 
 namespace XCLoc
 {
+class WaveformIdentifier;
 class CorrelogramParameters;
 /*!
  * @class Correlograms "correlationEngine.hpp" "xcloc/correlationEngine.hpp"
@@ -83,9 +84,9 @@ public:
      *         the waveform identifier does not exist.
      * @sa \c getInputSignalLength() \c isInitialized()
      */
-    void setInputSignal(int waveid, int nSamples, const double x[]);
+    void setInputSignal(int64_t waveid, int nSamples, const double x[]);
     /*! @copydoc setInputSignal */
-    void setInputSignal(int waveid, int nSamples, const float x[]);
+    void setInputSignal(int64_t waveid, int nSamples, const float x[]);
     /*!
      * @brief Sets all elements of the iw'th waveform to zero.  This is useful
      *        if the station is late or has a gap.
@@ -166,9 +167,10 @@ public:
      *        pair.
      * @param[in] ixc  The correlogram index.  This must be in the range of
      *                 [0, \c getNumberOfCorrelograms() - 1].
+     * @result The waveform identifiers comprising the ixc'th correlation.
      * @throws std::runtime_error if the class is not initialized.
      */
-    std::pair<int,int> getCorrelationPair(int ixc) const;
+    std::pair<WaveformIdentifier,WaveformIdentifier> getCorrelationPair(int ixc) const;
     /*! @} */
 
     /*! @name Properties

@@ -21,6 +21,7 @@ int omp_get_num_threads(){return 1;}
 #include <ipps.h>
 #include "xcloc/correlograms.hpp"
 #include "xcloc/correlogramParameters.hpp"
+#include "xcloc/waveformIdentifier.hpp"
 #include "rtseis/utilities/transforms/firEnvelope.hpp"
 
 using namespace XCLoc;
@@ -58,8 +59,8 @@ inline int padLength(const int n,
     return nptsPadded;
 }
 
-inline int getInputWaveformID(const int waveID,
-                              const std::vector<int> &signalMap,
+inline int getInputWaveformID(const int64_t waveID,
+                              const std::vector<int64_t> &signalMap,
                               const bool luseFastSignalMap)
 {
     if (luseFastSignalMap)
@@ -74,19 +75,25 @@ inline int getInputWaveformID(const int waveID,
         return waveID;
     }
     // Hunt for it
-    auto up = std::upper_bound(signalMap.begin(), signalMap.end(), waveID);
-    if (*up == waveID)
+    auto low = std::lower_bound(signalMap.begin(), signalMap.end(), waveID);
+    if (*low == waveID)
     {
-        return std::distance(signalMap.begin(), up);
+        return std::distance(signalMap.begin(), low);
     }
     else
     {
+        fprintf(stderr, "using linear search\n");
+        int index =-1;
+        for (int i=0; i<static_cast<int> (signalMap.size()); ++i)
+        {
+            if (signalMap[i] == waveID){return index;}
+        }
         throw std::invalid_argument("WaveID = " + std::to_string(waveID)
                                   + " not in signal map\n");
     }
 }
 
-bool useFastSignalMap(const std::vector<int> &signalMap)
+bool useFastSignalMap(const std::vector<int64_t> &signalMap)
 {
     int nsignals = static_cast<int> (signalMap.size());
     // If the unique elements are 0, 1, 2, ..., nsignals - 1 then I don't need
@@ -115,20 +122,30 @@ bool useFastSignalMap(const std::vector<int> &signalMap)
     return lUseFastSignalMap;
 }
 
-std::vector<int> 
-createSignalMap(const std::vector<std::pair<int, int>> &xcPairs)
+std::vector<int64_t>
+createSignalMap(
+    const std::vector<std::pair<WaveformIdentifier, WaveformIdentifier>> &xcPairs)
 {
     auto npairs = static_cast<int> (xcPairs.size());
-    std::vector<int> work(2*npairs+1);
+    // Extract the indices
+    std::vector<std::pair<int64_t, int64_t>> xcPairIDs(npairs);
     for (int i=0; i<npairs; ++i)
     {
-        work[2*i]   = xcPairs[i].first;
-        work[2*i+1] = xcPairs[i].second;
+        auto id1 = xcPairs[i].first.getWaveformIdentifier();
+        auto id2 = xcPairs[i].second.getWaveformIdentifier();
+        xcPairIDs[i] = std::make_pair(id1, id2);
+    }
+    // Now sort
+    std::vector<int64_t> work(2*npairs+1);
+    for (int i=0; i<npairs; ++i)
+    {
+        work[2*i]   = xcPairIDs[i].first;
+        work[2*i+1] = xcPairIDs[i].second;
     } 
     std::sort(work.begin(), work.begin() + 2*npairs);
     work[2*npairs] = work[0] - 1; // Trick to handle edge
     // Now create the signal map 
-    std::vector<int> signalMapWork;
+    std::vector<int64_t> signalMapWork;
     signalMapWork.reserve(2*npairs); 
     int nsignals = 0;
     for (int i=0; i<2*npairs; ++i)
@@ -147,8 +164,8 @@ createSignalMap(const std::vector<std::pair<int, int>> &xcPairs)
         i = j; // Start next iteration at mismatch
     }
     // Copy the elements I need from the signal map
-    std::vector<int> signalMap(signalMapWork.begin(),
-                               signalMapWork.begin() + nsignals);
+    std::vector<int64_t> signalMap(signalMapWork.begin(),
+                                   signalMapWork.begin() + nsignals);
 #ifdef DEBUG
     assert(std::is_sorted(signalMap.begin(), signalMap.end()));
 #endif
@@ -156,19 +173,22 @@ createSignalMap(const std::vector<std::pair<int, int>> &xcPairs)
 }
 
 std::vector<std::pair<int, int>>
-createCorrelationIndexPairs(const std::vector<std::pair<int, int>> &xcPairs,
-                            const std::vector<int> &signalMap,
-                            const bool luseFastSignalMap)
+createCorrelationIndexPairs(
+    const std::vector<std::pair<WaveformIdentifier, WaveformIdentifier>> &xcPairs,
+    const std::vector<int64_t> &signalMap,
+    const bool luseFastSignalMap)
 {
     int nxcs = static_cast<int> (xcPairs.size()); 
     std::vector<std::pair<int, int>> correlationIndexPairs(nxcs);
     for (int ixc=0; ixc<nxcs; ixc++)
     {
+        auto i1 = xcPairs[ixc].first.getWaveformIdentifier(); 
+        auto i2 = xcPairs[ixc].second.getWaveformIdentifier();
         // From the XC pairs get the input signal indices
-        int inputSignal1 = getInputWaveformID(xcPairs[ixc].first,
+        int inputSignal1 = getInputWaveformID(i1, //xcPairs[ixc].first,
                                               signalMap,
                                               luseFastSignalMap);
-        int inputSignal2 = getInputWaveformID(xcPairs[ixc].second,
+        int inputSignal2 = getInputWaveformID(i2, //xcPairs[ixc].second,
                                               signalMap,
                                               luseFastSignalMap);
         // Make the input signal indices a pair for internal usage
@@ -491,7 +511,7 @@ public:
     fftw_plan mInversePlan;
     /// Used in bisection search to map from a signal index to the
     /// local signal storage.
-    std::vector<int> mSignalMap;
+    std::vector<int64_t> mSignalMap;
     /// This is used internally to extract the (i,j)'th input signal 
     /// indices comprising a correlation pair.  This has dimension
     /// [mNumberOfCorrelograms].
@@ -611,7 +631,7 @@ void Correlograms<T>::initialize(const CorrelogramParameters &parameters)
 /// Set the input signal - double to double
 template<>
 void Correlograms<double>::setInputSignal(
-    const int waveID, const int nSamples, const double *__restrict__ x)
+    const int64_t waveID, const int nSamples, const double *__restrict__ x)
 {
     pImpl->mHaveCorrelograms = false;
     // Verify class is initialized
@@ -634,7 +654,7 @@ void Correlograms<double>::setInputSignal(
 /// Set the input signal - float to double
 template<>
 void Correlograms<double>::setInputSignal(
-    const int waveID, const int nSamples, const float x[])
+    const int64_t waveID, const int nSamples, const float x[])
 {
     pImpl->mHaveCorrelograms = false;
     // Verify class is initialized
@@ -691,6 +711,22 @@ void Correlograms<T>::computePhaseCorrelograms()
     constexpr bool mCrossCorrelate = false;
     if (!isInitialized()){throw std::runtime_error("Class not initialized\n");}
     pImpl->computeCorrelograms(mCrossCorrelate);
+}
+
+/// Gets the signal pairs comprising the correlogram 
+template<class T>
+std::pair<WaveformIdentifier, WaveformIdentifier>
+Correlograms<T>::getCorrelationPair(const int ixc) const
+{
+    auto nxc = getNumberOfCorrelograms(); // Throws on initialization
+    // Check that ixc is in range
+    if (ixc < 0 || ixc >= nxc)
+    {
+        throw std::invalid_argument("ixc = " + std::to_string(ixc)
+                                  + " must be in range [0,"
+                                  + std::to_string(nxc-1) + "]\n");
+    }
+    return pImpl->mParms.getCorrelationPair(ixc);
 }
 
 /// Get a correlogram

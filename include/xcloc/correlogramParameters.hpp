@@ -6,7 +6,7 @@
 
 namespace XCLoc
 {
-class CorrelogramParameters;
+class WaveformIdentifier;
 /*!
  * @class CorrelogramParameters "correlationEngineParameters.hpp" "xcloc/correlationEngineParameters.hpp"
  * @brief This defines the parameters for the cross-correlation engine.
@@ -109,7 +109,8 @@ public:
      * @throws std::invalid_argument if xcPairs.size() is less than 1.
      * @note This must be specified.
      */
-    void setCorrelationPairs(const std::vector<std::pair<int,int>> &xcPairs);
+    void setCorrelationPairs(const std::vector<std::pair<WaveformIdentifier, WaveformIdentifier>> &xcPairs);
+    //void setCorrelationPairs(const std::vector<std::pair<int,int>> &xcPairs);
     /*!
      * @brief Gets the number of correlation pairs.
      * @result The number of correlation pairs.
@@ -121,14 +122,16 @@ public:
      * @result The correlation pair table.
      * @throws std::invalid_argument if \c setCorrelationPairs was not called.
      */
-    std::vector<std::pair<int, int>> getCorrelationPairs() const;
+    std::vector<std::pair<WaveformIdentifier, WaveformIdentifier>> getCorrelationPairs() const;
+    //std::vector<std::pair<int, int>> getCorrelationPairs() const;
     /*!
      * @brief Gets the correlation pair for the ixc'th correlogram.
      * @param[in] ixc   The ixc'th correlogram.  This must be in the range
      *                  [0, \c getNumberOfCorrelationPairs() - 1].
      * @result The waveform ID's comprising the ixc'th correlation pair.
      */
-    std::pair<int, int> getCorrelationPair(const int ixc) const;
+    std::pair<WaveformIdentifier, WaveformIdentifier> getCorrelationPair(const int ixc) const;
+    //std::pair<int, int> getCorrelationPair(const int ixc) const;
     /*!
      * @brief Gets the unique signal IDs as defined in the correlation table.
      * @result A sorted list of unique signal IDs that are accounted for 
@@ -136,7 +139,7 @@ public:
      *         \c getNumberOfCorrelationPairs().
      * @throws std::runtime_error if \c setCorrelationPairs() was not called.
      */
-    std::vector<int> getUniqueSignalIDs() const;
+    std::vector<int64_t> getUniqueSignalIDs() const;
     /*! @} */
 
     /*! @name DFT zero padding length
