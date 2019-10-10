@@ -77,6 +77,19 @@ AcousticGreens2D::operator=(AcousticGreens2D &&greens) noexcept
 /// Destructor
 AcousticGreens2D::~AcousticGreens2D() = default;
 
+/// Clears/resets the class
+void AcousticGreens2D::clear() noexcept
+{
+    if (pImpl->mSTF){pImpl->mSTF.reset();}
+    pImpl->mSTF = nullptr;
+    pImpl->mReceiver.clear();
+    pImpl->mSource.clear();
+    pImpl->mGreens.clear();
+    pImpl->mVelocity = 0;
+    pImpl->mDensity = 0;
+    pImpl->mQ = 9999;
+}
+
 /// Set the source time function
 void AcousticGreens2D::setSourceTimeFunction(const ISourceTimeFunction &stf)
 {
@@ -94,6 +107,26 @@ bool AcousticGreens2D::haveSourceTimeFunction() const noexcept
 {
     if (pImpl->mSTF){return true;}
     return false;
+}
+
+/// Get the sampling rate
+double AcousticGreens2D::getSamplingRate() const
+{
+    if (!haveSourceTimeFunction())
+    {
+        throw std::runtime_error("Source time function not set\n");
+    }
+    return pImpl->mSTF->getSamplingRate();
+} 
+
+/// Gets the number of samples in a Green's function
+int AcousticGreens2D::getNumberOfSamples() const
+{
+    if (!haveSourceTimeFunction())
+    {
+        throw std::runtime_error("Source time function not set\n");
+    }
+    return pImpl->mSTF->getNumberOfSamples();
 }
 
 void AcousticGreens2D::setVelocity(const double vel)
@@ -147,6 +180,11 @@ void AcousticGreens2D::setSourcePosition(
     pImpl->mGreens.resize(0);
     pImpl->mSource.resize(1);
     pImpl->mSource[0] = position;
+}
+
+int AcousticGreens2D::getNumberOfGreensFunctions() const
+{
+    return static_cast<int> (pImpl->mReceiver.size());
 }
 
 /// Compute Green's functions

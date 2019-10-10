@@ -10,12 +10,13 @@ using namespace XCLoc;
 TEST(TravelTimeTables, name)
 {
     /// Test c'tor -> which calls subsidiary functions
-    TravelTimeTableName nameRef("FK", "STA1", "P");
+    TravelTimeTableName nameRef("FK", "STA1", "sP", "p");
     TravelTimeTableName name(nameRef);
     EXPECT_TRUE(name.isValid());
     EXPECT_EQ(name.getNetwork(), "FK");
     EXPECT_EQ(name.getStation(), "STA1");
-    EXPECT_EQ(name.getPhase(), "P");
+    EXPECT_EQ(name.getPhase(), "sP");
+    EXPECT_EQ(name.getPolarization(), "P");
 }
 
 

@@ -5,6 +5,7 @@
 
 namespace XCLoc
 {
+class TravelTimeTableName;
 template<class T> class Correlograms;
 template<class T> class TravelTimeTable;
 /*!
@@ -43,11 +44,11 @@ public:
      */
     /*!
      * @brief Adds a travel time.
-     * @param[in] waveformID  The waveform ID.
-     * @param[in] phase       The phase label for the table, e.g., P or S.
+     * @param[in] tableName   The travel time table name.
      * @param[in] table       The travel time table. 
+     * @throws std::invalid_argument if table name is invalid.
      */
-    void addTravelTimeTable(int waveformID, const std::string &phase,
+    void addTravelTimeTable(const TravelTimeTableName &tableName,
                             const TravelTimeTable<T> &table);
     /* @} */
 

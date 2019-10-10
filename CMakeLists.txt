@@ -105,6 +105,7 @@ set(LIBSRC
     src/travelTimeTable.cpp
     src/travelTimeTables.cpp
     src/travelTimeTableName.cpp
+    src/waveformIdentifier.cpp
     src/mesh/regularMesh2D.cpp
     src/mesh/regularMesh3D.cpp
     src/mesh/h5io.cpp
@@ -123,6 +124,8 @@ add_executable(testSerialLibrary
                testing/main.cpp
                testing/correlationEngine.cpp
                testing/mesh.cpp
+               testing/waveformIdentifier.cpp
+               testing/travelTimeTable.cpp
                testing/dsm.cpp
                testing/acousticGreens2D.cpp
                testing/rickerWavelet.cpp)

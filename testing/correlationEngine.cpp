@@ -11,6 +11,7 @@
 #include <rtseis/utilities/transforms/firEnvelope.hpp>
 #include "xcloc/correlograms.hpp"
 #include "xcloc/correlogramParameters.hpp"
+#include "xcloc/waveformIdentifier.hpp"
 #include <gtest/gtest.h>
 
 namespace
@@ -54,7 +55,7 @@ TEST(testCorrelograms, parameters)
     // still not initialized yet
     EXPECT_FALSE(parameters.isValid());
 
-    std::vector<std::pair<int, int>> xcPairs;
+    std::vector<std::pair<WaveformIdentifier, WaveformIdentifier>> xcPairs;
     for (int job=0; job<2; ++job)
     {
         bool ldoAutoCorr = false;
@@ -63,10 +64,25 @@ TEST(testCorrelograms, parameters)
         if (job == 1){iStart = 2;}
         for (int is=iStart; is<10; ++is)
         {
-            EXPECT_NO_THROW(parameters.setCorrelationPairs(is,
-                                                           ldoAutoCorr));
+            // Make the reference xcPairs
+            std::vector<std::pair<WaveformIdentifier, WaveformIdentifier>> ref;
+            for (int i=0; i<is; ++i)
+            {
+                for (int j=i; j<is; ++j)
+                {
+                    if (!ldoAutoCorr && j == i){continue;}
+                    if (!ldoAutoCorr && i == is - 1 && j == is - 1){continue;}
+                    WaveformIdentifier w1("UU", std::to_string(i), "P");
+                    WaveformIdentifier w2("UU", std::to_string(j), "P");
+                    ref.push_back(std::make_pair(w1, w2));
+                }
+            }
+            EXPECT_NO_THROW(parameters.setCorrelationPairs(ref));
+            //EXPECT_NO_THROW(parameters.setCorrelationPairs(is,
+            //                                               ldoAutoCorr));
             EXPECT_TRUE(parameters.isValid());
             EXPECT_NO_THROW(xcPairs = parameters.getCorrelationPairs());
+            EXPECT_EQ(xcPairs.size(), ref.size());
             int ixc = 0;
             for (int i=0; i<is; ++i) 
             {
@@ -74,8 +90,8 @@ TEST(testCorrelograms, parameters)
                 {
                     if (!ldoAutoCorr && j == i){continue;}
                     if (!ldoAutoCorr && i == is - 1 && j == is - 1){continue;}
-                    std::pair<int, int> xcPair;
-                    std::pair<int, int> refPair(i, j);
+                    std::pair<WaveformIdentifier, WaveformIdentifier> xcPair;
+                    auto refPair = ref[ixc]; //std::pair<int, int> refPair(i, j);
                     EXPECT_NO_THROW(xcPair = parameters.getCorrelationPair(ixc));
                     EXPECT_EQ(xcPairs[ixc].first,  refPair.first);
                     EXPECT_EQ(xcPairs[ixc].second, refPair.second);
@@ -107,7 +123,6 @@ TEST(testCorrelograms, parameters)
         EXPECT_EQ(xcPair.first,  xcPairs[i].first);
         EXPECT_EQ(xcPair.second, xcPairs[i].second);
     }
-
 }
 
 TEST(testCorrelograms, correlograms)
@@ -161,7 +176,26 @@ TEST(testCorrelograms, correlograms)
     CorrelogramParameters parameters;
     parameters.setNumberOfSamples(nSamples);
     parameters.setNumberOfPaddedSamples(nPaddedSamples);
-    parameters.setCorrelationPairs(nSignals, ldoAutoCorrelograms);
+    std::vector<WaveformIdentifier> waveid(nSignals);
+    for (int i=0; i<nSignals; ++i)
+    {
+        WaveformIdentifier id("UU", std::to_string(i), "P");
+        waveid[i] = id;
+    }
+    std::vector<std::pair<WaveformIdentifier, WaveformIdentifier>> xcPairs;
+    for (int i=0; i<nSignals; ++i)
+    {
+        for (int j=i; j<nSignals; ++j)
+        {
+            if (!ldoAutoCorrelograms && j == i){continue;}
+            if (!ldoAutoCorrelograms && i == nSignals - 1 && j == nSignals - 1)
+            {
+                continue;
+            }
+            xcPairs.push_back(std::make_pair(waveid[i], waveid[j]));
+        }
+    }
+    EXPECT_NO_THROW(parameters.setCorrelationPairs(xcPairs));//, ldoAutoCorrelograms);
     EXPECT_TRUE(parameters.isValid());
     // Create a correlation engine
     Correlograms<double> dcorr(parameters);
@@ -173,7 +207,8 @@ TEST(testCorrelograms, correlograms)
     for (int i=0; i<nSignals; ++i)
     {
         double *signalPtr = signals.data() + 10*i;
-        dcorr.setInputSignal(i, nSamples, signalPtr);
+        EXPECT_NO_THROW(dcorr.setInputSignal(waveid[i].getWaveformIdentifier(),
+                                             nSamples, signalPtr));
     }
     // Compute correlograms
     dcorr.computeCrossCorrelograms();
@@ -203,7 +238,7 @@ TEST(testCorrelograms, correlograms)
 
 TEST(testCorrelograms, generalTest)
 {
-    int nSignals = 5;
+    int nSignals = 9;
     int nSamples = 1000;
     int nPaddedSamples = 1024;
     bool ldoAutoCorrelograms = false;
@@ -211,7 +246,26 @@ TEST(testCorrelograms, generalTest)
     CorrelogramParameters parameters;
     parameters.setNumberOfSamples(nSamples);
     parameters.setNumberOfPaddedSamples(nPaddedSamples);
-    parameters.setCorrelationPairs(nSignals, ldoAutoCorrelograms);
+    std::vector<WaveformIdentifier> waveid(nSignals);
+    for (int i=0; i<nSignals; ++i)
+    {
+        WaveformIdentifier id("UU", std::to_string(i), "P");
+        waveid[i] = id;
+    }
+    std::vector<std::pair<WaveformIdentifier, WaveformIdentifier>> xcPairs;
+    for (int i=0; i<nSignals; ++i)
+    {
+        for (int j=i; j<nSignals; ++j)
+        {
+            if (!ldoAutoCorrelograms && j == i){continue;}
+            if (!ldoAutoCorrelograms && i == nSignals - 1 && j == nSignals - 1)
+            {
+                continue;
+            }
+            xcPairs.push_back(std::make_pair(waveid[i], waveid[j]));
+        }
+    }
+    parameters.setCorrelationPairs(xcPairs);//nSignals, ldoAutoCorrelograms);
     parameters.setFIREnvelopeFiltering(199); 
     EXPECT_TRUE(parameters.isValid());
     Correlograms<double> dcorr(parameters);
@@ -232,21 +286,32 @@ TEST(testCorrelograms, generalTest)
         std::vector<double> x(nPaddedSamples, 0);
         std::generate(x.begin(), x.begin()+nSamples, gen); 
         signals[i] = x;
-        dcorr.setInputSignal(i, nSamples, x.data());
+        EXPECT_NO_THROW(dcorr.setInputSignal(waveid[i].getWaveformIdentifier(),
+                                             nSamples, x.data()));
     }
     // Compute cross-correlations
     dcorr.computeCrossCorrelograms();
     // Compare
     int lenxc = dcorr.getCorrelogramLength();
     std::vector<double> xcRefEnv(lenxc);
-    int ixc = 0; 
+    int ixc = 0;
     for (int i=0; i<nSignals; ++i)
     {
         for (int j=i+1; j<nSignals; ++j)
         {
             auto xcPair = parameters.getCorrelationPair(ixc);
-            auto xc1 = signals[xcPair.first];
-            auto xc2 = signals[xcPair.second];
+            // Figure out the original signal index
+            int i1 =-1;
+            int i2 =-1;
+            for (int k=0; k<static_cast<int> (waveid.size()); ++k)
+            {
+                if (waveid[k] == xcPair.first){i1 = k;}
+                if (waveid[k] == xcPair.second){i2 = k;}
+            }
+            EXPECT_TRUE(i1 >= 0);
+            EXPECT_TRUE(i2 >= 0);
+            auto xc1 = signals[i1];//xcPair.first];
+            auto xc2 = signals[i2];//xcPair.second];
             // Compute reference then compare raw correlogram
             auto xcRef = computeReferenceCorrelogram(nPaddedSamples,
                                                      xc1.data(), xc2.data(),
@@ -275,8 +340,16 @@ TEST(testCorrelograms, generalTest)
         for (int j=i+1; j<nSignals; ++j)
         {
             auto xcPair = parameters.getCorrelationPair(ixc);
-            auto xc1 = signals[xcPair.first];
-            auto xc2 = signals[xcPair.second];
+            // Figure out the original signal index
+            int i1 =-1;
+            int i2 =-1;
+            for (int k=0; k<static_cast<int> (waveid.size()); ++k)
+            {
+                if (waveid[k] == xcPair.first){i1 = k;}
+                if (waveid[k] == xcPair.second){i2 = k;}
+            }
+            auto xc1 = signals[i1];//xcPair.first];
+            auto xc2 = signals[i2];//xcPair.second];
             auto xcRef = computeReferenceCorrelogram(nPaddedSamples,
                                                      xc1.data(), xc2.data(),
                                                      true);

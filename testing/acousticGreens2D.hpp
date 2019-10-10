@@ -57,6 +57,11 @@ public:
      */
     ~AcousticGreens2D();
     /*!
+     * @brief Resets the class and clears all memory.
+     */
+    void clear() noexcept;
+
+    /*!
      * @brief Sets the source time function.
      * @param[in] stf  A Ricker wavelet source time function.
      * @throws std::invalid_argument if the source time function is invalid.
@@ -67,7 +72,23 @@ public:
      * @result True indicates that the source time function was set.
      */
     bool haveSourceTimeFunction() const noexcept;
-
+    /*!
+     * @brief Gets the sampling rate that was defined when the source
+     *        time function was set.
+     * @result The sampling rate in Hz.
+     * @throws std::runtime_error if the source time function was not set.
+     * @sa \c haveSourcetimeFunction()
+     */
+    double getSamplingRate() const;
+    /*!
+     * @brief Gets the the number of samples in the Green's functions which
+     *        was defined when the source time function was set.
+     * @result The number of samples in the Green's functions.
+     * @throws std::runtime_error if the source time function was not set.
+     * @sa \c haveSourcetimeFunction()
+     */
+    int getNumberOfSamples() const;
+ 
     /*!
      * @brief Sets the whose spaces' acoustic velocity.
      * @param[in] vel   The seismic velocity in m/s.
@@ -113,6 +134,10 @@ public:
      * @throws std::runtime_error if the Greens functions were not computed.
      */
     std::vector<double> getGreensFunction(int irec) const;
+    /*!
+     * @brief Gets the number of Green's functions.
+     */
+    int getNumberOfGreensFunctions() const;
 private:
     class AcousticGreens2DImpl;
     std::unique_ptr<AcousticGreens2DImpl> pImpl;

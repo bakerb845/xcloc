@@ -40,10 +40,12 @@ public:
      * @param[in] network  The network code.
      * @param[in] station  The station code.
      * @param[in] phase    The phase name.
+     * @param[in] polarization  The polarization.  This can be "P" or "S".
      */
     TravelTimeTableName(const std::string &network,
                         const std::string &station,
-                        const std::string &phase); 
+                        const std::string &phase,
+                        const std::string &polarization); 
     /*! @} */
 
     /*! @name Operators
@@ -144,15 +146,55 @@ public:
     bool havePhase() const noexcept;
     /*! @} */
 
+    /*! @name Polarization
+     * @{
+     */
+    /*!
+     * @brief The polarization so that this travel time table can be tied to
+     *        the appropriate correlogram.  This can be P or S.
+     * @param[in] polarization  The polarization.
+     */
+    void setPolarization(const std::string &polarization) noexcept;
+    /*!
+     * @brief Gets the polarization.
+     * @result The polarization.
+     * @throws std::runtime_error if the polarization was not set.
+     * @sa \c havePhase()
+     */
+    std::string getPolarization() const;
+    /*!
+     * @brief Determines if polarizatin was set.
+     * @result True indicates that the polarization was set.
+     */
+    bool havePolarization() const noexcept;
+    /*! @} */
+
     /*!
      * @brief Determines if the network, station, and phase name are set.
-     * @result True indicates that the network, station, and phase name have
-     *         been set and this is a valid travel time table name.
+     * @result True indicates that the network, station, the phase name,
+     *         and polarization have been set and this is therefore a valid 
+     *         travel time table name.
      */
     bool isValid() const noexcept;
 private:
     class TravelTimeTableNameImpl;
     std::unique_ptr<TravelTimeTableNameImpl> pImpl;    
 };
+/*!
+ * @brief Determines if two table names are equivalent, i.e., lhs == rhs.
+ * @param[in] lhs  The left hand side in the equality test.
+ * @param[in] rhs  The right hand side in the equality test.
+ * @result True indicates that the two names are equivalent.
+ */
+bool operator==(const TravelTimeTableName &lhs, 
+                const TravelTimeTableName &rhs) noexcept;
+/*!
+ * @brief Determines if two table names are not equivalent, i.e., lhs != rhs.
+ * @param[in] lhs  The left hand side in the equality test.
+ * @param[in] rhs  The right hand side in the equality test.
+ * @result True indicates that the two names are not equivalent.
+ */
+bool operator!=(const TravelTimeTableName &lhs,
+                const TravelTimeTableName &rhs)  noexcept;
 }
 #endif

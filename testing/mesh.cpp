@@ -153,6 +153,11 @@ TEST(testMesh, regularMesh3D)
     EXPECT_EQ(static_cast<int> (nodeMax1.first),  -1);
     EXPECT_EQ(static_cast<int> (cellMin1.first),  -mesh.getNumberOfCells());
     EXPECT_EQ(static_cast<int> (cellMax1.first),  -1);
+    EXPECT_EQ(static_cast<int> (nodeMin1.second), mesh.getNumberOfGridPoints()-1);
+    EXPECT_EQ(static_cast<int> (nodeMax1.second), 0);
+    EXPECT_EQ(static_cast<int> (cellMin1.second), mesh.getNumberOfCells()-1);
+    EXPECT_EQ(static_cast<int> (cellMax1.second), 0);
+
     auto cellMin2 = mesh.getCellularScalarFieldMinValueAndIndex("cellTest2");
     auto cellMax2 = mesh.getCellularScalarFieldMaxValueAndIndex("cellTest2");
     auto nodeMin2 = mesh.getNodalScalarFieldMinValueAndIndex("nodalTest2");
@@ -162,10 +167,10 @@ TEST(testMesh, regularMesh3D)
     EXPECT_EQ(static_cast<int> (cellMin2.first),  1);
     EXPECT_EQ(static_cast<int> (cellMax2.first),  mesh.getNumberOfCells());
 
-printf("%f %d\n", cellMax1.first, cellMax1.second);
-printf("%f %d\n", cellMin1.first, cellMin1.second);
-printf("%f %d\n", nodeMax1.first, nodeMax1.second);
-printf("%f %d\n", nodeMin1.first, nodeMin1.second);
+    EXPECT_EQ(static_cast<int> (nodeMin2.second), 0);
+    EXPECT_EQ(static_cast<int> (nodeMax2.second), mesh.getNumberOfGridPoints()-1);
+    EXPECT_EQ(static_cast<int> (cellMin2.second), 0);
+    EXPECT_EQ(static_cast<int> (cellMax2.second), mesh.getNumberOfCells()-1);
 
     // Test copy
     RegularMesh3D meshCopy(mesh);

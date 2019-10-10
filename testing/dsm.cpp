@@ -8,8 +8,12 @@
 #include "xcloc/correlogramDSM.hpp"
 #include "xcloc/correlogramDSMParameters.hpp"
 #include "xcloc/correlograms.hpp"
+#include "xcloc/correlogramParameters.hpp"
 #include "xcloc/mesh/regularMesh2D.hpp"
+#include "xcloc/travelTimeTableName.hpp"
 #include "xcloc/travelTimeTable.hpp"
+#include "xcloc/travelTimeTables.hpp"
+#include "xcloc/waveformIdentifier.hpp"
 #include "acousticGreens2D.hpp"
 #include "rickerWavelet.hpp"
 #include <gtest/gtest.h>
@@ -17,7 +21,8 @@ namespace
 {
 using namespace XCLoc;
 
-AcousticGreens2D makeSimulation();
+void makeSimulation(AcousticGreens2D &greens, 
+                    TravelTimeTables<double> &tables);
 std::pair<TravelTimeTable<double>, TravelTimeTable<double>>
 createTravelTimeTable(const int nx, const double x0, const double x1,
                       const int ny, const double y0, const double y1,
@@ -52,18 +57,81 @@ TEST(CorrelogramDiffractionStackMigration, dsm)
     // Set DSM parameters
     CorrelogramDSMParameters parameters;
     parameters.setCacheBlockSize(2048); // Optional
+    // Create a 2D simulation
+    AcousticGreens2D greens;
+    TravelTimeTables<double> tables;
+    makeSimulation(greens, tables); 
     // Set correlograms parameters
-    Correlograms<double> correlograms;
-    // Create the diffraction stack migration
-    auto sim = makeSimulation(); 
+    CorrelogramParameters xcParms;
+    auto correlograms
+        = std::make_shared<Correlograms<double>> (Correlograms<double> ());
+    xcParms.setNumberOfSamples(greens.getNumberOfSamples());
+    const bool ldoAutoCorrelograms = false;
+    int nSignals = greens.getNumberOfGreensFunctions();
+    std::vector<WaveformIdentifier> waveids(nSignals);
+    for (int is=0; is<nSignals; ++is)
+    {
+        const std::string network = "FK";
+        const std::string station = "ST" + std::to_string(is+1);
+        const std::string polarization = "P";
+        WaveformIdentifier waveformID(network, station, polarization);
+        waveids[is] = waveformID;
+    }
+    // Create the cross-correlation table
+    std::vector<std::pair<WaveformIdentifier, WaveformIdentifier>> xcPairs;
+    for (int i=0; i<nSignals; ++i)
+    {
+        for (int j=0; j<nSignals; ++j)
+        {
+            if (!ldoAutoCorrelograms && j == i){continue;}
+            if (!ldoAutoCorrelograms && i == nSignals - 1 && j == nSignals - 1)
+            {
+                continue;
+            }
+            xcPairs.push_back(std::make_pair(waveids[i], waveids[j]));
+       }
+    }
+    xcParms.setCorrelationPairs(xcPairs); //nSignals, ldoAutoCorrelograms);
+    xcParms.setFIREnvelopeFiltering(101);
+    correlograms->initialize(xcParms);
+    // Create the DSM tool
+    CorrelogramDiffractionStackMigration<double> dsm;
+    EXPECT_NO_THROW(dsm.setCorrelograms(correlograms));
+    EXPECT_TRUE(dsm.haveCorrelogramPointer());
+    EXPECT_NO_THROW(dsm.setCorrelogramSamplingRate(greens.getSamplingRate()));
+    // Set the travel time tables
+    for (int is=0; is<nSignals; ++is)
+    {
+        const std::string phase = "P";
+        TravelTimeTableName tableName(waveids[is].getNetwork(), 
+                                      waveids[is].getStation(),
+                                      phase,
+                                      waveids[is].getPolarization());
+        auto table = tables.getTable(tableName);
+        dsm.addTravelTimeTable(tableName, table);
+    }
+    EXPECT_NO_THROW(dsm.createMigrationTables());
+    // Set the signals
+    for (int is=0; is<nSignals; ++is)
+    {
+        auto gf = greens.getGreensFunction(is);
+        correlograms->setInputSignal(is, gf.size(), gf.data()); 
+    }
+    // Compute the correlograms - the shared pointer means they are immediately
+    // available for migration
+    correlograms->computePhaseCorrelograms();
+    // Migrate
+ 
 }
 
 /// Make a simulation consisting of 10 stations randomly distributed on a 2D
 /// grid.
-AcousticGreens2D makeSimulation()
+void makeSimulation(AcousticGreens2D &greens,
+                    TravelTimeTables<double> &tables)
 {
     int nrec = 10;
     double vp = 4500;    // Vp velocity
+    double vs = vp/1.73; // Vs velocity
     double Qp = 600;     // Quality factor
     double rho = 2700;   // Density
     // Model width
@@ -93,7 +161,7 @@ AcousticGreens2D makeSimulation()
     wavelet.setNormalizeByEnergy(false);
     EXPECT_EQ(npts,  wavelet.getNumberOfSamples());
     // Green's functions
-    AcousticGreens2D greens;
+    greens.clear();
     greens.setSourceTimeFunction(wavelet);
     greens.setVelocity(vp);
     greens.setDensity(rho);
@@ -101,17 +169,26 @@ AcousticGreens2D makeSimulation()
     greens.setSourcePosition(sourcePosition);
     greens.setReceiverPositions(receiverPositions); 
     greens.compute();
-    // Travel time tables
+    // Create travel time tables and add them
+    tables.clear();
     for (int i=0; i<static_cast<int> (receiverPositions.size()); ++i)
     {
         auto xRec = receiverPositions[i].first;
         auto yRec = receiverPositions[i].second;
         auto pstable = createTravelTimeTable(nx, x0, x1,
                                              ny, y0, y1,
-                                             vp, vp/1.73,
+                                             vp, vs,
                                              xRec, yRec);
+        // Add table
+        const std::string network = "FK";
+        const std::string station = "ST" + std::to_string(i+1);
+        const std::string phase = "P";
+        const std::string polarization = "P";
+        TravelTimeTableName tableName(network, station, polarization, phase);
+        tables.addTable(tableName, pstable.first);
+        EXPECT_TRUE(tables.haveTable(tableName));
     }
-
+/*
 FILE *fout = fopen("greens.txt", "w");
 for (int irec=0; irec<nrec; ++irec)
 {
@@ -123,6 +200,7 @@ for (int irec=0; irec<nrec; ++irec)
  fprintf(fout, "\n");
 }
 fclose(fout);
+*/
 /*
 auto stf = wavelet.getWavelet();
 FILE *fout = fopen("stf.txt", "w");
@@ -146,8 +224,6 @@ for (auto s : wstf)
 }
 fclose(fout);
 */
-
-    return greens;
 }
 
 std::pair<TravelTimeTable<double>, TravelTimeTable<double>>
